@@ -1,0 +1,6 @@
+{
+  "name": "RESERVE",
+  "description": "Sistema escolar de agendamento e reserva da Sala de Informática e Laboratórios com autenticação Google e controle de administradores e professores.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
