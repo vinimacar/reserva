@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ReservationProvider, useReservations } from './context/ReservationContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -16,12 +16,14 @@ import { ReservationModal } from './components/ReservationModal';
 import { ReservationDetailsModal } from './components/ReservationDetailsModal';
 import { ReservationReceiptModal } from './components/ReservationReceiptModal';
 import { GoogleLoginModal } from './components/GoogleLoginModal';
+import { SchoolSetupModal } from './components/SchoolSetupModal';
+import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { Reservation } from './types';
 import { Plus, Shield, Calendar, Layers, Sparkles, School, AlertCircle } from 'lucide-react';
 
 function ReserveAppContent() {
   const { currentUser, isAdmin } = useAuth();
-  const { announcements } = useReservations();
+  const { announcements, settings } = useReservations();
 
   // Navigation View State
   const [currentView, setCurrentView] = useState<
@@ -31,6 +33,13 @@ function ReserveAppContent() {
   // Modals state
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isGoogleLoginModalOpen, setIsGoogleLoginModalOpen] = useState(false);
+  const [isUserRegistrationModalOpen, setIsUserRegistrationModalOpen] = useState(false);
+  const [isSchoolSetupModalOpen, setIsSchoolSetupModalOpen] = useState<boolean>(() => {
+    // If not configured in settings and not saved in localStorage, open on first use
+    const isConfiguredInStorage = localStorage.getItem('reserve_school_configured');
+    return !settings.isConfigured && !isConfiguredInStorage;
+  });
+
   const [selectedSlotData, setSelectedSlotData] = useState<{
     roomId?: string;
     date?: string;
@@ -38,6 +47,14 @@ function ReserveAppContent() {
   }>({});
   const [viewingReservation, setViewingReservation] = useState<Reservation | null>(null);
   const [receiptReservation, setReceiptReservation] = useState<Reservation | null>(null);
+
+  // Check if school setup is required on mount or if settings change
+  useEffect(() => {
+    const isConfiguredInStorage = localStorage.getItem('reserve_school_configured');
+    if (!settings.isConfigured && !isConfiguredInStorage) {
+      setIsSchoolSetupModalOpen(true);
+    }
+  }, [settings.isConfigured]);
 
   // Handlers
   const handleOpenSlotBooking = (roomId: string, date: string, periodId: string) => {
@@ -58,7 +75,7 @@ function ReserveAppContent() {
     setReceiptReservation(reservation);
   };
 
-  const criticalAnnouncements = announcements.filter((a) => a.important);
+  const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
   return (
     <div className="min-h-screen bg-slate-100/90 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -75,6 +92,8 @@ function ReserveAppContent() {
         onOpenNewReservation={handleOpenNewReservationGeneral}
         onOpenGoogleLogin={() => setIsGoogleLoginModalOpen(true)}
         onOpenAnnouncements={() => setCurrentView('ANNOUNCEMENTS')}
+        onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
+        onOpenRegisterTeacher={() => setIsUserRegistrationModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -99,6 +118,7 @@ function ReserveAppContent() {
           <AdminPanel
             onSelectReservation={handleSelectReservation}
             onOpenReceipt={handleOpenReceipt}
+            onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
           />
         )}
 
@@ -114,7 +134,7 @@ function ReserveAppContent() {
             <School className="w-4 h-4 text-blue-400" />
             <span className="font-bold text-white">RESERVE</span>
             <span className="text-slate-500">•</span>
-            <span>Sistema Escolar de Agendamento de Salas e Laboratórios</span>
+            <span>{settings.schoolName}</span>
           </div>
 
           <div className="flex items-center space-x-4 text-[11px]">
@@ -126,6 +146,12 @@ function ReserveAppContent() {
       </footer>
 
       {/* Modals */}
+      <SchoolSetupModal
+        isOpen={isSchoolSetupModalOpen}
+        onClose={() => setIsSchoolSetupModalOpen(false)}
+        isFirstTime={isFirstTimeSetup}
+      />
+
       <ReservationModal
         isOpen={isReservationModalOpen}
         onClose={() => setIsReservationModalOpen(false)}
@@ -150,10 +176,19 @@ function ReserveAppContent() {
       <GoogleLoginModal
         isOpen={isGoogleLoginModalOpen}
         onClose={() => setIsGoogleLoginModalOpen(false)}
+        onOpenRegister={() => {
+          setIsGoogleLoginModalOpen(false);
+          setIsUserRegistrationModalOpen(true);
+        }}
+      />
+
+      <UserRegistrationModal
+        isOpen={isUserRegistrationModalOpen}
+        onClose={() => setIsUserRegistrationModalOpen(false)}
       />
     </div>
   );
-}
+};
 
 export default function App() {
   return (

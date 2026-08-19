@@ -26,63 +26,81 @@ export const AnnouncementsView: React.FC<{ onOpenNewReservation: () => void }> =
 
       {/* Announcements List */}
       <div className="space-y-3">
-        {announcements.map((ann) => {
-          const targetRoom = rooms.find((r) => r.id === ann.targetRoomId);
-
-          return (
-            <div
-              key={ann.id}
-              className={`bg-white dark:bg-slate-900 rounded-2xl p-5 border transition-all shadow-xs ${
-                ann.important
-                  ? 'border-amber-300 dark:border-amber-800 ring-1 ring-amber-300 dark:ring-amber-800/80 bg-amber-50/20 dark:bg-amber-950/20'
-                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center space-x-2">
-                  {ann.important ? (
-                    <span className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="w-4 h-4" />
-                    </span>
-                  ) : (
-                    <span className="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 flex items-center justify-center shrink-0">
-                      <Info className="w-4 h-4" />
-                    </span>
-                  )}
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{ann.title}</h3>
-                </div>
-
-                <div className="flex items-center space-x-2 shrink-0">
-                  {ann.important && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800 uppercase">
-                      Importante
-                    </span>
-                  )}
-                  {targetRoom && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      {targetRoom.name}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-700 dark:text-slate-300 mt-2.5 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                {ann.content}
-              </p>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center space-x-1.5">
-                  <User className="w-3.5 h-3.5" />
-                  <span>Publicado por: <strong className="text-slate-600 dark:text-slate-300">{ann.author}</strong></span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>{ann.date}</span>
-                </div>
-              </div>
+        {announcements.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 text-center border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle className="w-7 h-7" />
             </div>
-          );
-        })}
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Nenhum Comunicado Ativo</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+              Todas as salas de informática e laboratórios estão funcionando normalmente e disponíveis para agendamento.
+            </p>
+            <button
+              onClick={onOpenNewReservation}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              Agendar uma Sala / Laboratório
+            </button>
+          </div>
+        ) : (
+          announcements.map((ann) => {
+            const targetRoom = rooms.find((r) => r.id === ann.targetRoomId);
+
+            return (
+              <div
+                key={ann.id}
+                className={`bg-white dark:bg-slate-900 rounded-2xl p-5 border transition-all shadow-xs ${
+                  ann.important
+                    ? 'border-amber-300 dark:border-amber-800 ring-1 ring-amber-300 dark:ring-amber-800/80 bg-amber-50/20 dark:bg-amber-950/20'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center space-x-2">
+                    {ann.important ? (
+                      <span className="w-7 h-7 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="w-7 h-7 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 flex items-center justify-center shrink-0">
+                        <Info className="w-4 h-4" />
+                      </span>
+                    )}
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{ann.title}</h3>
+                  </div>
+
+                  <div className="flex items-center space-x-2 shrink-0">
+                    {ann.important && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800 uppercase">
+                        Importante
+                      </span>
+                    )}
+                    {targetRoom && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        {targetRoom.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-700 dark:text-slate-300 mt-2.5 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  {ann.content}
+                </p>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center space-x-1.5">
+                    <User className="w-3.5 h-3.5" />
+                    <span>Publicado por: <strong className="text-slate-600 dark:text-slate-300">{ann.author}</strong></span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{ann.date}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

@@ -39,6 +39,9 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   const { currentUser, isAdmin } = useAuth();
   const [cancelReason, setCancelReason] = useState<string>('');
   const [showCancelPrompt, setShowCancelPrompt] = useState<boolean>(false);
+  const [showDeletePrompt, setShowDeletePrompt] = useState<boolean>(false);
+  const [showRejectPrompt, setShowRejectPrompt] = useState<boolean>(false);
+  const [rejectReason, setRejectReason] = useState<string>('Horário indisponível');
 
   if (!isOpen || !reservation) return null;
 
@@ -53,10 +56,9 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   };
 
   const handleDelete = () => {
-    if (window.confirm('Tem certeza que deseja excluir permanentemente esta reserva?')) {
-      deleteReservation(reservation.id);
-      onClose();
-    }
+    deleteReservation(reservation.id);
+    setShowDeletePrompt(false);
+    onClose();
   };
 
   const handleApprove = () => {
@@ -65,8 +67,8 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   };
 
   const handleReject = () => {
-    const reason = prompt('Informe o motivo da recusa:') || 'Horário indisponível';
-    rejectReservation(reservation.id, reason);
+    rejectReservation(reservation.id, rejectReason || 'Horário indisponível');
+    setShowRejectPrompt(false);
     onClose();
   };
 
@@ -256,6 +258,65 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
             </div>
           )}
 
+          {/* Delete prompt dialog */}
+          {showDeletePrompt && (
+            <div className="p-4 bg-red-50 dark:bg-red-950/40 rounded-2xl border border-red-200 dark:border-red-800 space-y-2 animate-in fade-in duration-150">
+              <p className="font-bold text-red-900 dark:text-red-200 text-xs">Excluir Permanentemente esta Reserva?</p>
+              <p className="text-[11px] text-red-700 dark:text-red-300">
+                Esta ação apagará permanentemente o registro da reserva do histórico da escola.
+              </p>
+              <div className="flex justify-end space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowDeletePrompt(false)}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow cursor-pointer"
+                >
+                  Confirmar Exclusão
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Reject prompt dialog */}
+          {showRejectPrompt && (
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-800 space-y-2 animate-in fade-in duration-150">
+              <p className="font-bold text-amber-900 dark:text-amber-200 text-xs">Recusar Solicitação de Reserva?</p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                Informe o motivo da recusa para notificar o professor solicitante.
+              </p>
+              <input
+                type="text"
+                placeholder="Ex: Horário indisponível para manutenção ou duplicidade..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="w-full p-2 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs focus:ring-2 focus:ring-amber-500"
+              />
+              <div className="flex justify-end space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowRejectPrompt(false)}
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow cursor-pointer"
+                >
+                  Confirmar Recusa
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Cancel prompt dialog */}
           {showCancelPrompt && (
             <div className="p-4 bg-red-50 dark:bg-red-950/40 rounded-2xl border border-red-200 dark:border-red-800 space-y-2 animate-in fade-in duration-150">
@@ -272,14 +333,16 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
               />
               <div className="flex justify-end space-x-2 pt-1">
                 <button
+                  type="button"
                   onClick={() => setShowCancelPrompt(false)}
-                  className="px-3 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 cursor-pointer"
                 >
                   Voltar
                 </button>
                 <button
+                  type="button"
                   onClick={handleCancel}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow cursor-pointer"
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow cursor-pointer"
                 >
                   Sim, Cancelar
                 </button>
@@ -304,7 +367,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
 
             {isAdmin && (
               <button
-                onClick={handleDelete}
+                onClick={() => setShowDeletePrompt(true)}
                 className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors cursor-pointer"
                 title="Excluir Permanentemente (Admin)"
               >
@@ -314,10 +377,10 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
           </div>
 
           <div className="flex items-center space-x-2">
-            {isAdmin && reservation.status === 'PENDING' && (
+            {isAdmin && reservation.status === 'PENDING' && !showRejectPrompt && (
               <>
                 <button
-                  onClick={handleReject}
+                  onClick={() => setShowRejectPrompt(true)}
                   className="px-3.5 py-2 rounded-xl bg-red-100 dark:bg-red-950 hover:bg-red-200 dark:hover:bg-red-900 text-red-800 dark:text-red-200 font-bold text-xs transition-colors cursor-pointer"
                 >
                   Recusar

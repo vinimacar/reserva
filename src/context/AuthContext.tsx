@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { DEFAULT_USERS } from '../data/initialData';
+import { detectGenderFromName, getDefaultAvatar } from '../data/avatars';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -12,7 +13,10 @@ interface AuthContextType {
   loginWithGoogleEmail: (email: string, name?: string) => User;
   toggleRole: () => void;
   updateUserRole: (userId: string, newRole: UserRole) => void;
-  addUser: (user: Partial<User>) => User;
+  addUser: (user: Partial<User>, autoLogin?: boolean) => User;
+  updateUser: (userId: string, data: Partial<User>) => void;
+  deleteUser: (userId: string) => void;
+  updateSchoolNameForAllUsers: (schoolName: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,17 +24,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY_USER = 'reserve_school_current_user';
 const STORAGE_KEY_USERS = 'reserve_school_users_list';
 
+// Helper to normalize user avatar and gender
+function normalizeUser(u: User): User {
+  const gender = u.gender || detectGenderFromName(u.name);
+  let avatar = u.avatar;
+  // If Vinicius had the previous mismatched image, fix it
+  if (u.id === 'user_vinicius' && avatar.includes('534528741775')) {
+    avatar = 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&auto=format&fit=crop&q=80';
+  } else if (!avatar) {
+    avatar = getDefaultAvatar(gender, u.name);
+  }
+  return {
+    ...u,
+    gender,
+    avatar,
+  };
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USERS);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: User[] = JSON.parse(saved);
+        return parsed.map(normalizeUser);
       }
     } catch {
       // ignore
     }
-    return DEFAULT_USERS;
+    return DEFAULT_USERS.map(normalizeUser);
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -38,13 +60,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem(STORAGE_KEY_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed;
+        return normalizeUser(parsed);
       }
     } catch {
       // ignore
     }
     // Default to the school administrator (Prof. Vinicius)
-    return DEFAULT_USERS[0];
+    return normalizeUser(DEFAULT_USERS[0]);
   });
 
   useEffect(() => {
@@ -88,12 +110,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email.toLowerCase().includes('coordenacao');
 
     const generatedName = name || email.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    const gender = detectGenderFromName(generatedName);
 
     const newUser: User = {
       id: `user_${Date.now()}`,
       name: generatedName,
       email: email.toLowerCase(),
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(email)}`,
+      avatar: getDefaultAvatar(gender, generatedName),
+      gender: gender,
       role: isAdminEmail ? 'ADMIN' : 'TEACHER',
       subject: 'Docente Convidado',
       schoolName: 'E.E. Governador Milton Campos',
@@ -128,18 +152,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  const addUser = (userData: Partial<User>): User => {
+  const addUser = (userData: Partial<User>, autoLogin: boolean = true): User => {
+    // Check if user with this email already exists
+    const existingIndex = users.findIndex(
+      (u) => userData.email && u.email.toLowerCase() === userData.email.toLowerCase()
+    );
+
+    if (existingIndex >= 0) {
+      const updatedUser: User = {
+        ...users[existingIndex],
+        ...userData,
+        name: userData.name || users[existingIndex].name,
+      };
+      const newUsers = [...users];
+      newUsers[existingIndex] = updatedUser;
+      setUsers(newUsers);
+      if (autoLogin) {
+        setCurrentUser(updatedUser);
+      }
+      return updatedUser;
+    }
+
+    const rawName = userData.name || 'Novo Professor';
+    const detectedGender = userData.gender || detectGenderFromName(rawName);
+    const chosenAvatar = userData.avatar || getDefaultAvatar(detectedGender, rawName);
+
     const newUser: User = {
-      id: `user_${Date.now()}`,
-      name: userData.name || 'Novo Professor',
+      id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      name: rawName,
       email: userData.email || `professor_${Date.now()}@educacao.mg.gov.br`,
-      avatar: userData.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userData.name || 'prof')}`,
+      gender: detectedGender,
+      avatar: chosenAvatar,
       role: userData.role || 'TEACHER',
       subject: userData.subject || 'Geral',
-      schoolName: userData.schoolName || 'E.E. Governador Milton Campos',
+      schoolName: userData.schoolName || currentUser?.schoolName || 'E.E. Governador Milton Campos',
     };
-    setUsers((prev) => [...prev, newUser]);
+
+    const updatedUsers = [...users, newUser];
+    setUsers(updatedUsers);
+    if (autoLogin) {
+      setCurrentUser(newUser);
+    }
     return newUser;
+  };
+
+  const updateUser = (userId: string, data: Partial<User>) => {
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === userId) {
+          const updated = { ...u, ...data };
+          if (currentUser && currentUser.id === userId) {
+            setCurrentUser(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
+  };
+
+  const deleteUser = (userId: string) => {
+    // Prevent deleting if it's the last user
+    if (users.length <= 1) return;
+
+    setUsers((prev) => {
+      const filtered = prev.filter((u) => u.id !== userId);
+      return filtered;
+    });
+
+    if (currentUser && currentUser.id === userId) {
+      const remaining = users.filter((u) => u.id !== userId);
+      if (remaining.length > 0) {
+        setCurrentUser(remaining[0]);
+      } else {
+        setCurrentUser(null);
+      }
+    }
+  };
+
+  const updateSchoolNameForAllUsers = (schoolName: string) => {
+    setUsers((prev) =>
+      prev.map((u) => ({
+        ...u,
+        schoolName,
+      }))
+    );
+    if (currentUser) {
+      setCurrentUser((prev) => (prev ? { ...prev, schoolName } : null));
+    }
   };
 
   return (
@@ -155,6 +255,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toggleRole,
         updateUserRole,
         addUser,
+        updateUser,
+        deleteUser,
+        updateSchoolNameForAllUsers,
       }}
     >
       {children}

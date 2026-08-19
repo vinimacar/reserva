@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  AlertCircle,
   Download,
   Printer,
   Calendar,
@@ -22,15 +23,26 @@ import {
   Bell,
   RefreshCw,
   Sparkles,
+  School,
+  Building2,
+  Mail,
+  Phone,
+  UserPlus,
+  UserCheck,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
-import { Room, SpaceType, Reservation, UserRole } from '../types';
+import { useTheme } from '../context/ThemeContext';
+import { Room, SpaceType, Reservation, UserRole, User } from '../types';
+import { UserRegistrationModal } from './UserRegistrationModal';
 
 export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
   onOpenReceipt: (r: Reservation) => void;
-}> = ({ onSelectReservation, onOpenReceipt }) => {
+  onOpenSchoolSettings?: () => void;
+}> = ({ onSelectReservation, onOpenReceipt, onOpenSchoolSettings }) => {
   const {
     reservations,
     rooms,
@@ -42,15 +54,20 @@ export const AdminPanel: React.FC<{
     approveReservation,
     rejectReservation,
     cancelReservation,
+    clearAllReservations,
     addAnnouncement,
     deleteAnnouncement,
+    clearAllAnnouncements,
     updateSettings,
     getRoomStats,
     getTeacherStats,
+    clearSystemForProduction,
+    loadDemoSampleData,
     resetToDefaultData,
   } = useReservations();
 
-  const { users, currentUser, updateUserRole, addUser } = useAuth();
+  const { users, currentUser, updateUserRole, addUser, deleteUser } = useAuth();
+  const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
     'BOOKINGS' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
@@ -61,9 +78,26 @@ export const AdminPanel: React.FC<{
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchBooking, setSearchBooking] = useState<string>('');
 
-  // Room modal state
+  // Room modal & delete state
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState<boolean>(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
   const [newRoomForm, setNewRoomForm] = useState<Partial<Room>>({
     name: '',
     type: 'INFORMATICA',
@@ -168,11 +202,19 @@ export const AdminPanel: React.FC<{
     });
     setAnnTitle('');
     setAnnContent('');
-    alert('Aviso publicado no mural da escola com sucesso!');
+    showToast('Aviso publicado no mural da escola com sucesso!');
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center space-x-2 text-xs font-bold animate-in slide-in-from-bottom-5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Admin Header Banner */}
       <div className="bg-slate-900 dark:bg-slate-900 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
@@ -192,8 +234,29 @@ export const AdminPanel: React.FC<{
           </div>
         </div>
 
-        {/* Quick CSV Export */}
+        {/* Top Header Actions */}
         <div className="flex items-center space-x-2.5">
+          {reservations.length > 0 && (
+            <button
+              onClick={() => {
+                setConfirmModal({
+                  title: 'Limpar Reservas de Teste?',
+                  message: 'Deseja limpar todas as reservas para iniciar o lançamento dos dados definitivos da escola?',
+                  confirmLabel: 'Sim, Limpar Reservas',
+                  isDestructive: true,
+                  onConfirm: () => {
+                    clearAllReservations();
+                    showToast('Todas as reservas foram limpas com sucesso! A grade está pronta.');
+                  },
+                });
+              }}
+              className="flex items-center space-x-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/80 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>Limpar Reservas de Teste</span>
+            </button>
+          )}
+
           <button
             onClick={handleExportCSV}
             className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
@@ -348,8 +411,22 @@ export const AdminPanel: React.FC<{
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredReservations.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
-                        Nenhuma reserva encontrada com os filtros selecionados.
+                      <td colSpan={6} className="p-10 text-center text-slate-500 dark:text-slate-400">
+                        {reservations.length === 0 ? (
+                          <div className="max-w-md mx-auto space-y-2">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                              <CheckCircle2 className="w-6 h-6" />
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                              Sistema Limpo para Lançamentos Definitivos
+                            </h4>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              Nenhuma reserva pendente ou anterior cadastrada. A grade de horários está pronta para receber os agendamentos reais dos professores.
+                            </p>
+                          </div>
+                        ) : (
+                          'Nenhuma reserva encontrada com os filtros selecionados.'
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -501,24 +578,37 @@ export const AdminPanel: React.FC<{
                     {room.location} • {room.capacity} Lugares
                   </p>
 
+                  <p className="text-xs text-blue-700 dark:text-blue-300 font-semibold mt-1 flex items-center gap-1 bg-blue-50/70 dark:bg-blue-950/40 px-2 py-1 rounded-lg border border-blue-100 dark:border-blue-900/50">
+                    <UserCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    Responsável: {room.responsibleName || 'Coordenação'}
+                  </p>
+
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 line-clamp-2 bg-slate-50 dark:bg-slate-800/60 p-2 rounded-lg">
                     {room.description}
                   </p>
 
                   {/* Equipment chips */}
                   <div className="mt-2.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Equipamentos ({room.equipment.length})</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Equipamentos ({room.equipment?.length || 0})</p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {room.equipment.slice(0, 3).map((eq, i) => (
+                      {room.equipment && room.equipment.slice(0, 3).map((eq, i) => (
                         <span key={i} className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded">
                           {eq}
                         </span>
                       ))}
-                      {room.equipment.length > 3 && (
+                      {room.equipment && room.equipment.length > 3 && (
                         <span className="text-[10px] text-slate-400 font-bold">+{room.equipment.length - 3}</span>
                       )}
                     </div>
                   </div>
+
+                  {/* Rules count */}
+                  {room.rules && room.rules.length > 0 && (
+                    <div className="mt-2 text-[10px] text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-500" />
+                      <span>{room.rules.length} normas de utilização cadastradas</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -527,6 +617,7 @@ export const AdminPanel: React.FC<{
                       updateRoom(room.id, {
                         status: room.status === 'ACTIVE' ? 'MAINTENANCE' : 'ACTIVE',
                       });
+                      showToast(`Espaço ${room.name} agora está ${room.status === 'ACTIVE' ? 'em Manutenção' : 'Ativo'}.`);
                     }}
                     className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
                       room.status === 'ACTIVE'
@@ -550,11 +641,7 @@ export const AdminPanel: React.FC<{
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Deseja excluir ${room.name}?`)) {
-                          deleteRoom(room.id);
-                        }
-                      }}
+                      onClick={() => setRoomToDelete(room)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg cursor-pointer"
                       title="Excluir Espaço"
                     >
@@ -566,13 +653,63 @@ export const AdminPanel: React.FC<{
             ))}
           </div>
 
+          {rooms.length === 0 && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-10 text-center border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+                <Layers className="w-7 h-7" />
+              </div>
+              <h3 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                Nenhum laboratório ou sala cadastrada
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                Cadastre os laboratórios de informática, ciências ou salas de recursos da sua escola para iniciar os agendamentos.
+              </p>
+              <button
+                onClick={() => {
+                  setEditingRoom(null);
+                  setNewRoomForm({
+                    name: '',
+                    type: 'INFORMATICA',
+                    capacity: 35,
+                    location: '',
+                    description: '',
+                    status: 'ACTIVE',
+                    color: 'blue',
+                    iconName: 'Monitor',
+                    equipment: ['Computadores', 'Projetor', 'Internet Fibra'],
+                    rules: ['Proibido alimentos', 'Desligar após o uso'],
+                  });
+                  setIsRoomModalOpen(true);
+                }}
+                className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Cadastrar Primeiro Espaço</span>
+              </button>
+            </div>
+          )}
+
           {/* Add/Edit Room Modal */}
           {isRoomModalOpen && (
             <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg overflow-hidden p-6 space-y-4 text-xs transition-colors">
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  {editingRoom ? `Editar: ${editingRoom.name}` : 'Cadastrar Novo Laboratório/Sala'}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {editingRoom ? `Editar: ${editingRoom.name}` : 'Cadastrar Novo Laboratório/Sala'}
+                  </h3>
+                  {editingRoom && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRoomToDelete(editingRoom);
+                      }}
+                      className="text-xs text-red-600 hover:text-red-700 font-bold flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir Espaço</span>
+                    </button>
+                  )}
+                </div>
 
                 <form onSubmit={handleSaveRoom} className="space-y-3">
                   <div>
@@ -624,6 +761,64 @@ export const AdminPanel: React.FC<{
                       placeholder="Ex: Bloco B - Sala 104"
                       className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Professor / Responsável pelo Espaço:</label>
+                    <input
+                      type="text"
+                      value={newRoomForm.responsibleName || ''}
+                      onChange={(e) => setNewRoomForm({ ...newRoomForm, responsibleName: e.target.value })}
+                      placeholder="Ex: Prof. Vinicius Carvalho ou Coordenação de TI"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl font-medium"
+                    />
+                    {users.length > 0 && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <span className="text-[10px] text-slate-400">Atribuir a:</span>
+                        {users.slice(0, 3).map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => setNewRoomForm({ ...newRoomForm, responsibleName: u.name })}
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 hover:bg-blue-100 cursor-pointer"
+                          >
+                            {u.name.split(' ')[0]} {u.name.split(' ')[1] || ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Equipamentos Disponíveis (um por linha):
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={Array.isArray(newRoomForm.equipment) ? newRoomForm.equipment.join('\n') : ''}
+                      onChange={(e) => {
+                        const lines = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean);
+                        setNewRoomForm({ ...newRoomForm, equipment: lines });
+                      }}
+                      placeholder="Ex:&#10;36 Computadores Core i5&#10;Projetor Multimídia&#10;Lousa Digital Interativa"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl font-mono text-[11px]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Normas e Regras de Utilização (uma por linha):
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={Array.isArray(newRoomForm.rules) ? newRoomForm.rules.join('\n') : ''}
+                      onChange={(e) => {
+                        const lines = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean);
+                        setNewRoomForm({ ...newRoomForm, rules: lines });
+                      }}
+                      placeholder="Ex:&#10;Proibido alimentos e bebidas&#10;Desligar computadores ao término&#10;Uso obrigatório de jaleco"
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl font-mono text-[11px]"
                     />
                   </div>
 
@@ -769,11 +964,22 @@ export const AdminPanel: React.FC<{
       {/* TAB 4: USERS & ADMIN ROLES */}
       {activeTab === 'USERS' && (
         <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Corpo Docente & Gestão de Permissões</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Professores autenticados via Google Workspace. Você pode conceder ou revogar privilégios de Administrador.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Corpo Docente & Gestão de Permissões</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Professores cadastrados no sistema escolar. Você pode adicionar novos docentes e gerenciar privilégios.
+              </p>
+            </div>
+
+            <button
+              id="admin-add-teacher-btn"
+              onClick={() => setIsUserModalOpen(true)}
+              className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer self-start sm:self-auto transform active:scale-95 transition-all"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Cadastrar Novo Professor</span>
+            </button>
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
@@ -785,7 +991,7 @@ export const AdminPanel: React.FC<{
                     <th className="p-3.5">E-mail Institucional Google</th>
                     <th className="p-3.5">Disciplina</th>
                     <th className="p-3.5">Nível de Acesso</th>
-                    <th className="p-3.5 text-right">Ação de Acesso</th>
+                    <th className="p-3.5 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -793,7 +999,7 @@ export const AdminPanel: React.FC<{
                     <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="p-3.5">
                         <div className="flex items-center space-x-2.5">
-                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700" />
+                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 object-cover" />
                           <span className="font-bold text-slate-900 dark:text-slate-100">{u.name}</span>
                         </div>
                       </td>
@@ -807,23 +1013,65 @@ export const AdminPanel: React.FC<{
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                           }`}
                         >
-                          {u.role === 'ADMIN' ? '👑 Administrador' : '👨‍🏫 Professor'}
+                          {u.role === 'ADMIN'
+                            ? '👑 Administrador'
+                            : u.gender === 'FEMALE'
+                            ? '👩‍🏫 Professora'
+                            : '👨‍🏫 Professor'}
                         </span>
                       </td>
                       <td className="p-3.5 text-right">
-                        <button
-                          onClick={() => {
-                            const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-                            updateUserRole(u.id, newRole);
-                          }}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                            u.role === 'ADMIN'
-                              ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
-                              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
-                          }`}
-                        >
-                          {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Administrador'}
-                        </button>
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {/* Edit Teacher Button */}
+                          <button
+                            id={`admin-edit-teacher-${u.id}`}
+                            onClick={() => {
+                              setEditingUser(u);
+                              setIsUserModalOpen(true);
+                            }}
+                            className="flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                            title={`Editar dados de ${u.name}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
+                              updateUserRole(u.id, newRole);
+                              showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                              u.role === 'ADMIN'
+                                ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
+                                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
+                            }`}
+                          >
+                            {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
+                          </button>
+
+                          {users.length > 1 && (
+                            <button
+                              onClick={() => {
+                                setConfirmModal({
+                                  title: 'Remover Docente do Sistema',
+                                  message: `Tem certeza que deseja remover o usuário de "${u.name}" (${u.email})?`,
+                                  confirmLabel: 'Sim, Remover',
+                                  isDestructive: true,
+                                  onConfirm: () => {
+                                    deleteUser(u.id);
+                                    showToast(`Professor ${u.name} removido com sucesso.`);
+                                  },
+                                });
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                              title="Remover docente"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -949,7 +1197,74 @@ export const AdminPanel: React.FC<{
       {/* TAB 6: SETTINGS */}
       {activeTab === 'SETTINGS' && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6 text-xs max-w-2xl transition-colors">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Configurações Gerais do Sistema RESERVE</h3>
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Configurações Gerais do Sistema RESERVE</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Personalize os dados da instituição escolar e as regras de agendamento de laboratórios.
+            </p>
+          </div>
+
+          {/* School Identity Card */}
+          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <School className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                      {settings.schoolName}
+                    </h4>
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                        settings.isConfigured
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                          : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                      }`}
+                    >
+                      {settings.isConfigured ? 'Escola Salva' : 'Configuração Inicial'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {settings.city ? `${settings.city} - ${settings.state || 'MG'}` : 'Minas Gerais'} • {settings.networkType || 'Rede Estadual'} {settings.inepCode && `• INEP: ${settings.inepCode}`}
+                  </p>
+                </div>
+              </div>
+
+              {onOpenSchoolSettings && (
+                <button
+                  id="admin-edit-school-btn"
+                  onClick={onOpenSchoolSettings}
+                  className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar Escola</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[11px]">
+              <div>
+                <span className="text-slate-400 block text-[10px]">E-mail de Contato:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">
+                  {settings.contactEmail}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Turnos Ativos:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  {(settings.shifts || ['MANHA', 'TARDE', 'NOITE']).join(', ')}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Responsável / Direção:</span>
+                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">
+                  {settings.directorName || 'Coordenação de TI'}
+                </span>
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-4">
             <div>
@@ -989,30 +1304,333 @@ export const AdminPanel: React.FC<{
               </p>
             </div>
 
-            {/* Reset Data Button */}
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            {/* Theme & Appearance Configuration */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    {isDark ? <Moon className="w-4 h-4 text-blue-500" /> : <Sun className="w-4 h-4 text-amber-500" />}
+                    <span>Aparência & Tema do Sistema</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Selecione o tema visual da interface ou deixe automático para acompanhar o dispositivo.
+                  </p>
+                </div>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {theme === 'light' ? '☀️ Modo Claro' : theme === 'dark' ? '🌙 Modo Escuro' : '💻 Automático'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  type="button"
+                  id="admin-theme-light-btn"
+                  onClick={() => setTheme('light')}
+                  className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold text-xs transition-all cursor-pointer ${
+                    theme === 'light'
+                      ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 text-amber-900 dark:text-amber-200 shadow-xs ring-2 ring-amber-400/40'
+                      : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <Sun className="w-4 h-4 text-amber-500" />
+                  <span>Tema Claro</span>
+                  <span className="text-[9px] font-normal opacity-70">Cores diurnas</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="admin-theme-dark-btn"
+                  onClick={() => setTheme('dark')}
+                  className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold text-xs transition-all cursor-pointer ${
+                    theme === 'dark'
+                      ? 'bg-blue-600 border-blue-500 text-white shadow-xs ring-2 ring-blue-400/40'
+                      : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <Moon className="w-4 h-4 text-blue-300" />
+                  <span>Tema Escuro</span>
+                  <span className="text-[9px] font-normal opacity-70">Modo noturno</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="admin-theme-system-btn"
+                  onClick={() => setTheme('system')}
+                  className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 font-bold text-xs transition-all cursor-pointer ${
+                    theme === 'system'
+                      ? 'bg-slate-800 text-white border-slate-600 shadow-xs ring-2 ring-slate-400/40'
+                      : 'bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                  }`}
+                >
+                  <Monitor className="w-4 h-4 text-indigo-400" />
+                  <span>Automático</span>
+                  <span className="text-[9px] font-normal opacity-70">Sistema / OS</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Production Clearance Section */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
               <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Restaurar Dados de Exemplo</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Restaura as reservas e laboratórios padrão da escola.
+                <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-500" />
+                  <span>Ambiente de Produção & Limpeza de Dados Definitivos</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Utilize estas opções para limpar dados de teste/demonstração e iniciar o lançamento dos agendamentos oficiais e definitivos da instituição.
                 </p>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  id="admin-clear-reservations-btn"
+                  onClick={() => {
+                    setConfirmModal({
+                      title: 'Limpar Todas as Reservas?',
+                      message: 'Tem certeza que deseja apagar TODAS as reservas cadastradas? Esta ação deixará a grade limpa para os agendamentos definitivos.',
+                      confirmLabel: 'Sim, Apagar Reservas',
+                      isDestructive: true,
+                      onConfirm: () => {
+                        clearAllReservations();
+                        showToast('Todas as reservas foram removidas. A grade está limpa!');
+                      },
+                    });
+                  }}
+                  className="flex items-center space-x-2 p-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-red-50 dark:hover:bg-red-950/40 border border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-800 text-slate-700 dark:text-slate-300 hover:text-red-700 dark:hover:text-red-300 rounded-xl font-bold transition-all text-left cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4 text-red-500 shrink-0" />
+                  <div>
+                    <p className="text-xs">Limpar Todas as Reservas</p>
+                    <p className="text-[10px] font-normal text-slate-400">Zera a grade de horários mantendo salas e usuários</p>
+                  </div>
+                </button>
+
+                <button
+                  id="admin-clear-announcements-btn"
+                  onClick={() => {
+                    setConfirmModal({
+                      title: 'Limpar Avisos do Mural?',
+                      message: 'Tem certeza que deseja apagar todos os comunicados e avisos do mural da escola?',
+                      confirmLabel: 'Sim, Apagar Avisos',
+                      isDestructive: true,
+                      onConfirm: () => {
+                        clearAllAnnouncements();
+                        showToast('Todos os avisos foram removidos do mural.');
+                      },
+                    });
+                  }}
+                  className="flex items-center space-x-2 p-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-red-50 dark:hover:bg-red-950/40 border border-slate-200 dark:border-slate-700 hover:border-red-300 dark:hover:border-red-800 text-slate-700 dark:text-slate-300 hover:text-red-700 dark:hover:text-red-300 rounded-xl font-bold transition-all text-left cursor-pointer"
+                >
+                  <Bell className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-xs">Limpar Avisos do Mural</p>
+                    <p className="text-[10px] font-normal text-slate-400">Remove comunicados de teste ou antigos</p>
+                  </div>
+                </button>
+
+                <button
+                  id="admin-clear-all-prod-btn"
+                  onClick={() => {
+                    setConfirmModal({
+                      title: 'Limpar Sistema Completo para Produção?',
+                      message: 'Deseja limpar COMPLETAMENTE o sistema para produção (zerar todas as reservas e avisos de teste, deixando o sistema pronto para os lançamentos definitivos)?',
+                      confirmLabel: 'Sim, Limpar para Produção',
+                      isDestructive: true,
+                      onConfirm: () => {
+                        clearSystemForProduction();
+                        showToast('Sistema 100% limpo e pronto para o lançamento dos dados definitivos!');
+                      },
+                    });
+                  }}
+                  className="sm:col-span-2 flex items-center justify-between p-3 bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 rounded-xl font-bold transition-all cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-black">Limpar Sistema Completo para Produção</p>
+                      <p className="text-[10px] font-normal text-emerald-700 dark:text-emerald-400">
+                        Zera todas as reservas e avisos de teste em um único clique
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-lg">
+                    Pronto para Uso
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Load Sample Demo Data (Optional) */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-bold text-slate-800 dark:text-slate-200">Dados de Exemplo / Demonstração</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Caso queira simular agendamentos de teste antes de entrar em produção.
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setConfirmModal({
+                      title: 'Carregar Dados de Demonstração?',
+                      message: 'Deseja carregar as reservas e avisos de exemplo para demonstração?',
+                      confirmLabel: 'Sim, Carregar Demonstração',
+                      onConfirm: () => {
+                        loadDemoSampleData();
+                        showToast('Dados de demonstração carregados com sucesso!');
+                      },
+                    });
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Carregar Exemplo</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setConfirmModal({
+                      title: 'Restaurar Padrão de Fábrica?',
+                      message: 'Deseja restaurar as configurações e dados padrão de fábrica do sistema?',
+                      confirmLabel: 'Restaurar Padrão',
+                      isDestructive: true,
+                      onConfirm: () => {
+                        resetToDefaultData();
+                        showToast('Sistema restaurado ao padrão inicial com sucesso.');
+                      },
+                    });
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Padrão de Fábrica</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated Room Deletion Confirmation Modal */}
+      {roomToDelete && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-4 text-center animate-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 flex items-center justify-center mx-auto">
+              <Trash2 className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                Excluir Espaço / Laboratório?
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Tem certeza que deseja excluir permanentemente o espaço <strong>"{roomToDelete.name}"</strong>?
+              </p>
+              <p className="text-[11px] text-red-500 dark:text-red-400 mt-1">
+                As reservas vinculadas a esta sala também serão removidas.
+              </p>
+            </div>
+            <div className="flex items-center justify-center space-x-3 pt-2">
               <button
-                onClick={() => {
-                  if (window.confirm('Deseja recarregar o banco de dados inicial da escola?')) {
-                    resetToDefaultData();
-                    alert('Dados restaurados com sucesso!');
-                  }
-                }}
-                className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold cursor-pointer"
+                type="button"
+                onClick={() => setRoomToDelete(null)}
+                className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl cursor-pointer"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Restaurar Padrão</span>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteRoom(roomToDelete.id);
+                  setRoomToDelete(null);
+                  if (isRoomModalOpen) {
+                    setIsRoomModalOpen(false);
+                    setEditingRoom(null);
+                  }
+                  showToast(`Espaço "${roomToDelete.name}" excluído com sucesso.`);
+                }}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl shadow cursor-pointer flex items-center space-x-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Confirmar Exclusão</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Generic In-App Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 space-y-4 text-center animate-in zoom-in-95 duration-150">
+            <div
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto ${
+                confirmModal.isDestructive
+                  ? 'bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400'
+                  : 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              {confirmModal.isDestructive ? (
+                <Trash2 className="w-7 h-7" />
+              ) : (
+                <AlertCircle className="w-7 h-7" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
+                {confirmModal.title}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {confirmModal.message}
+              </p>
+            </div>
+            <div className="flex items-center justify-center space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = confirmModal.onConfirm;
+                  setConfirmModal(null);
+                  cb();
+                }}
+                className={`px-4 py-2.5 text-white font-bold text-xs rounded-xl shadow cursor-pointer flex items-center space-x-1.5 ${
+                  confirmModal.isDestructive
+                    ? 'bg-red-600 hover:bg-red-500'
+                    : 'bg-blue-600 hover:bg-blue-500'
+                }`}
+              >
+                <span>{confirmModal.confirmLabel || 'Confirmar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Registration & Edit Modal */}
+      <UserRegistrationModal
+        isOpen={isUserModalOpen}
+        userToEdit={editingUser}
+        onClose={() => {
+          setIsUserModalOpen(false);
+          setEditingUser(null);
+        }}
+        onSuccess={(savedUser) => {
+          showToast(
+            editingUser
+              ? `Professor "${savedUser.name}" atualizado com sucesso!`
+              : `Professor "${savedUser.name}" cadastrado com sucesso!`
+          );
+          setIsUserModalOpen(false);
+          setEditingUser(null);
+        }}
+      />
     </div>
   );
 };

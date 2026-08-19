@@ -22,10 +22,14 @@ import {
   BookOpen,
   MapPin,
   Wrench,
+  Edit2,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
 import { Room, TimePeriod, Reservation, ShiftType } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
+import { EditRoomDetailsModal } from './EditRoomDetailsModal';
 
 interface WeeklyScheduleGridProps {
   onSelectSlot: (roomId: string, date: string, periodId: string) => void;
@@ -53,6 +57,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   // Week offset state (0 = current week, 1 = next week, -1 = last week)
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [showRoomInfo, setShowRoomInfo] = useState<boolean>(false);
+  const [isEditRoomModalOpen, setIsEditRoomModalOpen] = useState<boolean>(false);
 
   // Helper to get week dates (Monday to Friday)
   const getWeekDates = (offset: number) => {
@@ -147,22 +152,32 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {rooms.map((room) => {
-            const isSelected = room.id === selectedRoomId;
-            const isMaintenance = room.status === 'MAINTENANCE';
+        {rooms.length === 0 ? (
+          <div className="py-8 text-center space-y-2">
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Nenhum espaço ou laboratório cadastrado no momento.
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              O Administrador pode cadastrar novos ambientes e laboratórios na aba Administração.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            {rooms.map((room) => {
+              const isSelected = room.id === selectedRoomId;
+              const isMaintenance = room.status === 'MAINTENANCE';
 
-            return (
-              <button
-                key={room.id}
-                id={`room-tab-${room.id}`}
-                onClick={() => setSelectedRoomId(room.id)}
-                className={`relative flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-600 dark:border-blue-500 shadow-sm ring-1 ring-blue-600 dark:ring-blue-500'
-                    : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                }`}
-              >
+              return (
+                <button
+                  key={room.id}
+                  id={`room-tab-${room.id}`}
+                  onClick={() => setSelectedRoomId(room.id)}
+                  className={`relative flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-600 dark:border-blue-500 shadow-sm ring-1 ring-blue-600 dark:ring-blue-500'
+                      : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
                 {isMaintenance && (
                   <span className="absolute top-2 right-2 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -202,50 +217,93 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             );
           })}
         </div>
+        )}
 
         {/* Expandable Room Info & Hardware */}
         {showRoomInfo && currentRoom && (
-          <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-xs animate-in fade-in duration-150">
+          <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs animate-in fade-in duration-150 space-y-3.5">
+            {/* Header with Title and Admin Action */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center space-x-2">
+                <span className="font-black text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                  {currentRoom.name}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+                  {currentRoom.capacity} Lugares
+                </span>
+              </div>
+
+              {/* Only Administrator can edit equipments and rules */}
+              {isAdmin ? (
+                <button
+                  id="btn-edit-room-rules-admin"
+                  onClick={() => setIsEditRoomModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer self-start sm:self-auto transform active:scale-95 transition-all"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Editar Equipamentos, Regras e Responsável</span>
+                </button>
+              ) : (
+                <div className="flex items-center space-x-1 text-[11px] text-slate-400 dark:text-slate-500">
+                  <Shield className="w-3 h-3 text-slate-400" />
+                  <span>Edição restrita ao Administrador</span>
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 mb-1">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1.5">
                   <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  Localização & Responsável
+                  <span>Localização & Responsável</span>
                 </h4>
-                <p className="text-slate-600 dark:text-slate-300">{currentRoom.location}</p>
-                <p className="text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                  Responsável: <span className="text-slate-700 dark:text-slate-200">{currentRoom.responsibleName || 'Coordenação'}</span>
+                <p className="text-slate-700 dark:text-slate-300 font-medium">{currentRoom.location}</p>
+                <div className="mt-1 flex items-center space-x-1.5">
+                  <span className="text-[11px] text-slate-400">Responsável:</span>
+                  <span className="text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-lg border border-blue-200 dark:border-blue-800">
+                    {currentRoom.responsibleName || 'Coordenação'}
+                  </span>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 mt-2 text-[11px] leading-relaxed">
+                  {currentRoom.description || 'Espaço pedagógico para realização de atividades práticas.'}
                 </p>
-                <p className="text-slate-500 dark:text-slate-400 mt-1 text-[11px]">{currentRoom.description}</p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 mb-1">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1.5">
                   <Wrench className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                  Equipamentos Disponíveis
+                  <span>Equipamentos Disponíveis ({currentRoom.equipment?.length || 0})</span>
                 </h4>
-                <ul className="space-y-0.5 text-slate-600 dark:text-slate-300">
-                  {currentRoom.equipment.map((eq, i) => (
-                    <li key={i} className="flex items-center gap-1 text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-                      <span>{eq}</span>
-                    </li>
-                  ))}
+                <ul className="space-y-1 text-slate-600 dark:text-slate-300">
+                  {currentRoom.equipment && currentRoom.equipment.length > 0 ? (
+                    currentRoom.equipment.map((eq, i) => (
+                      <li key={i} className="flex items-center gap-1.5 text-[11px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                        <span>{eq}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-[11px] text-slate-400 italic">Nenhum equipamento cadastrado.</li>
+                  )}
                 </ul>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 mb-1">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1.5">
                   <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  Normas de Utilização
+                  <span>Normas de Utilização ({currentRoom.rules?.length || 0})</span>
                 </h4>
-                <ul className="space-y-0.5 text-slate-600 dark:text-slate-300">
-                  {currentRoom.rules?.map((rule, i) => (
-                    <li key={i} className="flex items-center gap-1 text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                      <span>{rule}</span>
-                    </li>
-                  ))}
+                <ul className="space-y-1 text-slate-600 dark:text-slate-300">
+                  {currentRoom.rules && currentRoom.rules.length > 0 ? (
+                    currentRoom.rules.map((rule, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1"></span>
+                        <span>{rule}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-[11px] text-slate-400 italic">Nenhuma norma especial cadastrada.</li>
+                  )}
                 </ul>
               </div>
             </div>
@@ -579,6 +637,13 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
           💡 Clique em qualquer horário livre para agendar sua aula.
         </p>
       </div>
+
+      {/* Edit Room Details, Equipments & Rules Modal (Admin Only) */}
+      <EditRoomDetailsModal
+        isOpen={isEditRoomModalOpen}
+        room={currentRoom}
+        onClose={() => setIsEditRoomModalOpen(false)}
+      />
     </div>
   );
 };

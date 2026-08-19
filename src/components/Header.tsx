@@ -15,6 +15,8 @@ import {
   HelpCircle,
   Sun,
   Moon,
+  Monitor,
+  UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
@@ -26,6 +28,8 @@ interface HeaderProps {
   onOpenNewReservation: () => void;
   onOpenGoogleLogin: () => void;
   onOpenAnnouncements: () => void;
+  onOpenSchoolSettings?: () => void;
+  onOpenRegisterTeacher?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,10 +38,12 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewReservation,
   onOpenGoogleLogin,
   onOpenAnnouncements,
+  onOpenSchoolSettings,
+  onOpenRegisterTeacher,
 }) => {
   const { currentUser, isAdmin, toggleRole, logout } = useAuth();
   const { announcements, settings } = useReservations();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const importantAnnouncementsCount = announcements.filter((a) => a.important).length;
@@ -63,11 +69,24 @@ export const Header: React.FC<HeaderProps> = ({
                     LABS
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium hidden sm:block truncate max-w-[220px] md:max-w-[320px]">
-                  {settings.schoolName.split('-')[0]}
+                <p className="text-[11px] text-slate-400 font-medium hidden sm:block truncate max-w-[200px] md:max-w-[280px]">
+                  {settings.shortName || settings.schoolName.split('-')[0]}
                 </p>
               </div>
             </button>
+
+            {onOpenSchoolSettings && (
+              <button
+                id="header-school-settings-btn"
+                onClick={onOpenSchoolSettings}
+                className="hidden lg:flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-[11px] text-slate-300 hover:text-white transition-all cursor-pointer"
+                title="Configurar informações da escola"
+              >
+                <School className="w-3.5 h-3.5 text-blue-400" />
+                <span className="truncate max-w-[130px]">{settings.city ? `${settings.city} - ${settings.state || 'MG'}` : 'Configurar'}</span>
+                <Settings className="w-3 h-3 text-slate-400 ml-0.5" />
+              </button>
+            )}
           </div>
 
           {/* Navigation Links */}
@@ -132,18 +151,22 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action & User Profile */}
           <div className="flex items-center space-x-2.5">
-            {/* Dark Mode Toggle Button */}
+            {/* Dark/Light Mode Toggle Button */}
             <button
               id="theme-toggle-btn"
               onClick={toggleTheme}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 border border-slate-700 transition-all cursor-pointer flex items-center justify-center"
-              title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Modo Escuro'}
-              aria-label={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Modo Escuro'}
+              className={`p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center border shadow-xs ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-slate-700'
+                  : 'bg-amber-100/90 hover:bg-amber-200 text-amber-900 border-amber-300'
+              }`}
+              title={isDark ? 'Tema Escuro ativo • Clique para Modo Claro' : 'Tema Claro ativo • Clique para Modo Escuro'}
+              aria-label={isDark ? 'Mudar para Tema Claro' : 'Mudar para Modo Escuro'}
             >
-              {theme === 'dark' ? (
+              {isDark ? (
                 <Sun className="w-4 h-4 text-amber-400 animate-in spin-in-180 duration-200" />
               ) : (
-                <Moon className="w-4 h-4 text-slate-300 animate-in spin-in-180 duration-200" />
+                <Moon className="w-4 h-4 text-amber-800 animate-in spin-in-180 duration-200" />
               )}
             </button>
 
@@ -193,7 +216,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {showProfileMenu && (
                   <div
                     id="profile-dropdown"
-                    className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                    className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                   >
                     {/* User Info Card */}
                     <div className="p-3 bg-slate-800/80 rounded-xl mb-2 border border-slate-700/50">
@@ -219,7 +242,7 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     {/* Role quick toggle */}
-                    <div className="px-2 py-1.5 mb-1">
+                    <div className="px-2 py-1 mb-1.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
                           <Shield className="w-3.5 h-3.5 text-amber-400" />
@@ -240,6 +263,64 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           {currentUser.role === 'ADMIN' ? '👑 Administrador' : '👨‍🏫 Professor'}
                           <span className="text-[10px] ml-1 opacity-70 underline">(Alternar)</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Theme selector in dropdown */}
+                    <div className="p-2 bg-slate-800/90 rounded-xl mb-2 border border-slate-700/60">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                          {isDark ? (
+                            <Moon className="w-3.5 h-3.5 text-blue-400" />
+                          ) : (
+                            <Sun className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                          Tema Visual:
+                        </span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400">
+                          {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Auto'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                        <button
+                          type="button"
+                          id="theme-select-light-btn"
+                          onClick={() => setTheme('light')}
+                          className={`py-1 px-1.5 rounded-md text-[11px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer ${
+                            theme === 'light'
+                              ? 'bg-amber-400 text-slate-950 shadow-xs font-black'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Sun className="w-3 h-3" />
+                          <span>Claro</span>
+                        </button>
+                        <button
+                          type="button"
+                          id="theme-select-dark-btn"
+                          onClick={() => setTheme('dark')}
+                          className={`py-1 px-1.5 rounded-md text-[11px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer ${
+                            theme === 'dark'
+                              ? 'bg-blue-600 text-white shadow-xs font-black'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Moon className="w-3 h-3" />
+                          <span>Escuro</span>
+                        </button>
+                        <button
+                          type="button"
+                          id="theme-select-system-btn"
+                          onClick={() => setTheme('system')}
+                          className={`py-1 px-1.5 rounded-md text-[11px] font-bold flex items-center justify-center space-x-1 transition-all cursor-pointer ${
+                            theme === 'system'
+                              ? 'bg-slate-700 text-white shadow-xs font-black'
+                              : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          <Monitor className="w-3 h-3" />
+                          <span>Auto</span>
                         </button>
                       </div>
                     </div>
@@ -269,6 +350,34 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <Shield className="w-4 h-4 text-amber-400" />
                           <span>Painel da Coordenação / Admin</span>
+                        </button>
+                      )}
+
+                      {onOpenSchoolSettings && (
+                        <button
+                          id="profile-school-settings-btn"
+                          onClick={() => {
+                            onOpenSchoolSettings();
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800 text-left transition-colors"
+                        >
+                          <School className="w-4 h-4 text-emerald-400" />
+                          <span>Configurar Dados da Escola</span>
+                        </button>
+                      )}
+
+                      {isAdmin && onOpenRegisterTeacher && (
+                        <button
+                          id="profile-register-teacher-btn"
+                          onClick={() => {
+                            onOpenRegisterTeacher();
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-950/40 text-left transition-colors"
+                        >
+                          <UserPlus className="w-4 h-4 text-blue-400" />
+                          <span>+ Cadastrar Novo Professor</span>
                         </button>
                       )}
 

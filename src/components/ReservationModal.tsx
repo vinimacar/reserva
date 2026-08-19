@@ -12,10 +12,12 @@ import {
   FileText,
   Sparkles,
   Info,
+  UserPlus,
+  User as UserIcon,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
-import { ShiftType, Room } from '../types';
+import { ShiftType, Room, User } from '../types';
 import { SCHOOL_CLASSES, SCHOOL_DISCIPLINES, AVAILABLE_EQUIPMENT } from '../data/initialData';
 
 interface ReservationModalProps {
@@ -34,7 +36,16 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   initialPeriodId,
 }) => {
   const { rooms, periods, addReservation, checkConflict, selectedRoomId } = useReservations();
-  const { currentUser } = useAuth();
+  const { currentUser, users, addUser, switchUser, isAdmin } = useAuth();
+
+  // Teacher / User selection state
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(
+    currentUser?.id || users[0]?.id || ''
+  );
+  const [isCreatingNewUser, setIsCreatingNewUser] = useState<boolean>(false);
+  const [newTeacherName, setNewTeacherName] = useState<string>('');
+  const [newTeacherEmail, setNewTeacherEmail] = useState<string>('');
+  const [newTeacherSubject, setNewTeacherSubject] = useState<string>(SCHOOL_DISCIPLINES[0] || 'Matemática');
 
   // Form State
   const [roomId, setRoomId] = useState<string>(initialRoomId || selectedRoomId || rooms[0]?.id || '');
@@ -57,6 +68,15 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       if (initialRoomId) setRoomId(initialRoomId);
       if (initialDate) setDate(initialDate);
       
+      if (currentUser) {
+        setSelectedTeacherId(currentUser.id);
+        if (currentUser.subject && currentUser.subject !== 'Geral') {
+          setDisciplina(currentUser.subject);
+        }
+      } else if (users.length > 0) {
+        setSelectedTeacherId(users[0].id);
+      }
+
       if (initialPeriodId) {
         setSelectedPeriodIds([initialPeriodId]);
         const p = periods.find((item) => item.id === initialPeriodId);
@@ -71,13 +91,46 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       
       setErrorMessage(null);
       setSuccessMessage(null);
+      setIsCreatingNewUser(false);
     }
-  }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods]);
+  }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods, currentUser, users]);
 
   if (!isOpen) return null;
 
   const currentRoom = rooms.find((r) => r.id === roomId) || rooms[0];
   const shiftPeriods = periods.filter((p) => p.shift === shift);
+  const currentSelectedTeacher = users.find((u) => u.id === selectedTeacherId) || currentUser || users[0];
+
+  // Quick Inline New Teacher Creation
+  const handleQuickCreateTeacher = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeacherName.trim()) {
+      setErrorMessage('Informe o nome do professor.');
+      return;
+    }
+    const emailToUse =
+      newTeacherEmail.trim() ||
+      `${newTeacherName.toLowerCase().replace(/\s+/g, '.')}@educacao.mg.gov.br`;
+
+    const createdUser = addUser(
+      {
+        name: newTeacherName.trim(),
+        email: emailToUse,
+        subject: newTeacherSubject,
+        role: 'TEACHER',
+      },
+      true // autoLogin as current
+    );
+
+    setSelectedTeacherId(createdUser.id);
+    if (createdUser.subject) {
+      setDisciplina(createdUser.subject);
+    }
+    setIsCreatingNewUser(false);
+    setNewTeacherName('');
+    setNewTeacherEmail('');
+    setErrorMessage(null);
+  };
 
   // Toggle period selection (allowing multi-select e.g. 1st and 2nd class)
   const handleTogglePeriod = (periodId: string) => {
@@ -105,8 +158,10 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!currentUser) {
-      setErrorMessage('Você precisa estar autenticado para realizar um agendamento.');
+    const reservingUser = users.find((u) => u.id === selectedTeacherId) || currentUser;
+
+    if (!reservingUser) {
+      setErrorMessage('Selecione ou cadastre um professor para realizar o agendamento.');
       return;
     }
 
@@ -142,7 +197,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       numberOfStudents,
       requestedEquipment,
       observations,
-      userId: currentUser.id,
+      userId: reservingUser.id,
     });
 
     if (!result.success) {
@@ -189,25 +244,149 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
         {/* Modal Body / Scrollable Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 dark:text-slate-300 flex-1">
-          {/* Teacher identity card */}
-          {currentUser && (
-            <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <img
-                  src={currentUser.avatar}
-                  alt={currentUser.name}
-                  className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600"
-                />
-                <div>
-                  <p className="font-bold text-slate-800 dark:text-slate-200">{currentUser.name}</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{currentUser.email}</p>
+          {/* Teacher identity & creation card */}
+          <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-blue-500" />
+                <span>Professor(a) Solicitante da Reserva:</span>
+              </span>
+
+              {isAdmin && !isCreatingNewUser && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingNewUser(true)}
+                  className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 transition-all cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>+ Criar Novo Professor / Usuário</span>
+                </button>
+              )}
+            </div>
+
+            {!isCreatingNewUser ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  {currentSelectedTeacher && (
+                    <img
+                      src={currentSelectedTeacher.avatar}
+                      alt={currentSelectedTeacher.name}
+                      className="w-10 h-10 rounded-full border-2 border-blue-500 object-cover shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <select
+                      value={selectedTeacherId}
+                      onChange={(e) => {
+                        setSelectedTeacherId(e.target.value);
+                        const found = users.find((u) => u.id === e.target.value);
+                        if (found && found.subject && found.subject !== 'Geral') {
+                          setDisciplina(found.subject);
+                        }
+                      }}
+                      className="w-full sm:w-auto p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.subject || 'Docente'})
+                        </option>
+                      ))}
+                    </select>
+                    {currentSelectedTeacher && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
+                        {currentSelectedTeacher.email} • {currentSelectedTeacher.schoolName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <span className="text-[10px] font-bold px-2 py-1 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 uppercase shrink-0 self-start sm:self-center">
+                  {currentSelectedTeacher?.role === 'ADMIN' ? 'Coordenador' : 'Docente'}
+                </span>
+              </div>
+            ) : (
+              /* Inline Quick Teacher Registration Form */
+              <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-blue-300 dark:border-blue-700 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <h4 className="font-bold text-xs text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-blue-600" />
+                    <span>Cadastrar Novo Usuário / Professor</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingNewUser(false)}
+                    className="text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-0.5">
+                      Nome do Professor: *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Profa. Claudia Castro"
+                      value={newTeacherName}
+                      onChange={(e) => setNewTeacherName(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-0.5">
+                      E-mail Institucional (@educacao.mg.gov.br ou Gmail):
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="claudia.castro@educacao.mg.gov.br"
+                      value={newTeacherEmail}
+                      onChange={(e) => setNewTeacherEmail(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono text-[11px]"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 dark:text-slate-400 mb-0.5">
+                      Disciplina Principal:
+                    </label>
+                    <select
+                      value={newTeacherSubject}
+                      onChange={(e) => setNewTeacherSubject(e.target.value)}
+                      className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs cursor-pointer"
+                    >
+                      {SCHOOL_DISCIPLINES.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingNewUser(false)}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold text-xs"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickCreateTeacher}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs shadow flex items-center space-x-1 cursor-pointer"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>Salvar Professor e Agendar</span>
+                  </button>
                 </div>
               </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 uppercase">
-                Professor Responsável
-              </span>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Conflict Alert Banner */}
           {conflict.hasConflict && (
@@ -231,11 +410,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error Banner */}
           {errorMessage && (
-            <div className="bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-2xl p-3 flex items-center space-x-2 text-red-800 dark:text-red-200">
-              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-              <span className="font-medium">{errorMessage}</span>
+            <div className="bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-2xl p-3.5 flex items-center space-x-3 text-red-900 dark:text-red-200 animate-in fade-in duration-150">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
+              <p className="font-bold text-xs">{errorMessage}</p>
             </div>
           )}
 

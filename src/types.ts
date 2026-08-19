@@ -1,4 +1,5 @@
 export type UserRole = 'ADMIN' | 'TEACHER';
+export type GenderType = 'MALE' | 'FEMALE';
 
 export interface User {
   id: string;
@@ -8,6 +9,7 @@ export interface User {
   role: UserRole;
   subject?: string;
   schoolName: string;
+  gender?: GenderType;
 }
 
 export type SpaceType = 'INFORMATICA' | 'CIENCIAS' | 'QUIMICA_FISICA' | 'MAKER' | 'MULTIMIDIA';
@@ -76,10 +78,20 @@ export interface Announcement {
 
 export interface SchoolSettings {
   schoolName: string;
+  shortName?: string;
+  city?: string;
+  state?: string;
+  inepCode?: string;
+  networkType?: string; // 'Estadual' | 'Municipal' | 'Federal' | 'Particular'
+  shifts?: ShiftType[];
   requireAdminApproval: boolean;
   maxAdvanceDays: number;
   allowWeekendBooking: boolean;
   contactEmail: string;
+  phone?: string;
+  directorName?: string;
+  isConfigured: boolean;
+  configuredAt?: string;
 }
 
 export interface RoomStats {

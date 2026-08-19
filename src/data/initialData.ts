@@ -5,8 +5,9 @@ export const DEFAULT_USERS: User[] = [
     id: 'user_vinicius',
     name: 'Prof. Vinicius Carvalho',
     email: 'vinicius.machado.carvalho@educacao.mg.gov.br',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&auto=format&fit=crop&q=80',
     role: 'ADMIN',
+    gender: 'MALE',
     subject: 'Tecnologia & Robótica',
     schoolName: 'E.E. Governador Milton Campos',
   },
@@ -14,8 +15,9 @@ export const DEFAULT_USERS: User[] = [
     id: 'user_mariana',
     name: 'Profa. Mariana Souza',
     email: 'mariana.souza@educacao.mg.gov.br',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
     role: 'TEACHER',
+    gender: 'FEMALE',
     subject: 'Matemática',
     schoolName: 'E.E. Governador Milton Campos',
   },
@@ -23,8 +25,9 @@ export const DEFAULT_USERS: User[] = [
     id: 'user_carlos',
     name: 'Prof. Carlos Eduardo Silva',
     email: 'carlos.silva@educacao.mg.gov.br',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
     role: 'TEACHER',
+    gender: 'MALE',
     subject: 'Biologia e Ciências',
     schoolName: 'E.E. Governador Milton Campos',
   },
@@ -32,8 +35,9 @@ export const DEFAULT_USERS: User[] = [
     id: 'user_ana',
     name: 'Profa. Ana Paula Ribeiro',
     email: 'ana.ribeiro@educacao.mg.gov.br',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
     role: 'TEACHER',
+    gender: 'FEMALE',
     subject: 'Química & Física',
     schoolName: 'E.E. Governador Milton Campos',
   },
@@ -41,8 +45,9 @@ export const DEFAULT_USERS: User[] = [
     id: 'user_roberto',
     name: 'Prof. Roberto Mendonça',
     email: 'roberto.mendonca@educacao.mg.gov.br',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
     role: 'TEACHER',
+    gender: 'MALE',
     subject: 'História & Geografia',
     schoolName: 'E.E. Governador Milton Campos',
   },
@@ -276,7 +281,7 @@ function getISODateOffset(daysOffset: number): string {
   return d.toISOString().split('T')[0];
 }
 
-export const DEFAULT_RESERVATIONS: Reservation[] = [
+export const SAMPLE_DEMO_RESERVATIONS: Reservation[] = [
   {
     id: 'res_1',
     roomId: 'room_info_1',
@@ -411,7 +416,9 @@ export const DEFAULT_RESERVATIONS: Reservation[] = [
   }
 ];
 
-export const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
+export const DEFAULT_RESERVATIONS: Reservation[] = [];
+
+export const SAMPLE_DEMO_ANNOUNCEMENTS: Announcement[] = [
   {
     id: 'ann_1',
     title: 'Manutenção Preventiva de Rede na Sala de Informática 1',
@@ -440,10 +447,21 @@ export const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
   },
 ];
 
+export const DEFAULT_ANNOUNCEMENTS: Announcement[] = [];
+
 export const DEFAULT_SETTINGS: SchoolSettings = {
-  schoolName: 'E.E. Governador Milton Campos - Rede Estadual de Educação',
+  schoolName: 'E.E. Governador Milton Campos',
+  shortName: 'E.E. Milton Campos',
+  city: 'Belo Horizonte',
+  state: 'MG',
+  inepCode: '31002341',
+  networkType: 'Estadual',
+  shifts: ['MANHA', 'TARDE', 'NOITE'],
   requireAdminApproval: false,
   maxAdvanceDays: 30,
   allowWeekendBooking: false,
-  contactEmail: 'suporte.laboratorios@educacao.mg.gov.br',
+  contactEmail: 'escola.miltoncampos@educacao.mg.gov.br',
+  phone: '(31) 3222-1000',
+  directorName: 'Prof. Vinicius Carvalho',
+  isConfigured: false,
 };

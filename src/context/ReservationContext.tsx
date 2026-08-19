@@ -15,6 +15,8 @@ import {
   DEFAULT_RESERVATIONS,
   DEFAULT_ANNOUNCEMENTS,
   DEFAULT_SETTINGS,
+  SAMPLE_DEMO_RESERVATIONS,
+  SAMPLE_DEMO_ANNOUNCEMENTS,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
 
@@ -46,6 +48,7 @@ interface ReservationContextType {
   deleteReservation: (id: string) => void;
   approveReservation: (id: string, note?: string) => void;
   rejectReservation: (id: string, note?: string) => void;
+  clearAllReservations: () => void;
   // Room Actions
   addRoom: (roomData: Omit<Room, 'id'>) => Room;
   updateRoom: (id: string, roomData: Partial<Room>) => void;
@@ -53,6 +56,7 @@ interface ReservationContextType {
   // Announcement Actions
   addAnnouncement: (data: Omit<Announcement, 'id' | 'date'>) => void;
   deleteAnnouncement: (id: string) => void;
+  clearAllAnnouncements: () => void;
   // Settings Actions
   updateSettings: (newSettings: Partial<SchoolSettings>) => void;
   // Conflict Checking
@@ -61,6 +65,9 @@ interface ReservationContextType {
   // Stats
   getRoomStats: () => RoomStats[];
   getTeacherStats: () => { teacherName: string; count: number; email: string }[];
+  // Production / Data Management
+  clearSystemForProduction: () => void;
+  loadDemoSampleData: () => void;
   resetToDefaultData: () => void;
 }
 
@@ -76,8 +83,24 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const [reservations, setReservations] = useState<Reservation[]>(() => {
     try {
+      const isCleared = localStorage.getItem('reserve_production_cleared');
+      if (isCleared === 'true') {
+        const saved = localStorage.getItem(STORAGE_KEY_RES);
+        if (saved) return JSON.parse(saved);
+        return [];
+      }
       const saved = localStorage.getItem(STORAGE_KEY_RES);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // If it was just the old mock test data (has res_1, res_2, etc.), wipe it for clean production
+        const isMockData = Array.isArray(parsed) && parsed.some((r) => r.id === 'res_1' || r.id === 'res_2');
+        if (isMockData) {
+          localStorage.setItem('reserve_production_cleared', 'true');
+          localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
+          return [];
+        }
+        return parsed;
+      }
     } catch {
       // ignore
     }
@@ -98,8 +121,22 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
     try {
+      const isCleared = localStorage.getItem('reserve_production_cleared');
+      if (isCleared === 'true') {
+        const saved = localStorage.getItem(STORAGE_KEY_ANN);
+        if (saved) return JSON.parse(saved);
+        return [];
+      }
       const saved = localStorage.getItem(STORAGE_KEY_ANN);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const isMockData = Array.isArray(parsed) && parsed.some((a) => a.id === 'ann_1' || a.id === 'ann_2');
+        if (isMockData) {
+          localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
+          return [];
+        }
+        return parsed;
+      }
     } catch {
       // ignore
     }
@@ -336,11 +373,44 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteRoom = (id: string) => {
-    setRooms((prev) => prev.filter((r) => r.id !== id));
-    if (selectedRoomId === id && rooms.length > 1) {
-      const remaining = rooms.filter((r) => r.id !== id);
-      setSelectedRoomId(remaining[0]?.id || '');
-    }
+    setRooms((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      try {
+        localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    // Also remove reservations and announcements for deleted room
+    setReservations((prev) => {
+      const updated = prev.filter((r) => r.roomId !== id);
+      try {
+        localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    setAnnouncements((prev) => {
+      const updated = prev.filter((a) => a.targetRoomId !== id);
+      try {
+        localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    setSelectedRoomId((prevId) => {
+      if (prevId === id) {
+        const remaining = rooms.filter((r) => r.id !== id);
+        return remaining[0]?.id || '';
+      }
+      return prevId;
+    });
   };
 
   // Announcement Actions
@@ -408,6 +478,30 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       .sort((a, b) => b.count - a.count);
   };
 
+  const clearAllReservations = () => {
+    setReservations([]);
+    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
+  };
+
+  const clearAllAnnouncements = () => {
+    setAnnouncements([]);
+    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
+  };
+
+  const clearSystemForProduction = () => {
+    setReservations([]);
+    setAnnouncements([]);
+    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
+  };
+
+  const loadDemoSampleData = () => {
+    setReservations(SAMPLE_DEMO_RESERVATIONS);
+    setAnnouncements(SAMPLE_DEMO_ANNOUNCEMENTS);
+    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(SAMPLE_DEMO_RESERVATIONS));
+    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(SAMPLE_DEMO_ANNOUNCEMENTS));
+  };
+
   const resetToDefaultData = () => {
     setReservations(DEFAULT_RESERVATIONS);
     setRooms(DEFAULT_ROOMS);
@@ -441,16 +535,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         deleteReservation,
         approveReservation,
         rejectReservation,
+        clearAllReservations,
         addRoom,
         updateRoom,
         deleteRoom,
         addAnnouncement,
         deleteAnnouncement,
+        clearAllAnnouncements,
         updateSettings,
         checkConflict,
         getReservationsForSlot,
         getRoomStats,
         getTeacherStats,
+        clearSystemForProduction,
+        loadDemoSampleData,
         resetToDefaultData,
       }}
     >
