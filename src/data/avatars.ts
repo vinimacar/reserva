@@ -1,126 +1,255 @@
 import { GenderType } from '../types';
 
-export interface AvatarOption {
+export interface EducationalIconOption {
   id: string;
-  url: string;
+  iconName: string; // Lucide icon name
   label: string;
-  gender: GenderType;
-  type: 'photo' | 'illustration';
+  category: string;
+  bgColor: string; // Tailwind class
+  iconColor: string; // Tailwind class
+  borderColor: string; // Tailwind class
+  gradient: string; // Tailwind gradient
 }
 
-// Curated high quality male educator avatar options
-export const MALE_EDUCATOR_AVATARS: AvatarOption[] = [
+// Curated high-quality educational and discipline vector icons (strictly non-human, non-animal)
+export const EDUCATIONAL_ICONS: EducationalIconOption[] = [
   {
-    id: 'male_photo_1',
-    url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&auto=format&fit=crop&q=80',
-    label: 'Professor Formal',
-    gender: 'MALE',
-    type: 'photo',
+    id: 'icon:academic',
+    iconName: 'GraduationCap',
+    label: 'Educação & Pedagogia Geral',
+    category: 'Pedagógico',
+    bgColor: 'bg-blue-50 dark:bg-blue-950/60',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+    gradient: 'from-blue-600 to-indigo-600',
   },
   {
-    id: 'male_photo_2',
-    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80',
-    label: 'Professor Dinâmico',
-    gender: 'MALE',
-    type: 'photo',
+    id: 'icon:tech',
+    iconName: 'Laptop',
+    label: 'Tecnologia, Robótica & Informática',
+    category: 'Tecnologia',
+    bgColor: 'bg-indigo-50 dark:bg-indigo-950/60',
+    iconColor: 'text-indigo-600 dark:text-indigo-400',
+    borderColor: 'border-indigo-200 dark:border-indigo-800',
+    gradient: 'from-indigo-600 to-blue-600',
   },
   {
-    id: 'male_photo_3',
-    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
-    label: 'Professor Experiente',
-    gender: 'MALE',
-    type: 'photo',
+    id: 'icon:math',
+    iconName: 'Calculator',
+    label: 'Matemática & Raciocínio Lógico',
+    category: 'Exatas',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/60',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    borderColor: 'border-amber-200 dark:border-amber-800',
+    gradient: 'from-amber-500 to-orange-600',
   },
   {
-    id: 'male_photo_4',
-    url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop&q=80',
-    label: 'Professor Amigável',
-    gender: 'MALE',
-    type: 'photo',
+    id: 'icon:science',
+    iconName: 'FlaskConical',
+    label: 'Química & Laboratório de Ciências',
+    category: 'Ciências',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/60',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
+    gradient: 'from-emerald-500 to-teal-600',
   },
   {
-    id: 'male_photo_5',
-    url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&auto=format&fit=crop&q=80',
-    label: 'Professor Jovem',
-    gender: 'MALE',
-    type: 'photo',
+    id: 'icon:physics',
+    iconName: 'Atom',
+    label: 'Física & Astronomia',
+    category: 'Ciências',
+    bgColor: 'bg-cyan-50 dark:bg-cyan-950/60',
+    iconColor: 'text-cyan-600 dark:text-cyan-400',
+    borderColor: 'border-cyan-200 dark:border-cyan-800',
+    gradient: 'from-cyan-500 to-blue-600',
   },
   {
-    id: 'male_illust_1',
-    url: 'https://api.dicebear.com/7.x/personas/svg?seed=TeacherMale1&backgroundColor=b6e3f4',
-    label: 'Avatar Ilustrado 1',
-    gender: 'MALE',
-    type: 'illustration',
+    id: 'icon:biology',
+    iconName: 'Dna',
+    label: 'Biologia & Saúde',
+    category: 'Biológicas',
+    bgColor: 'bg-teal-50 dark:bg-teal-950/60',
+    iconColor: 'text-teal-600 dark:text-teal-400',
+    borderColor: 'border-teal-200 dark:border-teal-800',
+    gradient: 'from-teal-500 to-emerald-600',
   },
   {
-    id: 'male_illust_2',
-    url: 'https://api.dicebear.com/7.x/personas/svg?seed=TeacherMaleAlex&backgroundColor=c0aede',
-    label: 'Avatar Ilustrado 2',
-    gender: 'MALE',
-    type: 'illustration',
-  },
-];
-
-// Curated high quality female educator avatar options
-export const FEMALE_EDUCATOR_AVATARS: AvatarOption[] = [
-  {
-    id: 'female_photo_1',
-    url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
-    label: 'Professora Formal',
-    gender: 'FEMALE',
-    type: 'photo',
+    id: 'icon:literature',
+    iconName: 'BookOpen',
+    label: 'Língua Portuguesa & Literatura',
+    category: 'Linguagens',
+    bgColor: 'bg-rose-50 dark:bg-rose-950/60',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    borderColor: 'border-rose-200 dark:border-rose-800',
+    gradient: 'from-rose-500 to-red-600',
   },
   {
-    id: 'female_photo_2',
-    url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80',
-    label: 'Professora Dinâmica',
-    gender: 'FEMALE',
-    type: 'photo',
+    id: 'icon:art',
+    iconName: 'Palette',
+    label: 'Artes & Criação Visual',
+    category: 'Artes',
+    bgColor: 'bg-purple-50 dark:bg-purple-950/60',
+    iconColor: 'text-purple-600 dark:text-purple-400',
+    borderColor: 'border-purple-200 dark:border-purple-800',
+    gradient: 'from-purple-500 to-pink-600',
   },
   {
-    id: 'female_photo_3',
-    url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=200&auto=format&fit=crop&q=80',
-    label: 'Professora Dedicada',
-    gender: 'FEMALE',
-    type: 'photo',
+    id: 'icon:geography',
+    iconName: 'Globe',
+    label: 'Geografia & Meio Ambiente',
+    category: 'Humanas',
+    bgColor: 'bg-emerald-50 dark:bg-emerald-950/60',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
+    gradient: 'from-emerald-600 to-sky-600',
   },
   {
-    id: 'female_photo_4',
-    url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
-    label: 'Professora Amigável',
-    gender: 'FEMALE',
-    type: 'photo',
+    id: 'icon:geometry',
+    iconName: 'Compass',
+    label: 'Desenho Geométrico & História',
+    category: 'Exatas/Humanas',
+    bgColor: 'bg-violet-50 dark:bg-violet-950/60',
+    iconColor: 'text-violet-600 dark:text-violet-400',
+    borderColor: 'border-violet-200 dark:border-violet-800',
+    gradient: 'from-violet-500 to-indigo-600',
   },
   {
-    id: 'female_photo_5',
-    url: 'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=200&auto=format&fit=crop&q=80',
-    label: 'Professora Experiente',
-    gender: 'FEMALE',
-    type: 'photo',
+    id: 'icon:ideas',
+    iconName: 'Lightbulb',
+    label: 'Filosofia, Sociologia & Inovação',
+    category: 'Humanas',
+    bgColor: 'bg-yellow-50 dark:bg-yellow-950/60',
+    iconColor: 'text-yellow-600 dark:text-yellow-400',
+    borderColor: 'border-yellow-200 dark:border-yellow-800',
+    gradient: 'from-amber-400 to-yellow-600',
   },
   {
-    id: 'female_illust_1',
-    url: 'https://api.dicebear.com/7.x/personas/svg?seed=TeacherFemaleMariana&backgroundColor=ffd5dc',
-    label: 'Avatar Ilustrado 1',
-    gender: 'FEMALE',
-    type: 'illustration',
+    id: 'icon:music',
+    iconName: 'Music',
+    label: 'Música & Artes Cênicas',
+    category: 'Artes',
+    bgColor: 'bg-fuchsia-50 dark:bg-fuchsia-950/60',
+    iconColor: 'text-fuchsia-600 dark:text-fuchsia-400',
+    borderColor: 'border-fuchsia-200 dark:border-fuchsia-800',
+    gradient: 'from-fuchsia-500 to-purple-600',
   },
   {
-    id: 'female_illust_2',
-    url: 'https://api.dicebear.com/7.x/personas/svg?seed=TeacherFemaleAna&backgroundColor=d1d4f9',
-    label: 'Avatar Ilustrado 2',
-    gender: 'FEMALE',
-    type: 'illustration',
+    id: 'icon:sports',
+    iconName: 'Award',
+    label: 'Educação Física & Esportes',
+    category: 'Esportes',
+    bgColor: 'bg-orange-50 dark:bg-orange-950/60',
+    iconColor: 'text-orange-600 dark:text-orange-400',
+    borderColor: 'border-orange-200 dark:border-orange-800',
+    gradient: 'from-orange-500 to-amber-600',
+  },
+  {
+    id: 'icon:management',
+    iconName: 'School',
+    label: 'Direção, Coordenação & Gestão',
+    category: 'Gestão',
+    bgColor: 'bg-slate-100 dark:bg-slate-800',
+    iconColor: 'text-slate-700 dark:text-slate-300',
+    borderColor: 'border-slate-300 dark:border-slate-700',
+    gradient: 'from-slate-700 to-slate-900',
+  },
+  {
+    id: 'icon:sparkles',
+    iconName: 'Sparkles',
+    label: 'Projetos Especiais & Makers',
+    category: 'Multidisciplinar',
+    bgColor: 'bg-blue-50 dark:bg-blue-950/60',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+    gradient: 'from-blue-500 to-violet-600',
+  },
+  {
+    id: 'icon:target',
+    iconName: 'Target',
+    label: 'Orientação Educacional',
+    category: 'Apoio',
+    bgColor: 'bg-rose-50 dark:bg-rose-950/60',
+    iconColor: 'text-rose-600 dark:text-rose-400',
+    borderColor: 'border-rose-200 dark:border-rose-800',
+    gradient: 'from-rose-500 to-orange-500',
   },
 ];
 
 /**
- * Intelligent helper to detect gender based on prefix or name
+ * Maps subject names to appropriate educational icons
+ */
+export function getIconForSubject(subject?: string): string {
+  if (!subject) return 'icon:academic';
+  const norm = subject.toLowerCase();
+
+  if (norm.includes('matemática') || norm.includes('calculo') || norm.includes('estatística')) {
+    return 'icon:math';
+  }
+  if (norm.includes('tecnologia') || norm.includes('informática') || norm.includes('robótica') || norm.includes('computação')) {
+    return 'icon:tech';
+  }
+  if (norm.includes('química') || norm.includes('quimica')) {
+    return 'icon:science';
+  }
+  if (norm.includes('física') || norm.includes('fisica') || norm.includes('astronomia')) {
+    return 'icon:physics';
+  }
+  if (norm.includes('biologia') || norm.includes('ciência') || norm.includes('ciencias') || norm.includes('saúde')) {
+    return 'icon:biology';
+  }
+  if (norm.includes('português') || norm.includes('portugues') || norm.includes('literatura') || norm.includes('redação') || norm.includes('inglês') || norm.includes('espanhol') || norm.includes('línguas')) {
+    return 'icon:literature';
+  }
+  if (norm.includes('arte') || norm.includes('artes') || norm.includes('desenho')) {
+    return 'icon:art';
+  }
+  if (norm.includes('geografia') || norm.includes('meio ambiente')) {
+    return 'icon:geography';
+  }
+  if (norm.includes('história') || norm.includes('historia')) {
+    return 'icon:geometry';
+  }
+  if (norm.includes('filosofia') || norm.includes('sociologia')) {
+    return 'icon:ideas';
+  }
+  if (norm.includes('música') || norm.includes('musica') || norm.includes('teatro')) {
+    return 'icon:music';
+  }
+  if (norm.includes('física escolar') || norm.includes('educação física') || norm.includes('esporte')) {
+    return 'icon:sports';
+  }
+  if (norm.includes('direção') || norm.includes('coordenação') || norm.includes('gestão')) {
+    return 'icon:management';
+  }
+  if (norm.includes('maker') || norm.includes('projeto') || norm.includes('inovação')) {
+    return 'icon:sparkles';
+  }
+
+  return 'icon:academic';
+}
+
+/**
+ * Gets educational icon metadata by ID or fallback
+ */
+export function getEducationalIcon(iconIdOrSubject?: string): EducationalIconOption {
+  if (!iconIdOrSubject) return EDUCATIONAL_ICONS[0];
+
+  const foundById = EDUCATIONAL_ICONS.find((i) => i.id === iconIdOrSubject);
+  if (foundById) return foundById;
+
+  const mappedId = getIconForSubject(iconIdOrSubject);
+  const foundMapped = EDUCATIONAL_ICONS.find((i) => i.id === mappedId);
+  if (foundMapped) return foundMapped;
+
+  return EDUCATIONAL_ICONS[0];
+}
+
+/**
+ * Fallback for gender detection (if needed for polite address)
  */
 export function detectGenderFromName(name: string): GenderType {
   const normalized = name.trim().toLowerCase();
 
-  // Explicit title prefixes
   if (
     normalized.startsWith('profa') ||
     normalized.startsWith('professora') ||
@@ -146,7 +275,6 @@ export function detectGenderFromName(name: string): GenderType {
     return 'MALE';
   }
 
-  // Extract first first-name word (without title)
   const cleanName = normalized
     .replace(/^(prof\.|profa\.|profª\.|prof\s|profa\s|professor\s|professora\s|dr\.|dra\.)\s*/i, '')
     .trim();
@@ -164,7 +292,6 @@ export function detectGenderFromName(name: string): GenderType {
     return 'FEMALE';
   }
 
-  // Common rule for Brazilian names ending in 'a' (except exceptions like Luca)
   if (firstName.endsWith('a') && firstName !== 'luca') {
     return 'FEMALE';
   }
@@ -173,20 +300,15 @@ export function detectGenderFromName(name: string): GenderType {
 }
 
 /**
- * Gets default avatar for a gender
+ * Gets default icon key for a teacher
  */
-export function getDefaultAvatar(gender: GenderType, name?: string): string {
-  if (gender === 'FEMALE') {
-    if (name) {
-      const idx = Math.abs(name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % FEMALE_EDUCATOR_AVATARS.length;
-      return FEMALE_EDUCATOR_AVATARS[idx].url;
-    }
-    return FEMALE_EDUCATOR_AVATARS[0].url;
-  } else {
-    if (name) {
-      const idx = Math.abs(name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % MALE_EDUCATOR_AVATARS.length;
-      return MALE_EDUCATOR_AVATARS[idx].url;
-    }
-    return MALE_EDUCATOR_AVATARS[0].url;
+export function getDefaultAvatar(genderOrSubject?: string, name?: string): string {
+  if (genderOrSubject && genderOrSubject.startsWith('icon:')) {
+    return genderOrSubject;
   }
+  if (genderOrSubject && genderOrSubject.length > 2 && genderOrSubject !== 'MALE' && genderOrSubject !== 'FEMALE') {
+    return getIconForSubject(genderOrSubject);
+  }
+  // Return standard educational icon
+  return 'icon:academic';
 }

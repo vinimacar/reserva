@@ -18,12 +18,14 @@ import { ReservationReceiptModal } from './components/ReservationReceiptModal';
 import { GoogleLoginModal } from './components/GoogleLoginModal';
 import { SchoolSetupModal } from './components/SchoolSetupModal';
 import { UserRegistrationModal } from './components/UserRegistrationModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { LoginScreen } from './components/LoginScreen';
 import { Reservation } from './types';
-import { Plus, Shield, Calendar, Layers, Sparkles, School, AlertCircle } from 'lucide-react';
+import { School } from 'lucide-react';
 
 function ReserveAppContent() {
   const { currentUser, isAdmin } = useAuth();
-  const { announcements, settings } = useReservations();
+  const { settings } = useReservations();
 
   // Navigation View State
   const [currentView, setCurrentView] = useState<
@@ -34,6 +36,7 @@ function ReserveAppContent() {
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
   const [isGoogleLoginModalOpen, setIsGoogleLoginModalOpen] = useState(false);
   const [isUserRegistrationModalOpen, setIsUserRegistrationModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isSchoolSetupModalOpen, setIsSchoolSetupModalOpen] = useState<boolean>(() => {
     // If not configured in settings and not saved in localStorage, open on first use
     const isConfiguredInStorage = localStorage.getItem('reserve_school_configured');
@@ -77,6 +80,11 @@ function ReserveAppContent() {
 
   const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
+  // If user is not authenticated, strictly show the Login Screen
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/90 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200 flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Header */}
@@ -94,6 +102,7 @@ function ReserveAppContent() {
         onOpenAnnouncements={() => setCurrentView('ANNOUNCEMENTS')}
         onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
         onOpenRegisterTeacher={() => setIsUserRegistrationModalOpen(true)}
+        onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -186,9 +195,14 @@ function ReserveAppContent() {
         isOpen={isUserRegistrationModalOpen}
         onClose={() => setIsUserRegistrationModalOpen(false)}
       />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+      />
     </div>
   );
-};
+}
 
 export default function App() {
   return (

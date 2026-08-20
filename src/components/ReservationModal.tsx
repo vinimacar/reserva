@@ -19,6 +19,7 @@ import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { ShiftType, Room, User } from '../types';
 import { SCHOOL_CLASSES, SCHOOL_DISCIPLINES, AVAILABLE_EQUIPMENT } from '../data/initialData';
+import { TeacherAvatar } from './TeacherAvatar';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -268,40 +269,52 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center space-x-3">
                   {currentSelectedTeacher && (
-                    <img
-                      src={currentSelectedTeacher.avatar}
-                      alt={currentSelectedTeacher.name}
-                      className="w-10 h-10 rounded-full border-2 border-blue-500 object-cover shrink-0"
+                    <TeacherAvatar
+                      avatar={currentSelectedTeacher.avatar}
+                      name={currentSelectedTeacher.name}
+                      subject={currentSelectedTeacher.subject}
+                      role={currentSelectedTeacher.role}
+                      size="md"
+                      showRoleBadge={true}
                     />
                   )}
                   <div className="flex-1 min-w-0">
-                    <select
-                      value={selectedTeacherId}
-                      onChange={(e) => {
-                        setSelectedTeacherId(e.target.value);
-                        const found = users.find((u) => u.id === e.target.value);
-                        if (found && found.subject && found.subject !== 'Geral') {
-                          setDisciplina(found.subject);
-                        }
-                      }}
-                      className="w-full sm:w-auto p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                    >
-                      {users.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.subject || 'Docente'})
-                        </option>
-                      ))}
-                    </select>
+                    {isAdmin ? (
+                      <select
+                        value={selectedTeacherId}
+                        onChange={(e) => {
+                          setSelectedTeacherId(e.target.value);
+                          const found = users.find((u) => u.id === e.target.value);
+                          if (found && found.subject && found.subject !== 'Geral') {
+                            setDisciplina(found.subject);
+                          }
+                        }}
+                        className="w-full sm:w-auto p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      >
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.subject || 'Docente'})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                          <span>{currentSelectedTeacher?.name}</span>
+                          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">(Seu Usuário)</span>
+                        </p>
+                      </div>
+                    )}
                     {currentSelectedTeacher && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-                        {currentSelectedTeacher.email} • {currentSelectedTeacher.schoolName}
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        {currentSelectedTeacher.email} • {currentSelectedTeacher.subject || 'Docente'}
                       </p>
                     )}
                   </div>
                 </div>
 
                 <span className="text-[10px] font-bold px-2 py-1 rounded bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 uppercase shrink-0 self-start sm:self-center">
-                  {currentSelectedTeacher?.role === 'ADMIN' ? 'Coordenador' : 'Docente'}
+                  {currentSelectedTeacher?.role === 'ADMIN' ? 'Coordenação' : 'Docente'}
                 </span>
               </div>
             ) : (

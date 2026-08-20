@@ -20,6 +20,7 @@ import {
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
+import { TeacherAvatar } from './TeacherAvatar';
 
 interface ReservationDetailsModalProps {
   reservation: Reservation | null;
@@ -141,17 +142,13 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
 
           {/* Teacher Info Card */}
           <div className="p-3 bg-blue-50/60 dark:bg-blue-950/40 rounded-2xl border border-blue-100 dark:border-blue-900/50 flex items-center space-x-3">
-            {reservation.userAvatar ? (
-              <img
-                src={reservation.userAvatar}
-                alt={reservation.userName}
-                className="w-10 h-10 rounded-full border border-blue-300 dark:border-blue-700"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center">
-                {reservation.userName.charAt(0)}
-              </div>
-            )}
+            <TeacherAvatar
+              avatar={reservation.userAvatar}
+              name={reservation.userName}
+              subject={reservation.disciplina}
+              size="md"
+              showRoleBadge={true}
+            />
             <div className="flex-1">
               <div className="flex items-center space-x-1.5">
                 <p className="font-bold text-slate-900 dark:text-slate-100 text-xs">{reservation.userName}</p>

@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { DEFAULT_USERS } from '../data/initialData';
-import { detectGenderFromName, getDefaultAvatar } from '../data/avatars';
+import { detectGenderFromName, getIconForSubject } from '../data/avatars';
+
+export interface LoginResult {
+  success: boolean;
+  error?: string;
+  user?: User;
+}
 
 interface AuthContextType {
   currentUser: User | null;
@@ -9,14 +15,16 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (user: User) => void;
   logout: () => void;
-  switchUser: (userId: string) => void;
+  loginWithCredentials: (email: string, password?: string) => LoginResult;
   loginWithGoogleEmail: (email: string, name?: string) => User;
+  changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
   toggleRole: () => void;
   updateUserRole: (userId: string, newRole: UserRole) => void;
   addUser: (user: Partial<User>, autoLogin?: boolean) => User;
   updateUser: (userId: string, data: Partial<User>) => void;
   deleteUser: (userId: string) => void;
   updateSchoolNameForAllUsers: (schoolName: string) => void;
+  switchUser: (userId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,20 +32,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY_USER = 'reserve_school_current_user';
 const STORAGE_KEY_USERS = 'reserve_school_users_list';
 
-// Helper to normalize user avatar and gender
+// Helper to normalize user avatar to educational icon (no photos/animals) and set password
 function normalizeUser(u: User): User {
   const gender = u.gender || detectGenderFromName(u.name);
   let avatar = u.avatar;
-  // If Vinicius had the previous mismatched image, fix it
-  if (u.id === 'user_vinicius' && avatar.includes('534528741775')) {
-    avatar = 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&auto=format&fit=crop&q=80';
-  } else if (!avatar) {
-    avatar = getDefaultAvatar(gender, u.name);
+
+  // Convert old photos or URLs to clean discipline icons
+  if (!avatar || avatar.startsWith('http') || avatar.includes('unsplash') || avatar.includes('dicebear')) {
+    avatar = getIconForSubject(u.subject);
   }
+
+  const password = u.password || 'educacao123';
+  const iconKey = u.iconKey || avatar;
+
   return {
     ...u,
     gender,
     avatar,
+    iconKey,
+    password,
   };
 }
 
@@ -59,13 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USER);
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed: User = JSON.parse(saved);
         return normalizeUser(parsed);
       }
     } catch {
       // ignore
     }
-    // Default to the school administrator (Prof. Vinicius)
+    // Default to school administrator (Prof. Vinicius) or null
     return normalizeUser(DEFAULT_USERS[0]);
   });
 
@@ -82,44 +95,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [users]);
 
   const login = (user: User) => {
-    setCurrentUser(user);
+    const normalized = normalizeUser(user);
+    setCurrentUser(normalized);
   };
 
   const logout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEY_USER);
   };
 
-  const switchUser = (userId: string) => {
-    const found = users.find((u) => u.id === userId);
-    if (found) {
-      setCurrentUser(found);
+  const loginWithCredentials = (email: string, password?: string): LoginResult => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const found = users.find((u) => u.email.toLowerCase() === trimmedEmail);
+
+    if (!found) {
+      return {
+        success: false,
+        error: `Nenhum professor encontrado com o e-mail "${trimmedEmail}". Verifique o endereço digitado ou solicite cadastro à coordenação.`,
+      };
     }
+
+    const expectedPassword = found.password || 'educacao123';
+    const providedPassword = (password || '').trim();
+
+    // If password provided and does not match
+    if (providedPassword && providedPassword !== expectedPassword) {
+      return {
+        success: false,
+        error: 'Senha incorreta para esta conta de professor. A senha padrão inicial é "educacao123".',
+      };
+    }
+
+    const normalized = normalizeUser(found);
+    setCurrentUser(normalized);
+    return {
+      success: true,
+      user: normalized,
+    };
   };
 
   const loginWithGoogleEmail = (email: string, name?: string): User => {
-    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const trimmedEmail = email.trim().toLowerCase();
+    const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail);
+
     if (existing) {
-      setCurrentUser(existing);
-      return existing;
+      const normalized = normalizeUser(existing);
+      setCurrentUser(normalized);
+      return normalized;
     }
 
     // Determine default role: if email matches initial admin or contains admin/coord, set as ADMIN
     const isAdminEmail =
-      email.toLowerCase().includes('admin') ||
-      email.toLowerCase().includes('vinicius') ||
-      email.toLowerCase().includes('coordenacao');
+      trimmedEmail.includes('admin') ||
+      trimmedEmail.includes('vinicius') ||
+      trimmedEmail.includes('coordenacao');
 
-    const generatedName = name || email.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    const generatedName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     const gender = detectGenderFromName(generatedName);
+    const subject = 'Docente Geral';
+    const iconAvatar = getIconForSubject(subject);
 
     const newUser: User = {
       id: `user_${Date.now()}`,
       name: generatedName,
-      email: email.toLowerCase(),
-      avatar: getDefaultAvatar(gender, generatedName),
+      email: trimmedEmail,
+      avatar: iconAvatar,
+      iconKey: iconAvatar,
+      password: 'educacao123',
       gender: gender,
       role: isAdminEmail ? 'ADMIN' : 'TEACHER',
-      subject: 'Docente Convidado',
+      subject: subject,
       schoolName: 'E.E. Governador Milton Campos',
     };
 
@@ -127,6 +172,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(updatedUsers);
     setCurrentUser(newUser);
     return newUser;
+  };
+
+  const changePassword = (userId: string, newPassword: string): { success: boolean; error?: string } => {
+    if (!newPassword || newPassword.trim().length < 4) {
+      return { success: false, error: 'A nova senha deve ter no mínimo 4 caracteres.' };
+    }
+
+    const updatedUsers = users.map((u) => {
+      if (u.id === userId) {
+        const updated = { ...u, password: newPassword.trim() };
+        if (currentUser && currentUser.id === userId) {
+          setCurrentUser(updated);
+        }
+        return updated;
+      }
+      return u;
+    });
+
+    setUsers(updatedUsers);
+    return { success: true };
+  };
+
+  const switchUser = (userId: string) => {
+    const found = users.find((u) => u.id === userId);
+    if (found) {
+      setCurrentUser(normalizeUser(found));
+    }
   };
 
   const toggleRole = () => {
@@ -152,18 +224,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  const addUser = (userData: Partial<User>, autoLogin: boolean = true): User => {
+  const addUser = (userData: Partial<User>, autoLogin: boolean = false): User => {
     // Check if user with this email already exists
     const existingIndex = users.findIndex(
       (u) => userData.email && u.email.toLowerCase() === userData.email.toLowerCase()
     );
 
     if (existingIndex >= 0) {
-      const updatedUser: User = {
+      const updatedUser: User = normalizeUser({
         ...users[existingIndex],
         ...userData,
         name: userData.name || users[existingIndex].name,
-      };
+      });
       const newUsers = [...users];
       newUsers[existingIndex] = updatedUser;
       setUsers(newUsers);
@@ -175,18 +247,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const rawName = userData.name || 'Novo Professor';
     const detectedGender = userData.gender || detectGenderFromName(rawName);
-    const chosenAvatar = userData.avatar || getDefaultAvatar(detectedGender, rawName);
+    const chosenSubject = userData.subject || 'Geral';
+    const chosenAvatar = userData.avatar || userData.iconKey || getIconForSubject(chosenSubject);
 
-    const newUser: User = {
+    const newUser: User = normalizeUser({
       id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       name: rawName,
       email: userData.email || `professor_${Date.now()}@educacao.mg.gov.br`,
       gender: detectedGender,
       avatar: chosenAvatar,
+      iconKey: chosenAvatar,
+      password: userData.password || 'educacao123',
       role: userData.role || 'TEACHER',
-      subject: userData.subject || 'Geral',
+      subject: chosenSubject,
       schoolName: userData.schoolName || currentUser?.schoolName || 'E.E. Governador Milton Campos',
-    };
+    });
 
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
@@ -200,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
-          const updated = { ...u, ...data };
+          const updated = normalizeUser({ ...u, ...data });
           if (currentUser && currentUser.id === userId) {
             setCurrentUser(updated);
           }
@@ -212,7 +287,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteUser = (userId: string) => {
-    // Prevent deleting if it's the last user
     if (users.length <= 1) return;
 
     setUsers((prev) => {
@@ -223,7 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser && currentUser.id === userId) {
       const remaining = users.filter((u) => u.id !== userId);
       if (remaining.length > 0) {
-        setCurrentUser(remaining[0]);
+        setCurrentUser(normalizeUser(remaining[0]));
       } else {
         setCurrentUser(null);
       }
@@ -250,14 +324,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin: currentUser?.role === 'ADMIN',
         login,
         logout,
-        switchUser,
+        loginWithCredentials,
         loginWithGoogleEmail,
+        changePassword,
         toggleRole,
         updateUserRole,
         addUser,
         updateUser,
         deleteUser,
         updateSchoolNameForAllUsers,
+        switchUser,
       }}
     >
       {children}

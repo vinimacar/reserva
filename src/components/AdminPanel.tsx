@@ -37,6 +37,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
+import { TeacherAvatar } from './TeacherAvatar';
 
 export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
@@ -999,7 +1000,14 @@ export const AdminPanel: React.FC<{
                     <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="p-3.5">
                         <div className="flex items-center space-x-2.5">
-                          <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 object-cover" />
+                          <TeacherAvatar
+                            avatar={u.avatar}
+                            name={u.name}
+                            subject={u.subject}
+                            role={u.role}
+                            size="sm"
+                            showRoleBadge={true}
+                          />
                           <span className="font-bold text-slate-900 dark:text-slate-100">{u.name}</span>
                         </div>
                       </td>

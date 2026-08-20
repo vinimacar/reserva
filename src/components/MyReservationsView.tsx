@@ -18,6 +18,7 @@ import {
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
+import { TeacherAvatar } from './TeacherAvatar';
 
 interface MyReservationsViewProps {
   onOpenNewReservation: () => void;
@@ -100,10 +101,13 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
       <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-14 h-14 rounded-2xl border-2 border-white/30 shadow-md object-cover"
+            <TeacherAvatar
+              avatar={currentUser.avatar}
+              name={currentUser.name}
+              subject={currentUser.subject}
+              role={currentUser.role}
+              size="lg"
+              showRoleBadge={true}
             />
             <div>
               <div className="flex items-center space-x-2">
