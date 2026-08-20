@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
-import { DEFAULT_USERS } from '../data/initialData';
+import { DEFAULT_USERS, DEFAULT_SCHOOLS } from '../data/initialData';
 import { detectGenderFromName, getIconForSubject } from '../data/avatars';
 
 export interface LoginResult {
@@ -15,15 +15,15 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (user: User) => void;
   logout: () => void;
-  loginWithCredentials: (email: string, password?: string) => LoginResult;
-  loginWithGoogleEmail: (email: string, name?: string) => User;
+  loginWithCredentials: (email: string, password?: string, preferredSchoolId?: string) => LoginResult;
+  loginWithGoogleEmail: (email: string, name?: string, schoolId?: string, schoolName?: string) => User;
   changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
   toggleRole: () => void;
   updateUserRole: (userId: string, newRole: UserRole) => void;
   addUser: (user: Partial<User>, autoLogin?: boolean) => User;
   updateUser: (userId: string, data: Partial<User>) => void;
   deleteUser: (userId: string) => void;
-  updateSchoolNameForAllUsers: (schoolName: string) => void;
+  updateSchoolNameForAllUsers: (schoolName: string, schoolId?: string) => void;
   switchUser: (userId: string) => void;
 }
 
@@ -44,6 +44,8 @@ function normalizeUser(u: User): User {
 
   const password = u.password || 'educacao123';
   const iconKey = u.iconKey || avatar;
+  const schoolId = u.schoolId || DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
+  const schoolName = u.schoolName || DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos';
 
   return {
     ...u,
@@ -51,6 +53,8 @@ function normalizeUser(u: User): User {
     avatar,
     iconKey,
     password,
+    schoolId,
+    schoolName,
   };
 }
 
@@ -60,7 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem(STORAGE_KEY_USERS);
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
-        return parsed.map(normalizeUser);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizeUser);
+        }
       }
     } catch {
       // ignore
@@ -104,15 +110,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(STORAGE_KEY_USER);
   };
 
-  const loginWithCredentials = (email: string, password?: string): LoginResult => {
+  const loginWithCredentials = (
+    email: string,
+    password?: string,
+    preferredSchoolId?: string
+  ): LoginResult => {
     const trimmedEmail = email.trim().toLowerCase();
-    const found = users.find((u) => u.email.toLowerCase() === trimmedEmail);
 
+    // Look for matching user in users list
+    let found = users.find((u) => u.email.toLowerCase() === trimmedEmail);
+
+    // If not found by direct email, check if user is a designated admin in DEFAULT_SCHOOLS
     if (!found) {
+      const schoolWithAdmin = DEFAULT_SCHOOLS.find((s) =>
+        s.adminEmails.some((e) => e.toLowerCase() === trimmedEmail)
+      );
+
+      if (schoolWithAdmin) {
+        // Auto register this school admin
+        const name = schoolWithAdmin.directorName || trimmedEmail.split('@')[0].replace('.', ' ');
+        const autoUser: User = normalizeUser({
+          id: `user_${Date.now()}`,
+          name: name.startsWith('Prof') ? name : `Prof. ${name}`,
+          email: trimmedEmail,
+          avatar: 'icon:tech',
+          iconKey: 'icon:tech',
+          password: password || 'educacao123',
+          role: 'ADMIN',
+          schoolId: schoolWithAdmin.id,
+          schoolName: schoolWithAdmin.name,
+          subject: 'Administração Escolar',
+        });
+
+        setUsers((prev) => [...prev, autoUser]);
+        setCurrentUser(autoUser);
+        return { success: true, user: autoUser };
+      }
+
       return {
         success: false,
-        error: `Nenhum professor encontrado com o e-mail "${trimmedEmail}". Verifique o endereço digitado ou solicite cadastro à coordenação.`,
+        error: `Nenhum professor encontrado com o e-mail "${trimmedEmail}". Verifique o endereço digitado ou solicite cadastro ao responsável da sua escola.`,
       };
+    }
+
+    // Check if user belongs to preferred school if specified and user has no schoolId
+    if (preferredSchoolId && (!found.schoolId || found.schoolId !== preferredSchoolId)) {
+      // If user specifically requested a school, update if applicable
+      const targetSchool = DEFAULT_SCHOOLS.find((s) => s.id === preferredSchoolId);
+      if (targetSchool && !found.schoolId) {
+        found = { ...found, schoolId: preferredSchoolId, schoolName: targetSchool.name };
+      }
     }
 
     const expectedPassword = found.password || 'educacao123';
@@ -134,7 +181,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   };
 
-  const loginWithGoogleEmail = (email: string, name?: string): User => {
+  const loginWithGoogleEmail = (
+    email: string,
+    name?: string,
+    schoolId?: string,
+    schoolName?: string
+  ): User => {
     const trimmedEmail = email.trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail);
 
@@ -144,20 +196,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return normalized;
     }
 
-    // Determine default role: if email matches initial admin or contains admin/coord, set as ADMIN
+    // Find school by provided schoolId or default
+    const matchedSchool = DEFAULT_SCHOOLS.find((s) => s.id === schoolId) || DEFAULT_SCHOOLS[0];
+    const targetSchoolId = schoolId || matchedSchool.id;
+    const targetSchoolName = schoolName || matchedSchool.name;
+
+    // Determine default role: if email is in school's admin list or contains admin/coord, set as ADMIN
     const isAdminEmail =
+      matchedSchool.adminEmails.some((e) => e.toLowerCase() === trimmedEmail) ||
       trimmedEmail.includes('admin') ||
       trimmedEmail.includes('vinicius') ||
-      trimmedEmail.includes('coordenacao');
+      trimmedEmail.includes('coordenacao') ||
+      trimmedEmail.includes('direcao');
 
-    const generatedName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    const gender = detectGenderFromName(generatedName);
+    const rawName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+    const formattedName = rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`;
+    const gender = detectGenderFromName(formattedName);
     const subject = 'Docente Geral';
     const iconAvatar = getIconForSubject(subject);
 
-    const newUser: User = {
+    const newUser: User = normalizeUser({
       id: `user_${Date.now()}`,
-      name: generatedName,
+      name: formattedName,
       email: trimmedEmail,
       avatar: iconAvatar,
       iconKey: iconAvatar,
@@ -165,8 +225,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       gender: gender,
       role: isAdminEmail ? 'ADMIN' : 'TEACHER',
       subject: subject,
-      schoolName: 'E.E. Governador Milton Campos',
-    };
+      schoolId: targetSchoolId,
+      schoolName: targetSchoolName,
+    });
 
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
@@ -246,13 +307,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     const rawName = userData.name || 'Novo Professor';
-    const detectedGender = userData.gender || detectGenderFromName(rawName);
+    const formattedName = rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`;
+    const detectedGender = userData.gender || detectGenderFromName(formattedName);
     const chosenSubject = userData.subject || 'Geral';
     const chosenAvatar = userData.avatar || userData.iconKey || getIconForSubject(chosenSubject);
 
     const newUser: User = normalizeUser({
       id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      name: rawName,
+      name: formattedName,
       email: userData.email || `professor_${Date.now()}@educacao.mg.gov.br`,
       gender: detectedGender,
       avatar: chosenAvatar,
@@ -260,7 +322,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       password: userData.password || 'educacao123',
       role: userData.role || 'TEACHER',
       subject: chosenSubject,
-      schoolName: userData.schoolName || currentUser?.schoolName || 'E.E. Governador Milton Campos',
+      schoolId: userData.schoolId || currentUser?.schoolId || DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos',
+      schoolName: userData.schoolName || currentUser?.schoolName || DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos',
     });
 
     const updatedUsers = [...users, newUser];
@@ -304,14 +367,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateSchoolNameForAllUsers = (schoolName: string) => {
+  const updateSchoolNameForAllUsers = (schoolName: string, schoolId?: string) => {
     setUsers((prev) =>
-      prev.map((u) => ({
-        ...u,
-        schoolName,
-      }))
+      prev.map((u) => {
+        if (!schoolId || u.schoolId === schoolId) {
+          return {
+            ...u,
+            schoolName,
+          };
+        }
+        return u;
+      })
     );
-    if (currentUser) {
+    if (currentUser && (!schoolId || currentUser.schoolId === schoolId)) {
       setCurrentUser((prev) => (prev ? { ...prev, schoolName } : null));
     }
   };

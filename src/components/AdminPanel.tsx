@@ -38,6 +38,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
+import { AdminSchoolsTab } from './AdminSchoolsTab';
 
 export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
@@ -45,6 +46,7 @@ export const AdminPanel: React.FC<{
   onOpenSchoolSettings?: () => void;
 }> = ({ onSelectReservation, onOpenReceipt, onOpenSchoolSettings }) => {
   const {
+    schools,
     reservations,
     rooms,
     announcements,
@@ -71,8 +73,8 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'BOOKINGS' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
-  >('BOOKINGS');
+    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
+  >('SCHOOLS');
 
   // Filter state for bookings
   const [filterRoomId, setFilterRoomId] = useState<string>('ALL');
@@ -271,6 +273,18 @@ export const AdminPanel: React.FC<{
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center overflow-x-auto bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
         <button
+          onClick={() => setActiveTab('SCHOOLS')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'SCHOOLS'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Building2 className="w-4 h-4 text-blue-400" />
+          <span>Rede de Escolas & Responsáveis ({schools.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('BOOKINGS')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'BOOKINGS'
@@ -342,6 +356,9 @@ export const AdminPanel: React.FC<{
           <span>Configurações</span>
         </button>
       </div>
+
+      {/* TAB 0: SCHOOLS & SYSTEM RESPONSABLES */}
+      {activeTab === 'SCHOOLS' && <AdminSchoolsTab onShowToast={showToast} />}
 
       {/* TAB 1: RESERVATIONS MANAGEMENT */}
       {activeTab === 'BOOKINGS' && (

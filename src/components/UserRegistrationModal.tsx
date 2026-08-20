@@ -14,6 +14,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useReservations } from '../context/ReservationContext';
 import { User, UserRole } from '../types';
 import { EDUCATIONAL_ICONS, getIconForSubject } from '../data/avatars';
 import { TeacherAvatar } from './TeacherAvatar';
@@ -51,6 +52,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   initialRole = 'TEACHER',
 }) => {
   const { addUser, updateUser, isAdmin, currentUser } = useAuth();
+  const { currentSchoolId, currentSchool } = useReservations();
   const isEditing = !!userToEdit;
 
   const [name, setName] = useState('');
@@ -157,7 +159,8 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
           role: role,
           avatar: chosenIcon,
           iconKey: chosenIcon,
-          schoolName: currentUser?.schoolName || 'E.E. Governador Milton Campos',
+          schoolId: currentSchoolId,
+          schoolName: currentSchool?.name || currentUser?.schoolName || 'E.E. Governador Milton Campos',
         },
         false // Do not auto login on registration
       );

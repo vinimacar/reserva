@@ -1,6 +1,27 @@
 export type UserRole = 'ADMIN' | 'TEACHER';
 export type GenderType = 'MALE' | 'FEMALE';
 
+export interface School {
+  id: string;
+  name: string;
+  shortName: string;
+  code: string; // e.g. '31002341' or 'MILTON'
+  city: string;
+  state: string;
+  inepCode?: string;
+  networkType: string; // 'Estadual' | 'Municipal' | 'Federal' | 'Particular'
+  shifts: ShiftType[];
+  contactEmail: string;
+  phone?: string;
+  directorName?: string;
+  active: boolean;
+  createdAt: string;
+  adminEmails: string[]; // List of emails of authorized administrators / responsáveis for this school
+  requireAdminApproval?: boolean;
+  maxAdvanceDays?: number;
+  allowWeekendBooking?: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -10,6 +31,7 @@ export interface User {
   password?: string;
   role: UserRole;
   subject?: string;
+  schoolId?: string;
   schoolName: string;
   gender?: GenderType;
 }
@@ -18,6 +40,7 @@ export type SpaceType = 'INFORMATICA' | 'CIENCIAS' | 'QUIMICA_FISICA' | 'MAKER' 
 
 export interface Room {
   id: string;
+  schoolId?: string;
   name: string;
   type: SpaceType;
   capacity: number;
@@ -46,6 +69,7 @@ export type ReservationStatus = 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLET
 
 export interface Reservation {
   id: string;
+  schoolId?: string;
   roomId: string;
   roomName: string;
   userId: string;
@@ -70,6 +94,7 @@ export interface Reservation {
 
 export interface Announcement {
   id: string;
+  schoolId?: string;
   title: string;
   content: string;
   date: string;

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  School,
+  School as SchoolIcon,
   Lock,
   Mail,
   Shield,
@@ -12,25 +12,92 @@ import {
   HelpCircle,
   Sparkles,
   ArrowRight,
-  BookOpen,
-  Laptop,
   GraduationCap,
+  Building2,
+  MapPin,
+  Search,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
 import { TeacherAvatar } from './TeacherAvatar';
-import { User } from '../types';
+import { User, School } from '../types';
 
 export const LoginScreen: React.FC = () => {
   const { users, loginWithCredentials, loginWithGoogleEmail } = useAuth();
-  const { settings } = useReservations();
+  const { schools, currentSchoolId, switchSchool } = useReservations();
+
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(currentSchoolId || schools[0]?.id || '');
+  const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
+  const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedUserForQuickFill, setSelectedUserForQuickFill] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Selected school object
+  const activeSelectedSchool = useMemo(() => {
+    return schools.find((s) => s.id === selectedSchoolId) || schools[0];
+  }, [schools, selectedSchoolId]);
+
+  // Filtered schools for search
+  const filteredSchools = useMemo(() => {
+    const q = schoolSearchQuery.toLowerCase().trim();
+    if (!q) return schools;
+    return schools.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.shortName.toLowerCase().includes(q) ||
+        s.city.toLowerCase().includes(q) ||
+        (s.code && s.code.toLowerCase().includes(q)) ||
+        (s.inepCode && s.inepCode.toLowerCase().includes(q))
+    );
+  }, [schools, schoolSearchQuery]);
+
+  // Teachers filtered by selected school
+  const teachersForSelectedSchool = useMemo(() => {
+    const list = users.filter((u) => u.schoolId === selectedSchoolId || (!u.schoolId && selectedSchoolId === schools[0]?.id));
+    if (list.length === 0) {
+      // Fallback: return users if only 1 school or default
+      return users.slice(0, 5);
+    }
+    return list;
+  }, [users, selectedSchoolId, schools]);
+
+  // Auto-detect school when user enters email
+  const handleEmailChange = (newEmail: string) => {
+    setEmail(newEmail);
+    const trimmed = newEmail.trim().toLowerCase();
+    if (trimmed.length > 3) {
+      // 1. Check if user exists in database
+      const matchedUser = users.find((u) => u.email.toLowerCase() === trimmed);
+      if (matchedUser && matchedUser.schoolId && matchedUser.schoolId !== selectedSchoolId) {
+        setSelectedSchoolId(matchedUser.schoolId);
+        switchSchool(matchedUser.schoolId);
+        return;
+      }
+
+      // 2. Check if user is an admin of any registered school
+      const schoolWithAdmin = schools.find((s) =>
+        (s.adminEmails || []).some((adm) => adm.toLowerCase() === trimmed)
+      );
+      if (schoolWithAdmin && schoolWithAdmin.id !== selectedSchoolId) {
+        setSelectedSchoolId(schoolWithAdmin.id);
+        switchSchool(schoolWithAdmin.id);
+      }
+    }
+  };
+
+  const handleSelectSchool = (school: School) => {
+    setSelectedSchoolId(school.id);
+    switchSchool(school.id);
+    setShowSchoolDropdown(false);
+    setSchoolSearchQuery('');
+    setErrorMessage(null);
+  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,10 +116,17 @@ export const LoginScreen: React.FC = () => {
 
     setIsLoading(true);
     setTimeout(() => {
-      const result = loginWithCredentials(trimmedEmail, password);
+      const result = loginWithCredentials(trimmedEmail, password, selectedSchoolId);
       setIsLoading(false);
       if (!result.success) {
         setErrorMessage(result.error || 'Erro ao realizar login. Verifique seus dados.');
+      } else {
+        // Switch to the correct school context for this user
+        if (result.user?.schoolId) {
+          switchSchool(result.user.schoolId);
+        } else if (selectedSchoolId) {
+          switchSchool(selectedSchoolId);
+        }
       }
     }, 250);
   };
@@ -60,19 +134,22 @@ export const LoginScreen: React.FC = () => {
   const handleSelectQuickUser = (user: User) => {
     setEmail(user.email);
     setPassword(user.password || 'educacao123');
-    setSelectedUserForQuickFill(user);
     setErrorMessage(null);
+
+    if (user.schoolId && user.schoolId !== selectedSchoolId) {
+      setSelectedSchoolId(user.schoolId);
+      switchSchool(user.schoolId);
+    }
   };
 
   const handleGoogleQuickLogin = () => {
     if (!email.trim()) {
-      // Default to the first teacher or admin
-      const defaultUser = users[0];
+      const defaultUser = teachersForSelectedSchool[0] || users[0];
       if (defaultUser) {
-        loginWithGoogleEmail(defaultUser.email, defaultUser.name);
+        loginWithGoogleEmail(defaultUser.email, defaultUser.name, selectedSchoolId, activeSelectedSchool?.name);
       }
     } else {
-      loginWithGoogleEmail(email.trim());
+      loginWithGoogleEmail(email.trim(), undefined, selectedSchoolId, activeSelectedSchool?.name);
     }
   };
 
@@ -84,52 +161,144 @@ export const LoginScreen: React.FC = () => {
       <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Bar / Institutional Header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between relative z-10">
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between relative z-20">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20">
-            <School className="w-5 h-5 text-white" />
+            <SchoolIcon className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-base font-black tracking-tight text-white font-mono">RESERVE LABS</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-400/30">
-                Portal Docente
+                Rede de Escolas
               </span>
             </div>
             <p className="text-[11px] text-slate-400 truncate max-w-xs sm:max-w-md">
-              {settings.schoolName || 'E.E. Governador Milton Campos'}
+              Sistema Integrado de Agendamento de Laboratórios & Espaços Pedagógicos
             </p>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center space-x-2 text-[11px] text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/60">
-          <Shield className="w-3.5 h-3.5 text-blue-400" />
-          <span>Acesso Seguro & Individual</span>
+        <div className="flex items-center space-x-3">
+          <div className="hidden sm:flex items-center space-x-2 text-[11px] text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700/60">
+            <Building2 className="w-3.5 h-3.5 text-blue-400" />
+            <span>{schools.length} Escolas Conectadas</span>
+          </div>
         </div>
       </header>
 
       {/* Main Login Box */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 relative z-10 my-4">
         <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden">
-          {/* Left Column: Login Form */}
+          
+          {/* Left Column: Login Form & School Selector */}
           <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between">
             <div>
-              <div className="space-y-1.5 mb-6">
+              <div className="space-y-1.5 mb-5">
                 <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-[11px] font-bold border border-blue-500/20 mb-1">
                   <Lock className="w-3 h-3" />
-                  <span>Identificação do Professor</span>
+                  <span>Acesso Institucional por Escola</span>
                 </div>
                 <h1 className="text-2xl font-black text-white tracking-tight">
                   Entrar no Sistema
                 </h1>
                 <p className="text-xs text-slate-400">
-                  Informe suas credenciais institucionais para gerenciar seus agendamentos de laboratório.
+                  Selecione sua unidade de ensino e informe suas credenciais para gerenciar agendamentos.
                 </p>
+              </div>
+
+              {/* 1. School Selector Dropdown */}
+              <div className="mb-4 relative">
+                <label className="block text-[11px] font-bold text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Unidade Escolar:</span>
+                  </span>
+                  <span className="text-[10px] text-blue-400 font-normal">
+                    {activeSelectedSchool?.city} - {activeSelectedSchool?.state || 'MG'}
+                  </span>
+                </label>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowSchoolDropdown(!showSchoolDropdown)}
+                    className="w-full p-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-800 focus:border-blue-500 rounded-xl text-left flex items-center justify-between transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
+                        <SchoolIcon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-white truncate">
+                          {activeSelectedSchool?.name || 'Selecione sua Escola'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 flex items-center gap-2">
+                          <span>{activeSelectedSchool?.networkType || 'Estadual'}</span>
+                          <span>•</span>
+                          <span>INEP: {activeSelectedSchool?.inepCode || activeSelectedSchool?.code}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform ${showSchoolDropdown ? 'rotate-180 text-blue-400' : ''}`} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showSchoolDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl z-50 p-2 animate-in fade-in duration-150">
+                      {/* Search inside dropdown */}
+                      <div className="relative mb-2">
+                        <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={schoolSearchQuery}
+                          onChange={(e) => setSchoolSearchQuery(e.target.value)}
+                          placeholder="Buscar por escola, cidade ou INEP..."
+                          className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="max-h-56 overflow-y-auto space-y-1">
+                        {filteredSchools.map((s) => {
+                          const isCur = s.id === selectedSchoolId;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => handleSelectSchool(s)}
+                              className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                isCur
+                                  ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40'
+                                  : 'hover:bg-slate-900 text-slate-300 hover:text-white border border-transparent'
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold truncate text-white">{s.name}</p>
+                                <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                  <MapPin className="w-3 h-3 text-slate-500" />
+                                  <span>{s.city} - {s.state}</span>
+                                  <span>•</span>
+                                  <span className="font-mono text-slate-500">INEP {s.inepCode || s.code}</span>
+                                </p>
+                              </div>
+                              {isCur && <Check className="w-4 h-4 text-blue-400 shrink-0 ml-2" />}
+                            </button>
+                          );
+                        })}
+                        {filteredSchools.length === 0 && (
+                          <div className="p-4 text-center text-xs text-slate-500">
+                            Nenhuma escola encontrada com "{schoolSearchQuery}".
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Error Message */}
               {errorMessage && (
-                <div className="p-3.5 mb-5 rounded-2xl bg-red-950/60 border border-red-800 text-red-300 text-xs font-semibold flex items-start space-x-2.5 animate-in fade-in">
+                <div className="p-3.5 mb-4 rounded-2xl bg-red-950/60 border border-red-800 text-red-300 text-xs font-semibold flex items-start space-x-2.5 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p>{errorMessage}</p>
@@ -138,11 +307,11 @@ export const LoginScreen: React.FC = () => {
               )}
 
               {/* Login Form */}
-              <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+              <form onSubmit={handleLoginSubmit} className="space-y-3.5 text-xs">
                 {/* Email Field */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1.5">
-                    E-mail Institucional:
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    E-mail Institucional do Docente ou Responsável:
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -151,7 +320,7 @@ export const LoginScreen: React.FC = () => {
                       type="email"
                       required
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => handleEmailChange(e.target.value)}
                       placeholder="ex: professor@educacao.mg.gov.br"
                       className="w-full pl-10 pr-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-mono"
                     />
@@ -160,7 +329,7 @@ export const LoginScreen: React.FC = () => {
 
                 {/* Password Field */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <label className="text-[11px] font-bold text-slate-300">
                       Senha de Acesso:
                     </label>
@@ -195,15 +364,15 @@ export const LoginScreen: React.FC = () => {
                   id="login-submit-btn"
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 mt-2"
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white rounded-xl font-black text-xs shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 mt-1"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>{isLoading ? 'Autenticando...' : 'Acessar Sistema'}</span>
+                  <span>{isLoading ? 'Autenticando...' : `Acessar ${activeSelectedSchool?.shortName || 'Escola'}`}</span>
                 </button>
               </form>
 
               {/* Divider */}
-              <div className="relative my-5">
+              <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-800"></div>
                 </div>
@@ -217,41 +386,41 @@ export const LoginScreen: React.FC = () => {
                 id="login-google-btn"
                 type="button"
                 onClick={handleGoogleQuickLogin}
-                className="w-full py-2.5 bg-slate-950 hover:bg-slate-800/80 border border-slate-800 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs"
+                className="w-full py-2 bg-slate-950 hover:bg-slate-800/80 border border-slate-800 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-xs"
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                <span>Entrar com Conta Google Institucional</span>
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5" />
+                <span>Entrar com Google Workspace Institucional</span>
               </button>
             </div>
 
             {/* Bottom Security Notice */}
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center space-x-2 text-[11px] text-slate-400">
+            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center space-x-2 text-[11px] text-slate-400">
               <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>
-                Proteção de dados: O Professor A não pode visualizar ou alterar agendamentos privados de outros docentes.
+                Proteção de dados: O Professor A não acessa a conta do Professor B.
               </span>
             </div>
           </div>
 
-          {/* Right Column: Quick Account Picker for Easy Testing */}
+          {/* Right Column: Staff & Quick Account Picker for Easy Testing */}
           <div className="lg:col-span-5 bg-slate-950/80 border-t lg:border-t-0 lg:border-l border-slate-800 p-6 sm:p-7 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                   <GraduationCap className="w-4 h-4 text-blue-400" />
-                  <span>Professores Cadastrados:</span>
+                  <span>Docentes Cadastrados:</span>
                 </span>
-                <span className="text-[10px] text-slate-500 font-mono">
-                  {users.length} ativos
+                <span className="text-[10px] text-blue-400 font-mono px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">
+                  {teachersForSelectedSchool.length} nesta escola
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mb-3.5">
-                Clique no seu nome abaixo para preencher automaticamente seu login:
+              <p className="text-[11px] text-slate-400 mb-3">
+                Selecione um professor da unidade <strong className="text-slate-200">{activeSelectedSchool?.shortName || activeSelectedSchool?.name}</strong> para preencher o login:
               </p>
 
               {/* Staff List */}
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                {users.map((user) => {
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                {teachersForSelectedSchool.map((user) => {
                   const isSelected = email.toLowerCase() === user.email.toLowerCase();
                   const isAdmin = user.role === 'ADMIN';
 
@@ -260,7 +429,7 @@ export const LoginScreen: React.FC = () => {
                       key={user.id}
                       type="button"
                       onClick={() => handleSelectQuickUser(user)}
-                      className={`w-full flex items-center space-x-3 p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      className={`w-full flex items-center space-x-2.5 p-2 rounded-2xl border text-left transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-blue-950/70 border-blue-500 shadow-sm ring-1 ring-blue-500'
                           : 'bg-slate-900/90 border-slate-800 hover:bg-slate-800/80 hover:border-slate-700'
@@ -300,10 +469,10 @@ export const LoginScreen: React.FC = () => {
             <div className="mt-4 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
               <div className="flex items-center space-x-1.5 font-bold text-slate-300">
                 <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                <span>Primeiro Acesso ou Novo Professor?</span>
+                <span>Multi-Escolas & Responsáveis</span>
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed">
-                Novos docentes são cadastrados pelo administrador do sistema (Coordenação/Direção).
+                O administrador geral cadastra novas escolas e vincula os responsáveis pelo sistema de cada unidade no Painel Admin.
               </p>
             </div>
           </div>
@@ -311,14 +480,14 @@ export const LoginScreen: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-900/40 text-slate-500 text-[11px] py-3.5 px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10">
+      <footer className="border-t border-slate-800/80 bg-slate-900/40 text-slate-500 text-[11px] py-3 px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 relative z-10">
         <div>
-          <span>Secretaria de Estado de Educação de Minas Gerais • Rede Estadual de Ensino</span>
+          <span>Secretaria de Estado de Educação de Minas Gerais • Sistema Multi-Escolas</span>
         </div>
         <div className="flex items-center space-x-3 text-slate-400">
           <span>RESERVE LABS v3.0</span>
           <span>•</span>
-          <span>Ambiente Seguro</span>
+          <span>Rede Integrada</span>
         </div>
       </footer>
     </div>

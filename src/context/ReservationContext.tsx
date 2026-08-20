@@ -8,6 +8,8 @@ import {
   ShiftType,
   ReservationStatus,
   RoomStats,
+  School,
+  User,
 } from '../types';
 import {
   DEFAULT_ROOMS,
@@ -17,6 +19,7 @@ import {
   DEFAULT_SETTINGS,
   SAMPLE_DEMO_RESERVATIONS,
   SAMPLE_DEMO_ANNOUNCEMENTS,
+  DEFAULT_SCHOOLS,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
 
@@ -28,11 +31,28 @@ interface ConflictResult {
 }
 
 interface ReservationContextType {
+  // Multi-school properties
+  schools: School[];
+  currentSchoolId: string;
+  currentSchool: School;
+  switchSchool: (schoolId: string) => void;
+  addSchool: (schoolData: Omit<School, 'id' | 'createdAt'>, createDefaultRooms?: boolean) => School;
+  updateSchool: (id: string, schoolData: Partial<School>) => void;
+  deleteSchool: (id: string) => boolean;
+  assignSchoolAdmin: (schoolId: string, email: string, name?: string) => void;
+  removeSchoolAdmin: (schoolId: string, email: string) => void;
+  getSchoolTeachers: (schoolId?: string) => User[];
+
+  // Tenant-scoped entities
   reservations: Reservation[];
+  allReservations: Reservation[];
   rooms: Room[];
+  allRooms: Room[];
   periods: TimePeriod[];
   announcements: Announcement[];
   settings: SchoolSettings;
+
+  // Selected filters & UI state
   selectedRoomId: string;
   selectedDate: string; // ISO YYYY-MM-DD
   selectedShift: ShiftType | 'ALL';
@@ -41,6 +61,7 @@ interface ReservationContextType {
   setSelectedDate: (date: string) => void;
   setSelectedShift: (shift: ShiftType | 'ALL') => void;
   setSearchQuery: (query: string) => void;
+
   // Reservation Actions
   addReservation: (data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>) => { success: boolean; error?: string; reservation?: Reservation };
   updateReservation: (id: string, data: Partial<Reservation>) => boolean;
@@ -49,22 +70,35 @@ interface ReservationContextType {
   approveReservation: (id: string, note?: string) => void;
   rejectReservation: (id: string, note?: string) => void;
   clearAllReservations: () => void;
+
   // Room Actions
   addRoom: (roomData: Omit<Room, 'id'>) => Room;
   updateRoom: (id: string, roomData: Partial<Room>) => void;
   deleteRoom: (id: string) => void;
+
   // Announcement Actions
   addAnnouncement: (data: Omit<Announcement, 'id' | 'date'>) => void;
   deleteAnnouncement: (id: string) => void;
   clearAllAnnouncements: () => void;
+
   // Settings Actions
   updateSettings: (newSettings: Partial<SchoolSettings>) => void;
+
   // Conflict Checking
   checkConflict: (roomId: string, date: string, periodIds: string[], excludeReservationId?: string) => ConflictResult;
   getReservationsForSlot: (roomId: string, date: string, periodId: string) => Reservation | undefined;
+
   // Stats
   getRoomStats: () => RoomStats[];
   getTeacherStats: () => { teacherName: string; count: number; email: string }[];
+  getNetworkOverviewStats: () => {
+    totalSchools: number;
+    activeSchools: number;
+    totalRooms: number;
+    totalReservations: number;
+    totalAdmins: number;
+  };
+
   // Production / Data Management
   clearSystemForProduction: () => void;
   loadDemoSampleData: () => void;
@@ -73,15 +107,48 @@ interface ReservationContextType {
 
 const ReservationContext = createContext<ReservationContextType | undefined>(undefined);
 
+const STORAGE_KEY_SCHOOLS = 'reserve_school_schools_list';
+const STORAGE_KEY_ACTIVE_SCHOOL = 'reserve_school_active_id';
 const STORAGE_KEY_RES = 'reserve_school_reservations';
 const STORAGE_KEY_ROOMS = 'reserve_school_rooms';
 const STORAGE_KEY_ANN = 'reserve_school_announcements';
-const STORAGE_KEY_SETTINGS = 'reserve_school_settings';
 
 export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, users, addUser, updateUserRole } = useAuth();
 
-  const [reservations, setReservations] = useState<Reservation[]>(() => {
+  // 1. Schools List State
+  const [schools, setSchools] = useState<School[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SCHOOLS);
+      if (saved) {
+        const parsed: School[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_SCHOOLS;
+  });
+
+  // 2. Active School ID
+  const [currentSchoolId, setCurrentSchoolId] = useState<string>(() => {
+    try {
+      const savedId = localStorage.getItem(STORAGE_KEY_ACTIVE_SCHOOL);
+      if (savedId) return savedId;
+    } catch {
+      // ignore
+    }
+    return DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
+  });
+
+  // Get active school object
+  const currentSchool: School =
+    schools.find((s) => s.id === currentSchoolId) ||
+    schools[0] ||
+    DEFAULT_SCHOOLS[0];
+
+  // 3. Raw Data Stores (Multi-tenant persisted)
+  const [allReservations, setAllReservations] = useState<Reservation[]>(() => {
     try {
       const isCleared = localStorage.getItem('reserve_production_cleared');
       if (isCleared === 'true') {
@@ -92,14 +159,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const saved = localStorage.getItem(STORAGE_KEY_RES);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // If it was just the old mock test data (has res_1, res_2, etc.), wipe it for clean production
-        const isMockData = Array.isArray(parsed) && parsed.some((r) => r.id === 'res_1' || r.id === 'res_2');
-        if (isMockData) {
-          localStorage.setItem('reserve_production_cleared', 'true');
-          localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
-          return [];
-        }
-        return parsed;
+        return Array.isArray(parsed) ? parsed : [];
       }
     } catch {
       // ignore
@@ -107,19 +167,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return DEFAULT_RESERVATIONS;
   });
 
-  const [rooms, setRooms] = useState<Room[]>(() => {
+  const [allRooms, setAllRooms] = useState<Room[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ROOMS);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch {
       // ignore
     }
     return DEFAULT_ROOMS;
   });
 
-  const [periods] = useState<TimePeriod[]>(TIME_PERIODS);
-
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+  const [allAnnouncements, setAllAnnouncements] = useState<Announcement[]>(() => {
     try {
       const isCleared = localStorage.getItem('reserve_production_cleared');
       if (isCleared === 'true') {
@@ -130,12 +191,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const saved = localStorage.getItem(STORAGE_KEY_ANN);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const isMockData = Array.isArray(parsed) && parsed.some((a) => a.id === 'ann_1' || a.id === 'ann_2');
-        if (isMockData) {
-          localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
-          return [];
-        }
-        return parsed;
+        return Array.isArray(parsed) ? parsed : [];
       }
     } catch {
       // ignore
@@ -143,37 +199,258 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return DEFAULT_ANNOUNCEMENTS;
   });
 
-  const [settings, setSettings] = useState<SchoolSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
-    }
-    return DEFAULT_SETTINGS;
-  });
+  const [periods] = useState<TimePeriod[]>(TIME_PERIODS);
 
-  // UI state
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(() => DEFAULT_ROOMS[0]?.id || 'room_info_1');
+  // Sync state to LocalStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(schools));
+  }, [schools]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_ACTIVE_SCHOOL, currentSchoolId);
+  }, [currentSchoolId]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(allReservations));
+  }, [allReservations]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(allRooms));
+  }, [allRooms]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(allAnnouncements));
+  }, [allAnnouncements]);
+
+  // Derived tenant-scoped slices
+  const defaultSchoolId = DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
+
+  const rooms: Room[] = allRooms.filter(
+    (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+  );
+
+  const reservations: Reservation[] = allReservations.filter(
+    (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+  );
+
+  const announcements: Announcement[] = allAnnouncements.filter(
+    (a) => a.schoolId === currentSchoolId || (!a.schoolId && currentSchoolId === defaultSchoolId)
+  );
+
+  // Derived School Settings dynamically generated from the active School tenant
+  const settings: SchoolSettings = {
+    schoolName: currentSchool.name,
+    shortName: currentSchool.shortName,
+    city: currentSchool.city,
+    state: currentSchool.state,
+    inepCode: currentSchool.inepCode || currentSchool.code,
+    networkType: currentSchool.networkType,
+    shifts: currentSchool.shifts,
+    requireAdminApproval: currentSchool.requireAdminApproval || false,
+    maxAdvanceDays: currentSchool.maxAdvanceDays || 30,
+    allowWeekendBooking: currentSchool.allowWeekendBooking || false,
+    contactEmail: currentSchool.contactEmail,
+    phone: currentSchool.phone,
+    directorName: currentSchool.directorName,
+    isConfigured: true,
+    configuredAt: currentSchool.createdAt,
+  };
+
+  // UI state for active school
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(() => rooms[0]?.id || 'room_info_1');
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedShift, setSelectedShift] = useState<ShiftType | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // When active school changes, ensure selected room is updated to a room belonging to the new school
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(reservations));
-  }, [reservations]);
+    const schoolRooms = allRooms.filter(
+      (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+    );
+    if (schoolRooms.length > 0) {
+      const exists = schoolRooms.some((r) => r.id === selectedRoomId);
+      if (!exists) {
+        setSelectedRoomId(schoolRooms[0].id);
+      }
+    } else {
+      setSelectedRoomId('');
+    }
+  }, [currentSchoolId, allRooms]);
 
+  // When user logs in, if their user object has a specific schoolId, switch context to that school
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(rooms));
-  }, [rooms]);
+    if (currentUser?.schoolId && currentUser.schoolId !== currentSchoolId) {
+      const schoolExists = schools.some((s) => s.id === currentUser.schoolId);
+      if (schoolExists) {
+        setCurrentSchoolId(currentUser.schoolId);
+      }
+    }
+  }, [currentUser]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(announcements));
-  }, [announcements]);
+  // School Actions
+  const switchSchool = (schoolId: string) => {
+    const found = schools.find((s) => s.id === schoolId);
+    if (found) {
+      setCurrentSchoolId(schoolId);
+    }
+  };
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
-  }, [settings]);
+  const addSchool = (
+    schoolData: Omit<School, 'id' | 'createdAt'>,
+    createDefaultRooms: boolean = true
+  ): School => {
+    const newSchoolId = `school_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const newSchool: School = {
+      ...schoolData,
+      id: newSchoolId,
+      createdAt: new Date().toISOString(),
+      active: true,
+      adminEmails: schoolData.adminEmails || [],
+    };
+
+    setSchools((prev) => [...prev, newSchool]);
+
+    // Create standard default rooms for this new school if requested
+    if (createDefaultRooms) {
+      const defaultStandardRooms: Room[] = [
+        {
+          id: `room_${newSchoolId}_info`,
+          schoolId: newSchoolId,
+          name: 'Laboratório de Informática & Tecnologia',
+          type: 'INFORMATICA',
+          capacity: 35,
+          location: 'Bloco Principal - Sala 101',
+          description: 'Espaço com computadores conectados à internet para atividades pedagógicas digitais.',
+          status: 'ACTIVE',
+          color: 'blue',
+          iconName: 'Monitor',
+          responsibleName: schoolData.directorName || 'Coordenação de TI',
+          equipment: ['Computadores com Acesso à Internet', 'Projetor Multimídia', 'Quadro Branco'],
+          rules: ['Proibido alimentos', 'Desligar equipamentos após o uso'],
+        },
+        {
+          id: `room_${newSchoolId}_ciencias`,
+          schoolId: newSchoolId,
+          name: 'Laboratório Integrado de Ciências e Biologia',
+          type: 'CIENCIAS',
+          capacity: 32,
+          location: 'Bloco de Laboratórios',
+          description: 'Ambiente com bancadas e instrumentos para práticas experimentais de Ciências da Natureza.',
+          status: 'ACTIVE',
+          color: 'emerald',
+          iconName: 'Microscope',
+          responsibleName: 'Coordenação de Ciências',
+          equipment: ['Microscópios Ópticos', 'Modelos Didáticos Anatômicos', 'Vidrarias Básicas'],
+          rules: ['Uso obrigatório de jaleco', 'Manter bancadas limpas e secas'],
+        },
+        {
+          id: `room_${newSchoolId}_maker`,
+          schoolId: newSchoolId,
+          name: 'Espaço Maker / Multimídia',
+          type: 'MAKER',
+          capacity: 30,
+          location: 'Sala Multiuso',
+          description: 'Ambiente flexível para projetos práticos, robótica e exibições audiovisuais.',
+          status: 'ACTIVE',
+          color: 'amber',
+          iconName: 'Cpu',
+          responsibleName: 'Coordenação Pedagógica',
+          equipment: ['Smart TV / Projetor', 'Kits de Robótica', 'Mesas Modulares'],
+          rules: ['Guardar materiais nos respectivos organizadores ao final'],
+        },
+      ];
+
+      setAllRooms((prev) => [...prev, ...defaultStandardRooms]);
+    }
+
+    return newSchool;
+  };
+
+  const updateSchool = (id: string, schoolData: Partial<School>) => {
+    setSchools((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...schoolData } : s))
+    );
+  };
+
+  const deleteSchool = (id: string): boolean => {
+    if (schools.length <= 1) {
+      return false; // Cannot delete the only remaining school
+    }
+
+    setSchools((prev) => prev.filter((s) => s.id !== id));
+    setAllRooms((prev) => prev.filter((r) => r.schoolId !== id));
+    setAllReservations((prev) => prev.filter((res) => res.schoolId !== id));
+    setAllAnnouncements((prev) => prev.filter((ann) => ann.schoolId !== id));
+
+    if (currentSchoolId === id) {
+      const nextSchool = schools.find((s) => s.id !== id);
+      if (nextSchool) {
+        setCurrentSchoolId(nextSchool.id);
+      }
+    }
+    return true;
+  };
+
+  const assignSchoolAdmin = (schoolId: string, email: string, name?: string) => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) return;
+
+    // 1. Add email to school's admin list
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId) {
+          const currentAdmins = s.adminEmails || [];
+          if (!currentAdmins.some((e) => e.toLowerCase() === trimmedEmail)) {
+            return { ...s, adminEmails: [...currentAdmins, trimmedEmail] };
+          }
+        }
+        return s;
+      })
+    );
+
+    // 2. Ensure user exists in AuthContext as Admin for this school
+    const targetSchool = schools.find((s) => s.id === schoolId);
+    const existingUser = users.find((u) => u.email.toLowerCase() === trimmedEmail);
+
+    if (existingUser) {
+      updateUserRole(existingUser.id, 'ADMIN');
+    } else {
+      addUser({
+        name: name || trimmedEmail.split('@')[0].replace('.', ' '),
+        email: trimmedEmail,
+        role: 'ADMIN',
+        schoolId: schoolId,
+        schoolName: targetSchool ? targetSchool.name : 'Escola da Rede',
+        subject: 'Administrador / Coordenação do Sistema',
+      });
+    }
+  };
+
+  const removeSchoolAdmin = (schoolId: string, email: string) => {
+    const trimmedEmail = email.trim().toLowerCase();
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === schoolId) {
+          return {
+            ...s,
+            adminEmails: (s.adminEmails || []).filter(
+              (e) => e.toLowerCase() !== trimmedEmail
+            ),
+          };
+        }
+        return s;
+      })
+    );
+  };
+
+  const getSchoolTeachers = (schoolId?: string): User[] => {
+    const targetId = schoolId || currentSchoolId;
+    return users.filter(
+      (u) =>
+        u.schoolId === targetId ||
+        (!u.schoolId && targetId === defaultSchoolId)
+    );
+  };
 
   // Conflict detection
   const checkConflict = (
@@ -221,7 +498,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
   ) => {
     if (!currentUser) {
-      return { success: false, error: 'Você precisa estar autenticado com uma conta Google.' };
+      return { success: false, error: 'Você precisa estar autenticado.' };
     }
 
     const room = rooms.find((r) => r.id === data.roomId);
@@ -257,11 +534,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       periodLabels = `${selectedPeriods.map((p) => `${p.number}ª`).join(' e ')} Aula (${startHour} - ${endHour})`;
     }
 
-    const initialStatus: ReservationStatus = settings.requireAdminApproval && !isAdmin ? 'PENDING' : 'CONFIRMED';
+    const initialStatus: ReservationStatus = currentSchool.requireAdminApproval && !isAdmin ? 'PENDING' : 'CONFIRMED';
 
     const newReservation: Reservation = {
       ...data,
       id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      schoolId: currentSchoolId,
       roomName: room.name,
       userId: currentUser.id,
       userName: currentUser.name,
@@ -273,12 +551,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       createdAt: new Date().toISOString(),
     };
 
-    setReservations((prev) => [newReservation, ...prev]);
+    setAllReservations((prev) => [newReservation, ...prev]);
     return { success: true, reservation: newReservation };
   };
 
   const updateReservation = (id: string, data: Partial<Reservation>): boolean => {
-    const existing = reservations.find((r) => r.id === id);
+    const existing = allReservations.find((r) => r.id === id);
     if (!existing) return false;
 
     // If changing room, date or periods, check conflict
@@ -294,12 +572,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     const updated = { ...existing, ...data };
-    setReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    setAllReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
     return true;
   };
 
   const cancelReservation = (id: string, reason?: string) => {
-    setReservations((prev) =>
+    setAllReservations((prev) =>
       prev.map((r) =>
         r.id === id
           ? {
@@ -313,11 +591,11 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteReservation = (id: string) => {
-    setReservations((prev) => prev.filter((r) => r.id !== id));
+    setAllReservations((prev) => prev.filter((r) => r.id !== id));
   };
 
   const approveReservation = (id: string, note?: string) => {
-    setReservations((prev) =>
+    setAllReservations((prev) =>
       prev.map((r) =>
         r.id === id
           ? {
@@ -331,7 +609,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const rejectReservation = (id: string, note?: string) => {
-    setReservations((prev) =>
+    setAllReservations((prev) =>
       prev.map((r) =>
         r.id === id
           ? {
@@ -349,19 +627,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const newRoom: Room = {
       ...roomData,
       id: `room_${Date.now()}`,
+      schoolId: currentSchoolId,
     };
-    setRooms((prev) => [...prev, newRoom]);
+    setAllRooms((prev) => [...prev, newRoom]);
     return newRoom;
   };
 
   const updateRoom = (id: string, roomData: Partial<Room>) => {
-    setRooms((prev) =>
+    setAllRooms((prev) =>
       prev.map((r) => {
         if (r.id === id) {
           const updated = { ...r, ...roomData };
-          // If name changed, update reservations
           if (roomData.name && roomData.name !== r.name) {
-            setReservations((resList) =>
+            setAllReservations((resList) =>
               resList.map((res) => (res.roomId === id ? { ...res, roomName: roomData.name! } : res))
             );
           }
@@ -373,36 +651,9 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteRoom = (id: string) => {
-    setRooms((prev) => {
-      const updated = prev.filter((r) => r.id !== id);
-      try {
-        localStorage.setItem(STORAGE_KEY_ROOMS, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
-
-    // Also remove reservations and announcements for deleted room
-    setReservations((prev) => {
-      const updated = prev.filter((r) => r.roomId !== id);
-      try {
-        localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
-
-    setAnnouncements((prev) => {
-      const updated = prev.filter((a) => a.targetRoomId !== id);
-      try {
-        localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
-    });
+    setAllRooms((prev) => prev.filter((r) => r.id !== id));
+    setAllReservations((prev) => prev.filter((r) => r.roomId !== id));
+    setAllAnnouncements((prev) => prev.filter((a) => a.targetRoomId !== id));
 
     setSelectedRoomId((prevId) => {
       if (prevId === id) {
@@ -418,18 +669,42 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const newAnn: Announcement = {
       ...data,
       id: `ann_${Date.now()}`,
+      schoolId: currentSchoolId,
       date: new Date().toISOString().split('T')[0],
     };
-    setAnnouncements((prev) => [newAnn, ...prev]);
+    setAllAnnouncements((prev) => [newAnn, ...prev]);
   };
 
   const deleteAnnouncement = (id: string) => {
-    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    setAllAnnouncements((prev) => prev.filter((a) => a.id !== id));
   };
 
   // Settings
   const updateSettings = (newSettings: Partial<SchoolSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    // Synchronize to the active school
+    setSchools((prev) =>
+      prev.map((s) => {
+        if (s.id === currentSchoolId) {
+          return {
+            ...s,
+            name: newSettings.schoolName || s.name,
+            shortName: newSettings.shortName || s.shortName,
+            city: newSettings.city || s.city,
+            state: newSettings.state || s.state,
+            inepCode: newSettings.inepCode || s.inepCode,
+            networkType: newSettings.networkType || s.networkType,
+            shifts: newSettings.shifts || s.shifts,
+            contactEmail: newSettings.contactEmail || s.contactEmail,
+            phone: newSettings.phone || s.phone,
+            directorName: newSettings.directorName || s.directorName,
+            requireAdminApproval: newSettings.requireAdminApproval !== undefined ? newSettings.requireAdminApproval : s.requireAdminApproval,
+            maxAdvanceDays: newSettings.maxAdvanceDays || s.maxAdvanceDays,
+            allowWeekendBooking: newSettings.allowWeekendBooking !== undefined ? newSettings.allowWeekendBooking : s.allowWeekendBooking,
+          };
+        }
+        return s;
+      })
+    );
   };
 
   // Stats
@@ -438,7 +713,6 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const roomRes = reservations.filter((r) => r.roomId === room.id && r.status !== 'CANCELLED');
       const totalBookings = roomRes.length;
 
-      // Calculate shift distribution
       const shiftsCount = { MANHA: 0, TARDE: 0, NOITE: 0 };
       roomRes.forEach((r) => {
         shiftsCount[r.shift] = (shiftsCount[r.shift] || 0) + 1;
@@ -451,7 +725,6 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         popularShift = 'NOITE';
       }
 
-      // Simple occupancy approximation (out of ~30 weekly available slot blocks)
       const occupancyRate = Math.min(100, Math.round((totalBookings / 15) * 100));
 
       return {
@@ -478,46 +751,74 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       .sort((a, b) => b.count - a.count);
   };
 
+  const getNetworkOverviewStats = () => {
+    const totalSchools = schools.length;
+    const activeSchools = schools.filter((s) => s.active).length;
+    const totalRooms = allRooms.length;
+    const totalReservations = allReservations.filter((r) => r.status !== 'CANCELLED').length;
+    const adminEmailsSet = new Set<string>();
+    schools.forEach((s) => (s.adminEmails || []).forEach((e) => adminEmailsSet.add(e.toLowerCase())));
+    users.filter((u) => u.role === 'ADMIN').forEach((u) => adminEmailsSet.add(u.email.toLowerCase()));
+
+    return {
+      totalSchools,
+      activeSchools,
+      totalRooms,
+      totalReservations,
+      totalAdmins: adminEmailsSet.size,
+    };
+  };
+
   const clearAllReservations = () => {
-    setReservations([]);
-    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
+    setAllReservations((prev) => prev.filter((r) => r.schoolId !== currentSchoolId && r.schoolId));
   };
 
   const clearAllAnnouncements = () => {
-    setAnnouncements([]);
-    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
+    setAllAnnouncements((prev) => prev.filter((a) => a.schoolId !== currentSchoolId && a.schoolId));
   };
 
   const clearSystemForProduction = () => {
-    setReservations([]);
-    setAnnouncements([]);
-    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify([]));
-    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify([]));
+    setAllReservations([]);
+    setAllAnnouncements([]);
+    localStorage.setItem('reserve_production_cleared', 'true');
   };
 
   const loadDemoSampleData = () => {
-    setReservations(SAMPLE_DEMO_RESERVATIONS);
-    setAnnouncements(SAMPLE_DEMO_ANNOUNCEMENTS);
-    localStorage.setItem(STORAGE_KEY_RES, JSON.stringify(SAMPLE_DEMO_RESERVATIONS));
-    localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(SAMPLE_DEMO_ANNOUNCEMENTS));
+    setAllReservations(SAMPLE_DEMO_RESERVATIONS);
+    setAllAnnouncements(SAMPLE_DEMO_ANNOUNCEMENTS);
+    localStorage.removeItem('reserve_production_cleared');
   };
 
   const resetToDefaultData = () => {
-    setReservations(DEFAULT_RESERVATIONS);
-    setRooms(DEFAULT_ROOMS);
-    setAnnouncements(DEFAULT_ANNOUNCEMENTS);
-    setSettings(DEFAULT_SETTINGS);
+    setSchools(DEFAULT_SCHOOLS);
+    setCurrentSchoolId(DEFAULT_SCHOOLS[0].id);
+    setAllReservations(DEFAULT_RESERVATIONS);
+    setAllRooms(DEFAULT_ROOMS);
+    setAllAnnouncements(DEFAULT_ANNOUNCEMENTS);
+    localStorage.removeItem(STORAGE_KEY_SCHOOLS);
+    localStorage.removeItem(STORAGE_KEY_ACTIVE_SCHOOL);
     localStorage.removeItem(STORAGE_KEY_RES);
     localStorage.removeItem(STORAGE_KEY_ROOMS);
     localStorage.removeItem(STORAGE_KEY_ANN);
-    localStorage.removeItem(STORAGE_KEY_SETTINGS);
   };
 
   return (
     <ReservationContext.Provider
       value={{
+        schools,
+        currentSchoolId,
+        currentSchool,
+        switchSchool,
+        addSchool,
+        updateSchool,
+        deleteSchool,
+        assignSchoolAdmin,
+        removeSchoolAdmin,
+        getSchoolTeachers,
         reservations,
+        allReservations,
         rooms,
+        allRooms,
         periods,
         announcements,
         settings,
@@ -547,6 +848,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         getReservationsForSlot,
         getRoomStats,
         getTeacherStats,
+        getNetworkOverviewStats,
         clearSystemForProduction,
         loadDemoSampleData,
         resetToDefaultData,
