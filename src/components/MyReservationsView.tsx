@@ -19,6 +19,7 @@ import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
+import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 
 interface MyReservationsViewProps {
   onOpenNewReservation: () => void;
@@ -48,7 +49,7 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
     );
   }
 
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = formatLocalDateToISO();
 
   // Filter reservations for current user
   const userReservations = reservations.filter((r) => r.userId === currentUser.id);

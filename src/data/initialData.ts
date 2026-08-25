@@ -1,4 +1,5 @@
 import { Room, TimePeriod, User, Reservation, Announcement, SchoolSettings, School } from '../types';
+import { formatLocalDateToISO } from '../lib/dateUtils';
 
 export const DEFAULT_SCHOOLS: School[] = [
   {
@@ -484,7 +485,7 @@ export const AVAILABLE_EQUIPMENT = [
 function getISODateOffset(daysOffset: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().split('T')[0];
+  return formatLocalDateToISO(d);
 }
 
 export const SAMPLE_DEMO_RESERVATIONS: Reservation[] = [

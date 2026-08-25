@@ -14,12 +14,14 @@ import {
   Info,
   UserPlus,
   User as UserIcon,
+  School,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { ShiftType, Room, User } from '../types';
 import { SCHOOL_CLASSES, SCHOOL_DISCIPLINES, AVAILABLE_EQUIPMENT } from '../data/initialData';
 import { TeacherAvatar } from './TeacherAvatar';
+import { formatLocalDateToISO, getRelativeDays } from '../lib/dateUtils';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -36,7 +38,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   initialDate,
   initialPeriodId,
 }) => {
-  const { rooms, periods, addReservation, checkConflict, selectedRoomId } = useReservations();
+  const { rooms, periods, addReservation, checkConflict, selectedRoomId, schools, currentSchoolId, currentSchool } = useReservations();
   const { currentUser, users, addUser, switchUser, isAdmin } = useAuth();
 
   // Teacher / User selection state
@@ -50,7 +52,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
   // Form State
   const [roomId, setRoomId] = useState<string>(initialRoomId || selectedRoomId || rooms[0]?.id || '');
-  const [date, setDate] = useState<string>(initialDate || new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(initialDate || formatLocalDateToISO());
   const [shift, setShift] = useState<ShiftType>('MANHA');
   const [selectedPeriodIds, setSelectedPeriodIds] = useState<string[]>([]);
   const [turma, setTurma] = useState<string>('9º Ano A');
@@ -119,6 +121,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
         email: emailToUse,
         subject: newTeacherSubject,
         role: 'TEACHER',
+        schoolId: currentSchoolId,
+        schoolName: currentSchool?.name || 'Escola',
       },
       true // autoLogin as current
     );
@@ -211,11 +215,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     }
   };
 
-  // Quick date pickers
+  // Quick date pickers using local timezone
   const setQuickDate = (offsetDays: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + offsetDays);
-    setDate(d.toISOString().split('T')[0]);
+    setDate(getRelativeDays(offsetDays));
   };
 
   return (
@@ -291,11 +293,14 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                         }}
                         className="w-full sm:w-auto p-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 cursor-pointer"
                       >
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name} ({u.subject || 'Docente'})
-                          </option>
-                        ))}
+                        {users.map((u) => {
+                          const uSchool = schools.find((s) => s.id === u.schoolId);
+                          return (
+                            <option key={u.id} value={u.id}>
+                              {u.name} ({u.subject || 'Docente'}) {schools.length > 1 && uSchool ? `— ${uSchool.shortName || uSchool.name}` : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     ) : (
                       <div>
@@ -485,7 +490,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={formatLocalDateToISO()}
                 className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
                 required
               />

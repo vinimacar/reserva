@@ -30,6 +30,7 @@ import { Room, TimePeriod, Reservation, ShiftType } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { EditRoomDetailsModal } from './EditRoomDetailsModal';
+import { formatLocalDateToISO } from '../lib/dateUtils';
 
 interface WeeklyScheduleGridProps {
   onSelectSlot: (roomId: string, date: string, periodId: string) => void;
@@ -69,11 +70,12 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
     monday.setDate(today.getDate() + diffToMonday + offset * 7);
 
     const weekDays = [];
+    const todayIso = formatLocalDateToISO();
     for (let i = 0; i < 5; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const isoDate = d.toISOString().split('T')[0];
-      const isToday = isoDate === new Date().toISOString().split('T')[0];
+      const isoDate = formatLocalDateToISO(d);
+      const isToday = isoDate === todayIso;
       
       const dayNames = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
       const shortDayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];

@@ -52,7 +52,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   initialRole = 'TEACHER',
 }) => {
   const { addUser, updateUser, isAdmin, currentUser } = useAuth();
-  const { currentSchoolId, currentSchool } = useReservations();
+  const { currentSchoolId, currentSchool, schools } = useReservations();
   const isEditing = !!userToEdit;
 
   const [name, setName] = useState('');
@@ -61,6 +61,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   const [subject, setSubject] = useState(SCHOOL_DISCIPLINES[0]);
   const [customSubject, setCustomSubject] = useState('');
   const [role, setRole] = useState<UserRole>(initialRole);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>(currentSchoolId);
   const [selectedIconId, setSelectedIconId] = useState<string>('icon:academic');
   const [hasManuallySelectedIcon, setHasManuallySelectedIcon] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -71,6 +72,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
       setName(userToEdit.name || '');
       setEmail(userToEdit.email || '');
       setPassword(userToEdit.password || 'educacao123');
+      setSelectedSchoolId(userToEdit.schoolId || currentSchoolId);
       if (userToEdit.subject && SCHOOL_DISCIPLINES.includes(userToEdit.subject)) {
         setSubject(userToEdit.subject);
         setCustomSubject('');
@@ -88,6 +90,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
       setName('');
       setEmail('');
       setPassword('educacao123');
+      setSelectedSchoolId(currentSchoolId);
       setSubject(SCHOOL_DISCIPLINES[0]);
       setCustomSubject('');
       setRole(initialRole);
@@ -96,7 +99,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
     }
     setErrorMessage(null);
     setSuccessMessage(null);
-  }, [userToEdit, isOpen, initialRole]);
+  }, [userToEdit, isOpen, initialRole, currentSchoolId]);
 
   // When subject changes, automatically match the most relevant discipline icon
   const handleSubjectChange = (newSubject: string) => {
@@ -137,6 +140,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
     }
 
     const chosenIcon = selectedIconId || getIconForSubject(finalSubject);
+    const assignedSchool = schools.find((s) => s.id === selectedSchoolId) || currentSchool;
 
     if (isEditing && userToEdit) {
       updateUser(userToEdit.id, {
@@ -147,6 +151,8 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
         role: role,
         avatar: chosenIcon,
         iconKey: chosenIcon,
+        schoolId: assignedSchool?.id || currentSchoolId,
+        schoolName: assignedSchool?.name || currentSchool?.name || 'Escola',
       });
       setSuccessMessage(`Dados de ${trimmedName} atualizados com sucesso!`);
     } else {
@@ -159,8 +165,8 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
           role: role,
           avatar: chosenIcon,
           iconKey: chosenIcon,
-          schoolId: currentSchoolId,
-          schoolName: currentSchool?.name || currentUser?.schoolName || 'E.E. Governador Milton Campos',
+          schoolId: assignedSchool?.id || currentSchoolId,
+          schoolName: assignedSchool?.name || currentSchool?.name || 'Escola',
         },
         false // Do not auto login on registration
       );
@@ -309,6 +315,29 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
                 })}
               </div>
             </div>
+
+            {/* School Association Field (Multi-school Support) */}
+            {schools.length > 1 && (
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Escola / Instituição de Ensino: <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <School className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <select
+                    value={selectedSchoolId}
+                    onChange={(e) => setSelectedSchoolId(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  >
+                    {schools.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.city} - {s.networkType})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Name & Email Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

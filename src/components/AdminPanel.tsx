@@ -39,6 +39,7 @@ import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
 import { AdminSchoolsTab } from './AdminSchoolsTab';
+import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 
 export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
@@ -51,6 +52,8 @@ export const AdminPanel: React.FC<{
     rooms,
     announcements,
     settings,
+    currentSchoolId,
+    currentSchool,
     updateRoom,
     addRoom,
     deleteRoom,
@@ -80,6 +83,10 @@ export const AdminPanel: React.FC<{
   const [filterRoomId, setFilterRoomId] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchBooking, setSearchBooking] = useState<string>('');
+
+  // Filter state for teachers
+  const [filterUserSchool, setFilterUserSchool] = useState<string>('ALL');
+  const [searchUser, setSearchUser] = useState<string>('');
 
   // Room modal & delete state
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
@@ -156,7 +163,7 @@ export const AdminPanel: React.FC<{
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `reservas_laboratorios_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `reservas_laboratorios_${formatLocalDateToISO()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -980,132 +987,213 @@ export const AdminPanel: React.FC<{
       )}
 
       {/* TAB 4: USERS & ADMIN ROLES */}
-      {activeTab === 'USERS' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Corpo Docente & Gestão de Permissões</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Professores cadastrados no sistema escolar. Você pode adicionar novos docentes e gerenciar privilégios.
-              </p>
+      {activeTab === 'USERS' && (() => {
+        const filteredUsers = users.filter((u) => {
+          // School filter
+          if (filterUserSchool !== 'ALL' && (u.schoolId || 'school_milton_campos') !== filterUserSchool) {
+            return false;
+          }
+          // Search filter
+          if (!searchUser.trim()) return true;
+          const q = searchUser.toLowerCase().trim();
+          return (
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            (u.subject && u.subject.toLowerCase().includes(q)) ||
+            (u.schoolName && u.schoolName.toLowerCase().includes(q))
+          );
+        });
+
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">Corpo Docente & Gestão de Permissões</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Professores cadastrados no sistema escolar. Você pode adicionar novos docentes e gerenciar privilégios.
+                </p>
+              </div>
+
+              <button
+                id="admin-add-teacher-btn"
+                onClick={() => {
+                  setEditingUser(null);
+                  setIsUserModalOpen(true);
+                }}
+                className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer self-start sm:self-auto transform active:scale-95 transition-all"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Cadastrar Novo Professor</span>
+              </button>
             </div>
 
-            <button
-              id="admin-add-teacher-btn"
-              onClick={() => setIsUserModalOpen(true)}
-              className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer self-start sm:self-auto transform active:scale-95 transition-all"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>+ Cadastrar Novo Professor</span>
-            </button>
-          </div>
+            {/* Filter Bar for Teachers */}
+            <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs transition-colors">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {schools.length > 1 && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Filtrar por Escola:</label>
+                    <select
+                      value={filterUserSchool}
+                      onChange={(e) => setFilterUserSchool(e.target.value)}
+                      className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-1.5 font-semibold focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="ALL">Todas as Escolas ({users.length} professores)</option>
+                      {schools.map((s) => {
+                        const count = users.filter((u) => (u.schoolId || 'school_milton_campos') === s.id).length;
+                        return (
+                          <option key={s.id} value={s.id}>
+                            {s.shortName || s.name} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+              </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold uppercase text-[10px]">
-                  <tr>
-                    <th className="p-3.5">Professor</th>
-                    <th className="p-3.5">E-mail Institucional Google</th>
-                    <th className="p-3.5">Disciplina</th>
-                    <th className="p-3.5">Nível de Acesso</th>
-                    <th className="p-3.5 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="p-3.5">
-                        <div className="flex items-center space-x-2.5">
-                          <TeacherAvatar
-                            avatar={u.avatar}
-                            name={u.name}
-                            subject={u.subject}
-                            role={u.role}
-                            size="sm"
-                            showRoleBadge={true}
-                          />
-                          <span className="font-bold text-slate-900 dark:text-slate-100">{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-slate-600 dark:text-slate-400 font-mono text-[11px]">{u.email}</td>
-                      <td className="p-3.5 text-slate-700 dark:text-slate-300">{u.subject || 'Geral'}</td>
-                      <td className="p-3.5">
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                            u.role === 'ADMIN'
-                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          {u.role === 'ADMIN'
-                            ? '👑 Administrador'
-                            : u.gender === 'FEMALE'
-                            ? '👩‍🏫 Professora'
-                            : '👨‍🏫 Professor'}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          {/* Edit Teacher Button */}
-                          <button
-                            id={`admin-edit-teacher-${u.id}`}
-                            onClick={() => {
-                              setEditingUser(u);
-                              setIsUserModalOpen(true);
-                            }}
-                            className="flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                            title={`Editar dados de ${u.name}`}
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                            <span>Editar</span>
-                          </button>
+              {/* Search Teacher Input */}
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar professor, disciplina, e-mail..."
+                  value={searchUser}
+                  onChange={(e) => setSearchUser(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
 
-                          <button
-                            onClick={() => {
-                              const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-                              updateUserRole(u.id, newRole);
-                              showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
-                            }}
-                            className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                              u.role === 'ADMIN'
-                                ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
-                                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
-                            }`}
-                          >
-                            {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
-                          </button>
-
-                          {users.length > 1 && (
-                            <button
-                              onClick={() => {
-                                setConfirmModal({
-                                  title: 'Remover Docente do Sistema',
-                                  message: `Tem certeza que deseja remover o usuário de "${u.name}" (${u.email})?`,
-                                  confirmLabel: 'Sim, Remover',
-                                  isDestructive: true,
-                                  onConfirm: () => {
-                                    deleteUser(u.id);
-                                    showToast(`Professor ${u.name} removido com sucesso.`);
-                                  },
-                                });
-                              }}
-                              className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
-                              title="Remover docente"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold uppercase text-[10px]">
+                    <tr>
+                      <th className="p-3.5">Professor</th>
+                      <th className="p-3.5">Escola</th>
+                      <th className="p-3.5">E-mail Institucional Google</th>
+                      <th className="p-3.5">Disciplina</th>
+                      <th className="p-3.5">Nível de Acesso</th>
+                      <th className="p-3.5 text-right">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                          Nenhum professor encontrado com os filtros informados.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map((u) => {
+                        const userSchool = schools.find((s) => s.id === u.schoolId) || currentSchool;
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="p-3.5">
+                              <div className="flex items-center space-x-2.5">
+                                <TeacherAvatar
+                                  avatar={u.avatar}
+                                  name={u.name}
+                                  subject={u.subject}
+                                  role={u.role}
+                                  size="sm"
+                                  showRoleBadge={true}
+                                />
+                                <div>
+                                  <span className="font-bold text-slate-900 dark:text-slate-100 block">{u.name}</span>
+                                  {currentUser?.id === u.id && (
+                                    <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Você (Conectado)</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3.5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-medium text-[10px] border border-blue-200 dark:border-blue-800">
+                                {userSchool?.shortName || userSchool?.name || u.schoolName || 'Escola'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-600 dark:text-slate-400 font-mono text-[11px]">{u.email}</td>
+                            <td className="p-3.5 text-slate-700 dark:text-slate-300">{u.subject || 'Geral'}</td>
+                            <td className="p-3.5">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                  u.role === 'ADMIN'
+                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                                }`}
+                              >
+                                {u.role === 'ADMIN'
+                                  ? '👑 Administrador'
+                                  : u.gender === 'FEMALE'
+                                  ? '👩‍🏫 Professora'
+                                  : '👨‍🏫 Professor'}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-right">
+                              <div className="flex items-center justify-end space-x-1.5">
+                                {/* Edit Teacher Button */}
+                                <button
+                                  id={`admin-edit-teacher-${u.id}`}
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setIsUserModalOpen(true);
+                                  }}
+                                  className="flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                  title={`Editar dados de ${u.name}`}
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                  <span>Editar</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
+                                    updateUserRole(u.id, newRole);
+                                    showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
+                                  }}
+                                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                                    u.role === 'ADMIN'
+                                      ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
+                                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
+                                  }`}
+                                >
+                                  {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
+                                </button>
+
+                                {users.length > 1 && (
+                                  <button
+                                    onClick={() => {
+                                      setConfirmModal({
+                                        title: 'Remover Docente do Sistema',
+                                        message: `Tem certeza que deseja remover o usuário de "${u.name}" (${u.email})?`,
+                                        confirmLabel: 'Sim, Remover',
+                                        isDestructive: true,
+                                        onConfirm: () => {
+                                          deleteUser(u.id);
+                                          showToast(`Professor ${u.name} removido com sucesso.`);
+                                        },
+                                      });
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                                    title="Remover docente"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 5: PUBLISH ANNOUNCEMENTS */}
       {activeTab === 'ANNOUNCEMENTS' && (

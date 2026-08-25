@@ -21,6 +21,7 @@ import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
+import { formatDateBR } from '../lib/dateUtils';
 
 interface ReservationDetailsModalProps {
   reservation: Reservation | null;
@@ -71,22 +72,6 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
     rejectReservation(reservation.id, rejectReason || 'Horário indisponível');
     setShowRejectPrompt(false);
     onClose();
-  };
-
-  // Format Date in Portuguese
-  const formatDateBR = (isoDate: string) => {
-    try {
-      const parts = isoDate.split('-');
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return d.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-    } catch {
-      return isoDate;
-    }
   };
 
   return (

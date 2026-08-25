@@ -22,6 +22,7 @@ import {
   DEFAULT_SCHOOLS,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
+import { formatLocalDateToISO } from '../lib/dateUtils';
 
 interface ConflictResult {
   hasConflict: boolean;
@@ -258,7 +259,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // UI state for active school
   const [selectedRoomId, setSelectedRoomId] = useState<string>(() => rooms[0]?.id || 'room_info_1');
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(() => formatLocalDateToISO());
   const [selectedShift, setSelectedShift] = useState<ShiftType | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -535,16 +536,17 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     const initialStatus: ReservationStatus = currentSchool.requireAdminApproval && !isAdmin ? 'PENDING' : 'CONFIRMED';
+    const targetUser = (data.userId && users.find((u) => u.id === data.userId)) || currentUser;
 
     const newReservation: Reservation = {
       ...data,
       id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       schoolId: currentSchoolId,
       roomName: room.name,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userEmail: currentUser.email,
-      userAvatar: currentUser.avatar,
+      userId: targetUser.id,
+      userName: targetUser.name,
+      userEmail: targetUser.email,
+      userAvatar: targetUser.avatar,
       periodNumbers,
       periodLabels,
       status: initialStatus,
@@ -670,7 +672,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ...data,
       id: `ann_${Date.now()}`,
       schoolId: currentSchoolId,
-      date: new Date().toISOString().split('T')[0],
+      date: formatLocalDateToISO(),
     };
     setAllAnnouncements((prev) => [newAnn, ...prev]);
   };
@@ -770,11 +772,21 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const clearAllReservations = () => {
-    setAllReservations((prev) => prev.filter((r) => r.schoolId !== currentSchoolId && r.schoolId));
+    setAllReservations((prev) =>
+      prev.filter((r) => {
+        const sId = r.schoolId || defaultSchoolId;
+        return sId !== currentSchoolId;
+      })
+    );
   };
 
   const clearAllAnnouncements = () => {
-    setAllAnnouncements((prev) => prev.filter((a) => a.schoolId !== currentSchoolId && a.schoolId));
+    setAllAnnouncements((prev) =>
+      prev.filter((a) => {
+        const sId = a.schoolId || defaultSchoolId;
+        return sId !== currentSchoolId;
+      })
+    );
   };
 
   const clearSystemForProduction = () => {
