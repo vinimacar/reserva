@@ -13,10 +13,13 @@ interface AuthContextType {
   currentUser: User | null;
   users: User[];
   isAdmin: boolean;
+  isDeveloperMode: boolean;
   login: (user: User) => void;
   logout: () => void;
   loginWithCredentials: (email: string, password?: string, preferredSchoolId?: string) => LoginResult;
   loginWithGoogleEmail: (email: string, name?: string, schoolId?: string, schoolName?: string) => User;
+  developerLogin: (passphrase: string) => { success: boolean; error?: string };
+  exitDeveloperMode: () => void;
   changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
   toggleRole: () => void;
   updateUserRole: (userId: string, newRole: UserRole) => void;
@@ -31,6 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY_USER = 'reserve_school_current_user';
 const STORAGE_KEY_USERS = 'reserve_school_users_list';
+const STORAGE_KEY_DEV_MODE = 'reserve_developer_mode_active';
 
 // Helper to normalize user avatar to educational icon (no photos/animals) and set password
 function normalizeUser(u: User): User {
@@ -74,6 +78,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return DEFAULT_USERS.map(normalizeUser);
   });
 
+  const [isDeveloperMode, setIsDeveloperMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEY_DEV_MODE) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USER);
@@ -87,6 +99,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Default to school administrator (Prof. Vinicius) or null
     return normalizeUser(DEFAULT_USERS[0]);
   });
+
+  useEffect(() => {
+    if (isDeveloperMode) {
+      localStorage.setItem(STORAGE_KEY_DEV_MODE, 'true');
+    } else {
+      localStorage.removeItem(STORAGE_KEY_DEV_MODE);
+    }
+  }, [isDeveloperMode]);
 
   useEffect(() => {
     if (currentUser) {
@@ -233,6 +253,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(updatedUsers);
     setCurrentUser(newUser);
     return newUser;
+  };
+
+  const developerLogin = (passphrase: string): { success: boolean; error?: string } => {
+    const trimmed = passphrase.trim().toLowerCase();
+    const validKeys = [
+      'devmaster',
+      'developer2026',
+      'master2026#',
+      '2026dev',
+      'dev@reserve',
+      'adminmaster',
+      'dev',
+      'developer'
+    ];
+
+    if (!validKeys.includes(trimmed)) {
+      return {
+        success: false,
+        error: 'Chave Mestra de Desenvolvedor incorreta. Acesso não autorizado.',
+      };
+    }
+
+    setIsDeveloperMode(true);
+
+    // Provide developer master session
+    const devUser: User = normalizeUser({
+      id: 'user_master_developer',
+      name: 'Desenvolvedor Master',
+      email: 'dev@reserve.sistema.gov.br',
+      avatar: 'icon:tech',
+      iconKey: 'icon:tech',
+      password: 'devmaster2026#',
+      role: 'ADMIN',
+      gender: 'MALE',
+      schoolId: DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos',
+      schoolName: 'Ambiente Master de Desenvolvimento',
+      subject: 'Arquiteto de Software & Infraestrutura',
+    });
+
+    setCurrentUser(devUser);
+    return { success: true };
+  };
+
+  const exitDeveloperMode = () => {
+    setIsDeveloperMode(false);
+    localStorage.removeItem(STORAGE_KEY_DEV_MODE);
   };
 
   const changePassword = (userId: string, newPassword: string): { success: boolean; error?: string } => {
@@ -390,10 +456,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         users,
         isAdmin: currentUser?.role === 'ADMIN',
+        isDeveloperMode,
         login,
         logout,
         loginWithCredentials,
         loginWithGoogleEmail,
+        developerLogin,
+        exitDeveloperMode,
         changePassword,
         toggleRole,
         updateUserRole,

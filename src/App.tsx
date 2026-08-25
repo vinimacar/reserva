@@ -19,18 +19,24 @@ import { GoogleLoginModal } from './components/GoogleLoginModal';
 import { SchoolSetupModal } from './components/SchoolSetupModal';
 import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
+import { DeveloperAuthModal } from './components/DeveloperAuthModal';
+import { DeveloperPortal } from './components/DeveloperPortal';
 import { LoginScreen } from './components/LoginScreen';
 import { Reservation } from './types';
-import { School } from 'lucide-react';
+import { School, Terminal } from 'lucide-react';
 
 function ReserveAppContent() {
-  const { currentUser, isAdmin } = useAuth();
-  const { settings } = useReservations();
+  const { currentUser, isAdmin, isDeveloperMode } = useAuth();
+  const { settings, switchSchool } = useReservations();
 
   // Navigation View State
   const [currentView, setCurrentView] = useState<
     'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS'
   >('SCHEDULE');
+
+  // Developer Portal state
+  const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
+  const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
 
   // Modals state
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -80,9 +86,36 @@ function ReserveAppContent() {
 
   const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
-  // If user is not authenticated, strictly show the Login Screen
+  // If Developer Portal is explicitly open or developer mode is active
+  if (showDeveloperPortal || isDeveloperMode) {
+    return (
+      <DeveloperPortal
+        onBackToApp={() => {
+          setShowDeveloperPortal(false);
+        }}
+        onSelectClientToView={(schoolId) => {
+          switchSchool(schoolId);
+          setShowDeveloperPortal(false);
+        }}
+      />
+    );
+  }
+
+  // If user is not authenticated, show the Login Screen with Developer Access option
   if (!currentUser) {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen onOpenDeveloperPortal={() => setShowDeveloperPortal(true)} />
+        <DeveloperAuthModal
+          isOpen={isDevAuthModalOpen}
+          onClose={() => setIsDevAuthModalOpen(false)}
+          onSuccess={() => {
+            setIsDevAuthModalOpen(false);
+            setShowDeveloperPortal(true);
+          }}
+        />
+      </>
+    );
   }
 
   return (
@@ -103,6 +136,7 @@ function ReserveAppContent() {
         onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
         onOpenRegisterTeacher={() => setIsUserRegistrationModalOpen(true)}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
+        onOpenDeveloperPortal={() => setShowDeveloperPortal(true)}
       />
 
       {/* Main Content Area */}
@@ -150,6 +184,15 @@ function ReserveAppContent() {
             <span>Autenticação Google Workspace</span>
             <span className="text-slate-600">•</span>
             <span>Secretaria de Estado de Educação</span>
+            <span className="text-slate-600">•</span>
+            <button
+              type="button"
+              onClick={() => setShowDeveloperPortal(true)}
+              className="text-indigo-400 hover:text-indigo-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Terminal className="w-3 h-3" />
+              <span>Console Dev</span>
+            </button>
           </div>
         </div>
       </footer>
@@ -199,6 +242,15 @@ function ReserveAppContent() {
       <ChangePasswordModal
         isOpen={isChangePasswordModalOpen}
         onClose={() => setIsChangePasswordModalOpen(false)}
+      />
+
+      <DeveloperAuthModal
+        isOpen={isDevAuthModalOpen}
+        onClose={() => setIsDevAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsDevAuthModalOpen(false);
+          setShowDeveloperPortal(true);
+        }}
       />
     </div>
   );

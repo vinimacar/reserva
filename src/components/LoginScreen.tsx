@@ -18,14 +18,21 @@ import {
   Search,
   Check,
   ChevronDown,
+  Terminal,
+  Code2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
 import { TeacherAvatar } from './TeacherAvatar';
+import { DeveloperAuthModal } from './DeveloperAuthModal';
 import { User, School } from '../types';
 
-export const LoginScreen: React.FC = () => {
-  const { users, loginWithCredentials, loginWithGoogleEmail } = useAuth();
+interface LoginScreenProps {
+  onOpenDeveloperPortal?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal }) => {
+  const { users, loginWithCredentials, loginWithGoogleEmail, isDeveloperMode } = useAuth();
   const { schools, currentSchoolId, switchSchool } = useReservations();
 
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>(currentSchoolId || schools[0]?.id || '');
@@ -37,6 +44,7 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
 
   // Selected school object
   const activeSelectedSchool = useMemo(() => {
@@ -184,6 +192,18 @@ export const LoginScreen: React.FC = () => {
             <Building2 className="w-3.5 h-3.5 text-blue-400" />
             <span>{schools.length} Escolas Conectadas</span>
           </div>
+
+          <button
+            id="dev-portal-top-btn"
+            type="button"
+            onClick={() => setIsDevAuthModalOpen(true)}
+            className="px-3 py-1.5 bg-indigo-950/70 hover:bg-indigo-900/90 text-indigo-300 hover:text-white rounded-xl text-xs font-bold border border-indigo-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+            title="Acesso exclusivo do desenvolvedor para cadastrar e gerenciar clientes"
+          >
+            <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Acesso Desenvolvedor</span>
+            <span className="sm:hidden">Dev</span>
+          </button>
         </div>
       </header>
 
@@ -487,9 +507,28 @@ export const LoginScreen: React.FC = () => {
         <div className="flex items-center space-x-3 text-slate-400">
           <span>RESERVE LABS v3.0</span>
           <span>•</span>
-          <span>Rede Integrada</span>
+          <button
+            type="button"
+            onClick={() => setIsDevAuthModalOpen(true)}
+            className="text-indigo-400 hover:text-indigo-300 font-mono hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <Code2 className="w-3 h-3" />
+            <span>Painel do Desenvolvedor</span>
+          </button>
         </div>
       </footer>
+
+      {/* Developer Auth Modal */}
+      <DeveloperAuthModal
+        isOpen={isDevAuthModalOpen}
+        onClose={() => setIsDevAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsDevAuthModalOpen(false);
+          if (onOpenDeveloperPortal) {
+            onOpenDeveloperPortal();
+          }
+        }}
+      />
     </div>
   );
 };

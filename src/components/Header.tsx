@@ -16,6 +16,7 @@ import {
   UserPlus,
   KeyRound,
   GraduationCap,
+  Terminal,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
@@ -31,6 +32,7 @@ interface HeaderProps {
   onOpenSchoolSettings?: () => void;
   onOpenRegisterTeacher?: () => void;
   onOpenChangePassword?: () => void;
+  onOpenDeveloperPortal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSchoolSettings,
   onOpenRegisterTeacher,
   onOpenChangePassword,
+  onOpenDeveloperPortal,
 }) => {
   const { currentUser, isAdmin, logout } = useAuth();
   const { announcements, settings, schools, currentSchoolId, switchSchool } = useReservations();
@@ -435,6 +438,20 @@ export const Header: React.FC<HeaderProps> = ({
                         >
                           <UserPlus className="w-4 h-4 text-blue-400" />
                           <span>+ Cadastrar Novo Professor</span>
+                        </button>
+                      )}
+
+                      {onOpenDeveloperPortal && (
+                        <button
+                          id="profile-developer-portal-btn"
+                          onClick={() => {
+                            onOpenDeveloperPortal();
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-indigo-300 hover:text-indigo-200 hover:bg-indigo-950/50 text-left transition-colors cursor-pointer border-t border-slate-800/80 pt-2.5 mt-1"
+                        >
+                          <Terminal className="w-4 h-4 text-indigo-400" />
+                          <span>Console do Desenvolvedor</span>
                         </button>
                       )}
                     </div>

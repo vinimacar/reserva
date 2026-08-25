@@ -10,6 +10,8 @@ import {
   RoomStats,
   School,
   User,
+  ClientOnboardingData,
+  ClientOnboardingResult,
 } from '../types';
 import {
   DEFAULT_ROOMS,
@@ -38,6 +40,7 @@ interface ReservationContextType {
   currentSchool: School;
   switchSchool: (schoolId: string) => void;
   addSchool: (schoolData: Omit<School, 'id' | 'createdAt'>, createDefaultRooms?: boolean) => School;
+  onboardNewClient: (clientData: ClientOnboardingData) => ClientOnboardingResult;
   updateSchool: (id: string, schoolData: Partial<School>) => void;
   deleteSchool: (id: string) => boolean;
   assignSchoolAdmin: (schoolId: string, email: string, name?: string) => void;
@@ -365,6 +368,224 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
 
     return newSchool;
+  };
+
+  const onboardNewClient = (clientData: ClientOnboardingData): ClientOnboardingResult => {
+    try {
+      if (!clientData.name.trim()) {
+        return { success: false, error: 'O nome da instituição / cliente é obrigatório.' };
+      }
+      if (!clientData.adminEmail.trim()) {
+        return { success: false, error: 'O e-mail do administrador master é obrigatório.' };
+      }
+
+      const trimmedAdminEmail = clientData.adminEmail.trim().toLowerCase();
+      const newSchoolId = `school_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+      // 1. Build School Entity
+      const newSchool: School = {
+        id: newSchoolId,
+        name: clientData.name.trim(),
+        shortName: clientData.shortName.trim() || clientData.name.trim().substring(0, 20),
+        code: clientData.code.trim() || `CLI-${Math.floor(1000 + Math.random() * 9000)}`,
+        city: clientData.city.trim() || 'Não informada',
+        state: clientData.state.trim() || 'MG',
+        inepCode: clientData.inepCode?.trim() || clientData.code.trim(),
+        networkType: clientData.networkType || 'Estadual',
+        shifts: clientData.shifts && clientData.shifts.length > 0 ? clientData.shifts : ['MANHA', 'TARDE'],
+        contactEmail: clientData.contactEmail?.trim() || trimmedAdminEmail,
+        phone: clientData.phone?.trim() || '',
+        directorName: clientData.directorName?.trim() || clientData.adminName.trim(),
+        active: true,
+        createdAt: new Date().toISOString(),
+        adminEmails: [trimmedAdminEmail],
+        requireAdminApproval: clientData.requireAdminApproval ?? false,
+        maxAdvanceDays: clientData.maxAdvanceDays || 30,
+        allowWeekendBooking: clientData.allowWeekendBooking ?? false,
+      };
+
+      // 2. Provision Rooms based on Blueprint Package
+      let roomsToCreate: Room[] = [];
+
+      if (clientData.roomPackage === 'STANDARD_BASIC') {
+        roomsToCreate = [
+          {
+            id: `room_${newSchoolId}_info`,
+            schoolId: newSchoolId,
+            name: 'Laboratório de Informática & Tecnologia',
+            type: 'INFORMATICA',
+            capacity: 35,
+            location: 'Bloco A - Sala 101',
+            description: 'Computadores com internet banda larga e recursos para atividades digitais.',
+            status: 'ACTIVE',
+            color: 'blue',
+            iconName: 'Monitor',
+            responsibleName: clientData.adminName,
+            equipment: ['Computadores com Acesso à Internet', 'Projetor Multimídia', 'Quadro Branco Digital'],
+            rules: ['Proibido alimentos', 'Desligar equipamentos após o uso'],
+          },
+          {
+            id: `room_${newSchoolId}_ciencias`,
+            schoolId: newSchoolId,
+            name: 'Laboratório de Ciências da Natureza',
+            type: 'CIENCIAS',
+            capacity: 32,
+            location: 'Bloco B - Sala 201',
+            description: 'Bancadas de experimentação científica e modelos didáticos anatômicos.',
+            status: 'ACTIVE',
+            color: 'emerald',
+            iconName: 'Microscope',
+            responsibleName: 'Coordenação de Ciências',
+            equipment: ['Microscópios Ópticos', 'Modelos Didáticos', 'Vidrarias Básicas'],
+            rules: ['Uso obrigatório de jaleco', 'Manter bancadas limpas e organizadas'],
+          },
+          {
+            id: `room_${newSchoolId}_maker`,
+            schoolId: newSchoolId,
+            name: 'Espaço Maker & Multimídia',
+            type: 'MAKER',
+            capacity: 30,
+            location: 'Espaço Criativo - Térreo',
+            description: 'Ambiente flexível para projetos práticos, robótica e apresentações.',
+            status: 'ACTIVE',
+            color: 'amber',
+            iconName: 'Cpu',
+            responsibleName: 'Coordenação Pedagógica',
+            equipment: ['Smart TV / Projetor', 'Kits de Robótica', 'Mesas Modulares'],
+            rules: ['Organizar materiais ao término da aula'],
+          },
+        ];
+      } else if (clientData.roomPackage === 'TECHNICAL_FULL') {
+        roomsToCreate = [
+          {
+            id: `room_${newSchoolId}_info1`,
+            schoolId: newSchoolId,
+            name: 'Lab Informática 1 (Desenvolvimento)',
+            type: 'INFORMATICA',
+            capacity: 40,
+            location: 'Polo Tecnológico - Sala 1',
+            description: 'Workstations de alta performance com IDEs e ferramentas de programação.',
+            status: 'ACTIVE',
+            color: 'blue',
+            iconName: 'Monitor',
+            responsibleName: clientData.adminName,
+            equipment: ['40 Workstations i7', 'Projetor Interativo Laser', 'Rede Gigabit'],
+            rules: ['Zelar pelos periféricos'],
+          },
+          {
+            id: `room_${newSchoolId}_info2`,
+            schoolId: newSchoolId,
+            name: 'Lab Informática 2 (Multiuso & Pesquisa)',
+            type: 'INFORMATICA',
+            capacity: 35,
+            location: 'Polo Tecnológico - Sala 2',
+            description: 'Espaço voltado a pesquisas, avaliações digitais e treinamentos.',
+            status: 'ACTIVE',
+            color: 'indigo',
+            iconName: 'Monitor',
+            responsibleName: clientData.adminName,
+            equipment: ['35 Computadores', 'Telão de Projeção', 'Sistema de Som'],
+            rules: ['Desligar computadores ao sair'],
+          },
+          {
+            id: `room_${newSchoolId}_ciencias_quimica`,
+            schoolId: newSchoolId,
+            name: 'Laboratório de Química & Biotecnologia',
+            type: 'QUIMICA_FISICA',
+            capacity: 32,
+            location: 'Bloco de Exatas e Biológicas',
+            description: 'Capela de exaustão, reagentes controlados e estações de pesagem analítica.',
+            status: 'ACTIVE',
+            color: 'emerald',
+            iconName: 'FlaskConical',
+            responsibleName: 'Coordenação Técnica',
+            equipment: ['Capela de Exaustão', 'Balanças de Precisão', 'Centrífuga Didática', 'Chuveiro de Emergência'],
+            rules: ['EPI obrigatório (jaleco + óculos)', 'Descarte correto de resíduos'],
+          },
+          {
+            id: `room_${newSchoolId}_maker_robotica`,
+            schoolId: newSchoolId,
+            name: 'Centro Maker & Robótica Avançada',
+            type: 'MAKER',
+            capacity: 30,
+            location: 'Espaço Inovação',
+            description: 'Impressoras 3D, bancadas de solda, microcontroladores Arduino e ESP32.',
+            status: 'ACTIVE',
+            color: 'amber',
+            iconName: 'Cpu',
+            responsibleName: 'Coordenação de Inovação',
+            equipment: ['2 Impressoras 3D', 'Estações de Solda', 'Kits Arduino & Sensores', 'Cortadora a Laser'],
+            rules: ['Supervisão obrigatória para maquinário'],
+          },
+          {
+            id: `room_${newSchoolId}_auditorio`,
+            schoolId: newSchoolId,
+            name: 'Auditório Multimídia & Eventos',
+            type: 'MULTIMIDIA',
+            capacity: 120,
+            location: 'Ala Central',
+            description: 'Auditório equipado para palestras, seminários, defesas e exibições.',
+            status: 'ACTIVE',
+            color: 'purple',
+            iconName: 'Presentation',
+            responsibleName: clientData.adminName,
+            equipment: ['Sonorização Profissional', 'Microfones Sem Fio', 'Projetor Full HD 5000 Lumens'],
+            rules: ['Solicitar reserva com antecedência'],
+          },
+        ];
+      } else if (clientData.customRooms && clientData.customRooms.length > 0) {
+        roomsToCreate = clientData.customRooms.map((r, idx) => ({
+          ...r,
+          id: `room_${newSchoolId}_custom_${idx + 1}`,
+          schoolId: newSchoolId,
+        }));
+      }
+
+      // 3. Save School and Rooms to State
+      setSchools((prev) => [...prev, newSchool]);
+      if (roomsToCreate.length > 0) {
+        setAllRooms((prev) => [...prev, ...roomsToCreate]);
+      }
+
+      // 4. Create Initial Administrator User
+      const adminUser = addUser({
+        name: clientData.adminName.trim().startsWith('Prof')
+          ? clientData.adminName.trim()
+          : `Prof. ${clientData.adminName.trim()}`,
+        email: trimmedAdminEmail,
+        password: clientData.adminPassword || 'educacao123',
+        role: 'ADMIN',
+        schoolId: newSchoolId,
+        schoolName: newSchool.name,
+        subject: 'Administração & Gestão Escolar',
+      });
+
+      // 5. Create Welcome Announcement if enabled
+      if (clientData.createWelcomeAnnouncement !== false) {
+        const welcomeAnnouncement: Announcement = {
+          id: `ann_${Date.now()}`,
+          schoolId: newSchoolId,
+          title: `Boas-vindas ao Sistema de Agendamento - ${newSchool.shortName}`,
+          content: `Ambiente oficial de reservas de laboratórios e espaços pedagógicos da instituição ${newSchool.name} configurado e pronto para o corpo docente.`,
+          date: formatLocalDateToISO(),
+          author: clientData.adminName.trim(),
+          important: true,
+        };
+        setAllAnnouncements((prev) => [welcomeAnnouncement, ...prev]);
+      }
+
+      return {
+        success: true,
+        school: newSchool,
+        adminUser: adminUser,
+        roomsCreatedCount: roomsToCreate.length,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Erro inesperado durante o cadastro do cliente.',
+      };
+    }
   };
 
   const updateSchool = (id: string, schoolData: Partial<School>) => {
@@ -822,6 +1043,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         currentSchool,
         switchSchool,
         addSchool,
+        onboardNewClient,
         updateSchool,
         deleteSchool,
         assignSchoolAdmin,

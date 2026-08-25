@@ -128,3 +128,46 @@ export interface RoomStats {
   occupancyRate: number;
   popularShift: ShiftType;
 }
+
+export type RoomPackageType = 'STANDARD_BASIC' | 'TECHNICAL_FULL' | 'CUSTOM';
+
+export interface ClientOnboardingData {
+  // Institutional
+  name: string;
+  shortName: string;
+  code: string;
+  city: string;
+  state: string;
+  inepCode?: string;
+  networkType: string;
+  contactEmail: string;
+  phone?: string;
+  directorName?: string;
+  
+  // Operational rules
+  shifts: ShiftType[];
+  requireAdminApproval: boolean;
+  maxAdvanceDays: number;
+  allowWeekendBooking: boolean;
+
+  // Initial Administrator / Gestor
+  adminName: string;
+  adminEmail: string;
+  adminPassword?: string;
+  adminPhone?: string;
+
+  // Rooms blueprint
+  roomPackage: RoomPackageType;
+  customRooms?: Omit<Room, 'id' | 'schoolId'>[];
+
+  // Welcome announcement
+  createWelcomeAnnouncement?: boolean;
+}
+
+export interface ClientOnboardingResult {
+  success: boolean;
+  school?: School;
+  adminUser?: User;
+  roomsCreatedCount?: number;
+  error?: string;
+}
