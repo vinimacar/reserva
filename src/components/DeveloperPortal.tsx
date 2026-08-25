@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
+import { clearCloudDatabase } from '../services/firestoreSync';
 import {
   School,
   ShiftType,
@@ -1293,8 +1294,16 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
               </div>
 
               <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span className="text-emerald-400 font-bold text-[11px]">Banco em Nuvem Ativo (Firebase Firestore)</span>
+                  </div>
+                  <span className="text-slate-500 font-mono text-[10px]">Auto-Sync Realtime</span>
+                </div>
+
                 <p className="text-slate-300 leading-relaxed">
-                  Remove todas as reservas de demonstração e comunicados de teste para entrega limpa aos clientes.
+                  Gerenciamento de persistência em nuvem. Você pode zerar as reservas para produção ou limpar o banco de dados na nuvem para começar do zero.
                 </p>
 
                 <div className="flex flex-wrap gap-2 pt-2">
@@ -1308,7 +1317,22 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                     }}
                     className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 border border-amber-500/40 rounded-xl font-bold text-xs transition-colors cursor-pointer"
                   >
-                    Zerar Apenas Reservas de Teste
+                    Zerar Apenas Reservas
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (confirm('Atenção: Deseja LIMPAR O BANCO DE DADOS EM NUVEM E COMEÇAR DO ZERO? Todas as reservas e dados temporários serão apagados e reiniciados limpos.')) {
+                        await clearCloudDatabase();
+                        clearSystemForProduction();
+                        alert('Banco de dados em nuvem limpo com sucesso! Pronto para começar do zero.');
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-300 border border-red-500/40 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Limpar Nuvem (Começar do Zero)
                   </button>
 
                   <button
@@ -1322,7 +1346,7 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                     }}
                     className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs transition-colors cursor-pointer border border-slate-700"
                   >
-                    Restaurar Padrões de Fábrica
+                    Restaurar Padrões
                   </button>
                 </div>
               </div>

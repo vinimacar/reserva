@@ -2,6 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { DEFAULT_USERS, DEFAULT_SCHOOLS } from '../data/initialData';
 import { detectGenderFromName, getIconForSubject } from '../data/avatars';
+import {
+  subscribeToUsers,
+  saveUserToCloud,
+  deleteUserFromCloud,
+} from '../services/firestoreSync';
 
 export interface LoginResult {
   success: boolean;
@@ -28,6 +33,7 @@ interface AuthContextType {
   deleteUser: (userId: string) => void;
   updateSchoolNameForAllUsers: (schoolName: string, schoolId?: string) => void;
   switchUser: (userId: string) => void;
+  resetUsersToDefault: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -120,6 +126,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
   }, [users]);
+
+  // Real-time synchronization with Cloud Firestore for Users
+  useEffect(() => {
+    const unsubscribe = subscribeToUsers((cloudUsers) => {
+      if (cloudUsers && cloudUsers.length > 0) {
+        setUsers(cloudUsers.map(normalizeUser));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const login = (user: User) => {
     const normalized = normalizeUser(user);
@@ -395,6 +411,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
+    saveUserToCloud(newUser).catch((e) => console.warn('Cloud user save warning:', e));
     if (autoLogin) {
       setCurrentUser(newUser);
     }
@@ -409,6 +426,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (currentUser && currentUser.id === userId) {
             setCurrentUser(updated);
           }
+          saveUserToCloud(updated).catch((e) => console.warn('Cloud user update warning:', e));
           return updated;
         }
         return u;
@@ -423,6 +441,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const filtered = prev.filter((u) => u.id !== userId);
       return filtered;
     });
+    deleteUserFromCloud(userId).catch((e) => console.warn('Cloud user delete warning:', e));
 
     if (currentUser && currentUser.id === userId) {
       const remaining = users.filter((u) => u.id !== userId);
@@ -434,14 +453,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetUsersToDefault = () => {
+    const defaultNormalized = DEFAULT_USERS.map(normalizeUser);
+    setUsers(defaultNormalized);
+    localStorage.removeItem(STORAGE_KEY_USERS);
+    defaultNormalized.forEach((u) => {
+      saveUserToCloud(u).catch(() => {});
+    });
+  };
+
   const updateSchoolNameForAllUsers = (schoolName: string, schoolId?: string) => {
     setUsers((prev) =>
       prev.map((u) => {
         if (!schoolId || u.schoolId === schoolId) {
-          return {
+          const updated = {
             ...u,
             schoolName,
           };
+          saveUserToCloud(updated).catch(() => {});
+          return updated;
         }
         return u;
       })
@@ -472,6 +502,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteUser,
         updateSchoolNameForAllUsers,
         switchUser,
+        resetUsersToDefault,
       }}
     >
       {children}

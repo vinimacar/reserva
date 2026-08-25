@@ -25,6 +25,21 @@ import {
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
 import { formatLocalDateToISO } from '../lib/dateUtils';
+import {
+  subscribeToSchools,
+  subscribeToRooms,
+  subscribeToReservations,
+  subscribeToAnnouncements,
+  saveSchoolToCloud,
+  deleteSchoolFromCloud,
+  saveRoomToCloud,
+  deleteRoomFromCloud,
+  saveReservationToCloud,
+  deleteReservationFromCloud,
+  saveAnnouncementToCloud,
+  deleteAnnouncementFromCloud,
+  clearCloudDatabase,
+} from '../services/firestoreSync';
 
 interface ConflictResult {
   hasConflict: boolean;
@@ -226,6 +241,42 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(allAnnouncements));
   }, [allAnnouncements]);
 
+  // Real-time Cloud Firestore Listeners
+  useEffect(() => {
+    const unsubSchools = subscribeToSchools((cloudSchools) => {
+      if (cloudSchools && cloudSchools.length > 0) {
+        setSchools(cloudSchools);
+      }
+    });
+
+    const unsubRooms = subscribeToRooms((cloudRooms) => {
+      if (cloudRooms && cloudRooms.length > 0) {
+        setAllRooms(cloudRooms);
+      }
+    });
+
+    const unsubReservations = subscribeToReservations((cloudReservations) => {
+      const isCleared = localStorage.getItem('reserve_production_cleared') === 'true';
+      if (!isCleared || (cloudReservations && cloudReservations.length > 0)) {
+        setAllReservations(cloudReservations);
+      }
+    });
+
+    const unsubAnnouncements = subscribeToAnnouncements((cloudAnnouncements) => {
+      const isCleared = localStorage.getItem('reserve_production_cleared') === 'true';
+      if (!isCleared || (cloudAnnouncements && cloudAnnouncements.length > 0)) {
+        setAllAnnouncements(cloudAnnouncements);
+      }
+    });
+
+    return () => {
+      unsubSchools();
+      unsubRooms();
+      unsubReservations();
+      unsubAnnouncements();
+    };
+  }, []);
+
   // Derived tenant-scoped slices
   const defaultSchoolId = DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
 
@@ -313,6 +364,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     setSchools((prev) => [...prev, newSchool]);
+    saveSchoolToCloud(newSchool).catch(() => {});
 
     // Create standard default rooms for this new school if requested
     if (createDefaultRooms) {
@@ -365,6 +417,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ];
 
       setAllRooms((prev) => [...prev, ...defaultStandardRooms]);
+      defaultStandardRooms.forEach((r) => saveRoomToCloud(r).catch(() => {}));
     }
 
     return newSchool;
@@ -775,6 +828,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     setAllReservations((prev) => [newReservation, ...prev]);
+    saveReservationToCloud(newReservation).catch((e) => console.warn('Cloud save reservation error:', e));
     return { success: true, reservation: newReservation };
   };
 
@@ -796,52 +850,63 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const updated = { ...existing, ...data };
     setAllReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    saveReservationToCloud(updated).catch((e) => console.warn('Cloud update reservation error:', e));
     return true;
   };
 
   const cancelReservation = (id: string, reason?: string) => {
     setAllReservations((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: 'CANCELLED',
-              adminNote: reason ? `Cancelado: ${reason}` : r.adminNote,
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id === id) {
+          const updated: Reservation = {
+            ...r,
+            status: 'CANCELLED',
+            adminNote: reason ? `Cancelado: ${reason}` : r.adminNote,
+          };
+          saveReservationToCloud(updated).catch(() => {});
+          return updated;
+        }
+        return r;
+      })
     );
   };
 
   const deleteReservation = (id: string) => {
     setAllReservations((prev) => prev.filter((r) => r.id !== id));
+    deleteReservationFromCloud(id).catch((e) => console.warn('Cloud delete reservation error:', e));
   };
 
   const approveReservation = (id: string, note?: string) => {
     setAllReservations((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: 'CONFIRMED',
-              adminNote: note || 'Aprovado pela Coordenação',
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id === id) {
+          const updated: Reservation = {
+            ...r,
+            status: 'CONFIRMED',
+            adminNote: note || 'Aprovado pela Coordenação',
+          };
+          saveReservationToCloud(updated).catch(() => {});
+          return updated;
+        }
+        return r;
+      })
     );
   };
 
   const rejectReservation = (id: string, note?: string) => {
     setAllReservations((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: 'CANCELLED',
-              adminNote: note ? `Não aprovado: ${note}` : 'Reserva não aprovada pela administração.',
-            }
-          : r
-      )
+      prev.map((r) => {
+        if (r.id === id) {
+          const updated: Reservation = {
+            ...r,
+            status: 'CANCELLED',
+            adminNote: note ? `Não aprovado: ${note}` : 'Reserva não aprovada pela administração.',
+          };
+          saveReservationToCloud(updated).catch(() => {});
+          return updated;
+        }
+        return r;
+      })
     );
   };
 
@@ -853,6 +918,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       schoolId: currentSchoolId,
     };
     setAllRooms((prev) => [...prev, newRoom]);
+    saveRoomToCloud(newRoom).catch((e) => console.warn('Cloud save room error:', e));
     return newRoom;
   };
 
@@ -866,6 +932,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
               resList.map((res) => (res.roomId === id ? { ...res, roomName: roomData.name! } : res))
             );
           }
+          saveRoomToCloud(updated).catch((e) => console.warn('Cloud update room error:', e));
           return updated;
         }
         return r;
@@ -877,6 +944,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setAllRooms((prev) => prev.filter((r) => r.id !== id));
     setAllReservations((prev) => prev.filter((r) => r.roomId !== id));
     setAllAnnouncements((prev) => prev.filter((a) => a.targetRoomId !== id));
+    deleteRoomFromCloud(id).catch((e) => console.warn('Cloud delete room error:', e));
 
     setSelectedRoomId((prevId) => {
       if (prevId === id) {
@@ -896,10 +964,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       date: formatLocalDateToISO(),
     };
     setAllAnnouncements((prev) => [newAnn, ...prev]);
+    saveAnnouncementToCloud(newAnn).catch((e) => console.warn('Cloud save announcement error:', e));
   };
 
   const deleteAnnouncement = (id: string) => {
     setAllAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    deleteAnnouncementFromCloud(id).catch((e) => console.warn('Cloud delete announcement error:', e));
   };
 
   // Settings
@@ -996,7 +1066,11 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setAllReservations((prev) =>
       prev.filter((r) => {
         const sId = r.schoolId || defaultSchoolId;
-        return sId !== currentSchoolId;
+        const matches = sId !== currentSchoolId;
+        if (!matches) {
+          deleteReservationFromCloud(r.id).catch(() => {});
+        }
+        return matches;
       })
     );
   };
@@ -1005,7 +1079,11 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setAllAnnouncements((prev) =>
       prev.filter((a) => {
         const sId = a.schoolId || defaultSchoolId;
-        return sId !== currentSchoolId;
+        const matches = sId !== currentSchoolId;
+        if (!matches) {
+          deleteAnnouncementFromCloud(a.id).catch(() => {});
+        }
+        return matches;
       })
     );
   };
@@ -1014,12 +1092,16 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setAllReservations([]);
     setAllAnnouncements([]);
     localStorage.setItem('reserve_production_cleared', 'true');
+    allReservations.forEach((r) => deleteReservationFromCloud(r.id).catch(() => {}));
+    allAnnouncements.forEach((a) => deleteAnnouncementFromCloud(a.id).catch(() => {}));
   };
 
   const loadDemoSampleData = () => {
     setAllReservations(SAMPLE_DEMO_RESERVATIONS);
     setAllAnnouncements(SAMPLE_DEMO_ANNOUNCEMENTS);
     localStorage.removeItem('reserve_production_cleared');
+    SAMPLE_DEMO_RESERVATIONS.forEach((r) => saveReservationToCloud(r).catch(() => {}));
+    SAMPLE_DEMO_ANNOUNCEMENTS.forEach((a) => saveAnnouncementToCloud(a).catch(() => {}));
   };
 
   const resetToDefaultData = () => {
@@ -1033,6 +1115,13 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.removeItem(STORAGE_KEY_RES);
     localStorage.removeItem(STORAGE_KEY_ROOMS);
     localStorage.removeItem(STORAGE_KEY_ANN);
+    localStorage.removeItem('reserve_production_cleared');
+
+    // Sync defaults to Cloud Firestore
+    DEFAULT_SCHOOLS.forEach((s) => saveSchoolToCloud(s).catch(() => {}));
+    DEFAULT_ROOMS.forEach((r) => saveRoomToCloud(r).catch(() => {}));
+    DEFAULT_RESERVATIONS.forEach((res) => saveReservationToCloud(res).catch(() => {}));
+    DEFAULT_ANNOUNCEMENTS.forEach((a) => saveAnnouncementToCloud(a).catch(() => {}));
   };
 
   return (

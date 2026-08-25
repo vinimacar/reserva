@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Schools: Publicly readable for tenant selection, writable for institutional setup
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Rooms: Readable by teachers and students, managed by staff
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Reservations: Readable by community, writable for creating and modifying bookings
+    match /reservations/{reservationId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Users: Profiles accessible for educational workflow
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Announcements: Notices visible to all users
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

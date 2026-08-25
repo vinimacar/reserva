@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "schools": {
+      "title": "Schools",
+      "description": "Tenant schools registered in the multi-school system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique school ID" },
+        "name": { "type": "string", "description": "Full school name" },
+        "shortName": { "type": "string", "description": "Abbreviated name" },
+        "code": { "type": "string", "description": "School code or acronym" },
+        "city": { "type": "string", "description": "City" },
+        "state": { "type": "string", "description": "State UF" },
+        "inepCode": { "type": "string", "description": "MEC INEP code" },
+        "networkType": { "type": "string", "description": "School network type (Estadual, Municipal, etc.)" },
+        "shifts": { "type": "array", "items": { "type": "string" }, "description": "Active operational shifts" },
+        "contactEmail": { "type": "string", "description": "Contact email" },
+        "phone": { "type": "string", "description": "Contact phone" },
+        "directorName": { "type": "string", "description": "School director name" },
+        "active": { "type": "boolean", "description": "Active status flag" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of creation" },
+        "adminEmails": { "type": "array", "items": { "type": "string" }, "description": "Admin emails authorized" },
+        "requireAdminApproval": { "type": "boolean", "description": "Require approval flag" },
+        "maxAdvanceDays": { "type": "number", "description": "Max advance days allowed" },
+        "allowWeekendBooking": { "type": "boolean", "description": "Allow booking on weekends" }
+      },
+      "required": ["id", "name", "shortName", "code", "city", "state", "networkType", "shifts", "contactEmail", "active", "createdAt", "adminEmails"]
+    },
+    "rooms": {
+      "title": "Rooms and Labs",
+      "description": "Laboratories and pedagogical rooms available for reservations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Room ID" },
+        "schoolId": { "type": "string", "description": "ID of the associated school" },
+        "name": { "type": "string", "description": "Room or lab name" },
+        "type": { "type": "string", "description": "Type of laboratory" },
+        "capacity": { "type": "number", "description": "Max student capacity" },
+        "location": { "type": "string", "description": "Location in school" },
+        "description": { "type": "string", "description": "Description of resources" },
+        "status": { "type": "string", "description": "Status ACTIVE, MAINTENANCE, INACTIVE" },
+        "equipment": { "type": "array", "items": { "type": "string" }, "description": "List of available equipment" },
+        "color": { "type": "string", "description": "Color accent" },
+        "iconName": { "type": "string", "description": "Icon identifier" },
+        "responsibleName": { "type": "string", "description": "Responsible staff name" },
+        "rules": { "type": "array", "items": { "type": "string" }, "description": "Room specific rules" }
+      },
+      "required": ["id", "name", "type", "capacity", "location", "description", "status", "equipment", "color", "iconName"]
+    },
+    "reservations": {
+      "title": "Reservations",
+      "description": "Room and lab reservation bookings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Reservation ID" },
+        "schoolId": { "type": "string", "description": "ID of school" },
+        "roomId": { "type": "string", "description": "Target room ID" },
+        "roomName": { "type": "string", "description": "Target room name" },
+        "userId": { "type": "string", "description": "User teacher ID" },
+        "userName": { "type": "string", "description": "User teacher name" },
+        "userEmail": { "type": "string", "description": "User teacher email" },
+        "userAvatar": { "type": "string", "description": "User avatar" },
+        "date": { "type": "string", "description": "Booking date YYYY-MM-DD" },
+        "shift": { "type": "string", "description": "Shift MANHA, TARDE, NOITE" },
+        "periodIds": { "type": "array", "items": { "type": "string" }, "description": "Period IDs booked" },
+        "periodNumbers": { "type": "array", "items": { "type": "number" }, "description": "Period numbers" },
+        "periodLabels": { "type": "string", "description": "Human readable label" },
+        "turma": { "type": "string", "description": "Class grade or turma" },
+        "disciplina": { "type": "string", "description": "Curricular discipline" },
+        "subjectTopic": { "type": "string", "description": "Class topic/lesson objective" },
+        "numberOfStudents": { "type": "number", "description": "Estimated student count" },
+        "requestedEquipment": { "type": "array", "items": { "type": "string" }, "description": "Requested equipment" },
+        "observations": { "type": "string", "description": "Additional notes" },
+        "status": { "type": "string", "description": "CONFIRMED, PENDING, CANCELLED, COMPLETED" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" },
+        "adminNote": { "type": "string", "description": "Note from administrator" }
+      },
+      "required": ["id", "roomId", "roomName", "userId", "userName", "userEmail", "date", "shift", "periodIds", "periodNumbers", "periodLabels", "turma", "disciplina", "subjectTopic", "status", "createdAt"]
+    },
+    "users": {
+      "title": "Users",
+      "description": "System users, teachers and administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "User ID" },
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "description": "Institutional email" },
+        "avatar": { "type": "string", "description": "Avatar URL or initial letter" },
+        "iconKey": { "type": "string", "description": "Icon key" },
+        "role": { "type": "string", "description": "ADMIN or TEACHER" },
+        "subject": { "type": "string", "description": "Teaching subject" },
+        "schoolId": { "type": "string", "description": "School ID" },
+        "schoolName": { "type": "string", "description": "School Name" },
+        "gender": { "type": "string", "description": "MALE or FEMALE" }
+      },
+      "required": ["id", "name", "email", "avatar", "role", "schoolName"]
+    },
+    "announcements": {
+      "title": "Announcements",
+      "description": "Institutional notices and announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Notice ID" },
+        "schoolId": { "type": "string", "description": "School ID" },
+        "title": { "type": "string", "description": "Title" },
+        "content": { "type": "string", "description": "Content body" },
+        "date": { "type": "string", "description": "Date string" },
+        "author": { "type": "string", "description": "Author name" },
+        "important": { "type": "boolean", "description": "Priority flag" },
+        "targetRoomId": { "type": "string", "description": "Optional specific room ID" }
+      },
+      "required": ["id", "title", "content", "date", "author", "important"]
+    }
+  },
+  "enums": {
+    "UserRole": {
+      "description": "User roles in the system",
+      "values": ["ADMIN", "TEACHER"]
+    },
+    "SpaceType": {
+      "description": "Types of spaces",
+      "values": ["INFORMATICA", "CIENCIAS", "QUIMICA_FISICA", "MAKER", "MULTIMIDIA"]
+    },
+    "ShiftType": {
+      "description": "Operational shifts",
+      "values": ["MANHA", "TARDE", "NOITE"]
+    },
+    "ReservationStatus": {
+      "description": "Booking status",
+      "values": ["CONFIRMED", "PENDING", "CANCELLED", "COMPLETED"]
+    }
+  }
+}
