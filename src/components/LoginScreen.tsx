@@ -20,6 +20,9 @@ import {
   ChevronDown,
   Terminal,
   Code2,
+  X,
+  KeyRound,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
@@ -38,6 +41,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>(currentSchoolId || schools[0]?.id || '');
   const [schoolSearchQuery, setSchoolSearchQuery] = useState('');
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState('');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,6 +49,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // Selected school object
   const activeSelectedSchool = useMemo(() => {
@@ -65,15 +70,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
     );
   }, [schools, schoolSearchQuery]);
 
-  // Teachers filtered by selected school
+  // Teachers filtered by selected school and teacher search
   const teachersForSelectedSchool = useMemo(() => {
     const list = users.filter((u) => u.schoolId === selectedSchoolId || (!u.schoolId && selectedSchoolId === schools[0]?.id));
-    if (list.length === 0) {
-      // Fallback: return users if only 1 school or default
-      return users.slice(0, 5);
-    }
-    return list;
-  }, [users, selectedSchoolId, schools]);
+    const baseList = list.length > 0 ? list : users.slice(0, 5);
+
+    const tq = teacherSearchQuery.toLowerCase().trim();
+    if (!tq) return baseList;
+
+    return baseList.filter(
+      (u) =>
+        u.name.toLowerCase().includes(tq) ||
+        u.email.toLowerCase().includes(tq) ||
+        (u.subject && u.subject.toLowerCase().includes(tq))
+    );
+  }, [users, selectedSchoolId, schools, teacherSearchQuery]);
 
   // Auto-detect school when user enters email
   const handleEmailChange = (newEmail: string) => {
@@ -353,9 +364,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
                     <label className="text-[11px] font-bold text-slate-300">
                       Senha de Acesso:
                     </label>
-                    <span className="text-[10px] text-slate-500">
-                      Padrão: <code className="text-blue-400 font-mono">educacao123</code>
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsHelpModalOpen(true)}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold transition-colors cursor-pointer"
+                    >
+                      Primeiro acesso ou esqueceu?
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -414,11 +429,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
             </div>
 
             {/* Bottom Security Notice */}
-            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center space-x-2 text-[11px] text-slate-400">
-              <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>
-                Proteção de dados: O Professor A não acessa a conta do Professor B.
-              </span>
+            <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="flex items-center space-x-2">
+                <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Proteção de dados por unidade escolar</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpModalOpen(true)}
+                className="text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+              >
+                Ajuda
+              </button>
             </div>
           </div>
 
@@ -431,15 +453,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
                   <span>Docentes Cadastrados:</span>
                 </span>
                 <span className="text-[10px] text-blue-400 font-mono px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">
-                  {teachersForSelectedSchool.length} nesta escola
+                  {teachersForSelectedSchool.length} listados
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Selecione um professor da unidade <strong className="text-slate-200">{activeSelectedSchool?.shortName || activeSelectedSchool?.name}</strong> para preencher o login:
-              </p>
+
+              {/* Teacher Search Input */}
+              <div className="relative mb-2.5">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={teacherSearchQuery}
+                  onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                  placeholder="Filtrar por nome ou disciplina..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
 
               {/* Staff List */}
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
                 {teachersForSelectedSchool.map((user) => {
                   const isSelected = email.toLowerCase() === user.email.toLowerCase();
                   const isAdmin = user.role === 'ADMIN';
@@ -482,6 +513,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
                     </button>
                   );
                 })}
+
+                {teachersForSelectedSchool.length === 0 && (
+                  <div className="p-4 text-center text-xs text-slate-500 bg-slate-900/40 rounded-xl">
+                    Nenhum docente encontrado para o termo pesquisado.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -489,10 +526,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
             <div className="mt-4 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
               <div className="flex items-center space-x-1.5 font-bold text-slate-300">
                 <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                <span>Multi-Escolas & Responsáveis</span>
+                <span>Multi-Escolas & Docentes</span>
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed">
-                O administrador geral cadastra novas escolas e vincula os responsáveis pelo sistema de cada unidade no Painel Admin.
+                Clique em qualquer professor da lista para preencher as credenciais instantaneamente ou digite seu e-mail institucional.
               </p>
             </div>
           </div>
@@ -517,6 +554,74 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
           </button>
         </div>
       </footer>
+
+      {/* First Time / Password Help Modal */}
+      {isHelpModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Primeiro Acesso & Senha</h3>
+                  <p className="text-xs text-slate-400">Guia de acesso institucional</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsHelpModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1.5">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-blue-400" />
+                  1. Senha Inicial Padrão
+                </span>
+                <p className="text-slate-400">
+                  Para todos os novos professores e administradores cadastrados, a senha padrão é:
+                </p>
+                <div className="p-2 bg-blue-950/50 border border-blue-500/30 rounded-xl text-center">
+                  <code className="text-blue-300 font-mono font-black text-sm">educacao123</code>
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
+                <span className="font-bold text-white">2. Como Alterar sua Senha</span>
+                <p className="text-slate-400">
+                  Após entrar no sistema, clique na sua foto no canto superior direito e selecione <strong>"Alterar Minha Senha"</strong>.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-1">
+                <span className="font-bold text-white">3. Esqueci Minha Senha</span>
+                <p className="text-slate-400">
+                  Solicite ao gestor / administrador da sua escola que redefina sua senha no Painel Administrativo ou no Console do Desenvolvedor.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setPassword('educacao123');
+                  setIsHelpModalOpen(false);
+                }}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Preencher Senha Padrão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Developer Auth Modal */}
       <DeveloperAuthModal

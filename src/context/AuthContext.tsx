@@ -89,15 +89,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USER);
-      if (saved) {
+      if (saved && saved !== 'null' && saved !== 'undefined') {
         const parsed: User = JSON.parse(saved);
-        return normalizeUser(parsed);
+        if (parsed && parsed.id && parsed.name) {
+          return normalizeUser(parsed);
+        }
       }
     } catch {
       // ignore
     }
-    // Default to school administrator (Prof. Vinicius) or null
-    return normalizeUser(DEFAULT_USERS[0]);
+    return null;
   });
 
   useEffect(() => {
