@@ -652,6 +652,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return false; // Cannot delete the only remaining school
     }
 
+    // Delete school and all its child documents from Cloud
+    deleteSchoolFromCloud(id).catch(console.error);
+    allRooms.filter((r) => r.schoolId === id).forEach((r) => deleteRoomFromCloud(r.id).catch(console.error));
+    allReservations.filter((res) => res.schoolId === id).forEach((res) => deleteReservationFromCloud(res.id).catch(console.error));
+    allAnnouncements.filter((ann) => ann.schoolId === id).forEach((ann) => deleteAnnouncementFromCloud(ann.id).catch(console.error));
+
     setSchools((prev) => prev.filter((s) => s.id !== id));
     setAllRooms((prev) => prev.filter((r) => r.schoolId !== id));
     setAllReservations((prev) => prev.filter((res) => res.schoolId !== id));
