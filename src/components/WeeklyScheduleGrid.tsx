@@ -104,7 +104,8 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   });
 
   // Shifts present in filteredPeriods
-  const activeShifts: ShiftType[] = selectedShift === 'ALL' ? ['MANHA', 'TARDE', 'NOITE'] : [selectedShift];
+  const activeShifts: ShiftType[] =
+    selectedShift === 'ALL' ? ['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] : [selectedShift];
 
   const getRoomIcon = (iconName: string) => {
     switch (iconName) {
@@ -372,7 +373,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
         {/* Shift Filter & Search */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Shift Filter Tabs */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+          <div className="flex flex-wrap items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
             <button
               onClick={() => setSelectedShift('ALL')}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
@@ -412,6 +413,16 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
               }`}
             >
               Noite
+            </button>
+            <button
+              onClick={() => setSelectedShift('INTEGRAL')}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+                selectedShift === 'INTEGRAL'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Integral
             </button>
           </div>
 
@@ -472,12 +483,16 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             {/* Matrix Body: Loop through Shifts */}
             {activeShifts.map((shift) => {
               const shiftPeriods = periods.filter((p) => p.shift === shift);
+              if (shiftPeriods.length === 0) return null;
+
               const shiftName =
                 shift === 'MANHA'
                   ? '☀️ Turno da Manhã (Matutino)'
                   : shift === 'TARDE'
                   ? '🌤️ Turno da Tarde (Vespertino)'
-                  : '🌙 Turno da Noite (Noturno)';
+                  : shift === 'NOITE'
+                  ? '🌙 Turno da Noite (Noturno)'
+                  : '🕒 Tempo Integral (Educação Integral / EMTI)';
 
               return (
                 <div key={shift} className="border-b border-slate-200 dark:border-slate-800 last:border-b-0">
@@ -494,7 +509,8 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                     // Check if we need an interval separator row
                     const showInterval =
                       (shift === 'MANHA' && period.number === 3) ||
-                      (shift === 'TARDE' && period.number === 3);
+                      (shift === 'TARDE' && period.number === 3) ||
+                      (shift === 'INTEGRAL' && (period.number === 3 || period.number === 5 || period.number === 7));
 
                     return (
                       <React.Fragment key={period.id}>
@@ -602,10 +618,20 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                         {showInterval && (
                           <div className="grid grid-cols-6 bg-amber-50/50 dark:bg-amber-950/40 border-b border-amber-200/60 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-[11px] font-semibold py-1">
                             <div className="p-1 text-center font-mono text-[10px] text-amber-700 dark:text-amber-400">
-                              {shift === 'MANHA' ? '09:30 - 09:50' : '15:30 - 15:50'}
+                              {shift === 'MANHA'
+                                ? '09:30 - 09:50'
+                                : shift === 'TARDE'
+                                ? '15:30 - 15:50'
+                                : period.number === 3
+                                ? '09:10 - 09:25'
+                                : period.number === 5
+                                ? '11:55 - 13:00 (Almoço)'
+                                : '14:40 - 14:55'}
                             </div>
                             <div className="col-span-5 text-center text-amber-900/80 dark:text-amber-200/90 font-medium">
-                              ☕ Intervalo Escolar / Recreio dos Professores e Alunos
+                              {shift === 'INTEGRAL' && period.number === 5
+                                ? '🍽️ Horário de Almoço & Tutoria Pedagógica'
+                                : '☕ Intervalo Escolar / Recreio dos Professores e Alunos'}
                             </div>
                           </div>
                         )}

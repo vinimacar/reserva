@@ -825,6 +825,7 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                           { id: 'MANHA' as ShiftType, label: 'Manhã (07:00 - 12:20)' },
                           { id: 'TARDE' as ShiftType, label: 'Tarde (13:00 - 18:20)' },
                           { id: 'NOITE' as ShiftType, label: 'Noite (18:40 - 22:40)' },
+                          { id: 'INTEGRAL' as ShiftType, label: 'Integral (07:30 - 16:35)' },
                         ].map((shift) => (
                           <label
                             key={shift.id}

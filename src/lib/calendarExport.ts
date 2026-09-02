@@ -21,11 +21,13 @@ function getReservationTimeBounds(reservation: Reservation): { startTime: string
 
   // Fallback defaults based on shift
   if (reservation.shift === 'TARDE') {
-    return { startTime: '13:00', endTime: '17:30' };
+    return { startTime: '13:00', endTime: '18:20' };
   } else if (reservation.shift === 'NOITE') {
-    return { startTime: '19:00', endTime: '22:30' };
+    return { startTime: '19:00', endTime: '22:10' };
+  } else if (reservation.shift === 'INTEGRAL') {
+    return { startTime: '07:30', endTime: '16:35' };
   }
-  return { startTime: '07:00', endTime: '11:30' };
+  return { startTime: '07:00', endTime: '12:20' };
 }
 
 /**
@@ -147,6 +149,95 @@ export function generateIcsContent(
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n');
+}
+
+/**
+ * Generates RFC 5545 .ics text content containing multiple reservation events
+ */
+export function generateMultipleIcsContent(
+  reservations: Reservation[],
+  schoolName: string = 'Escola da Rede',
+  roomLocation?: string
+): string {
+  const now = new Date();
+  const dtStamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const events = reservations.map((reservation) => {
+    const { startTime, endTime } = getReservationTimeBounds(reservation);
+    const startDt = formatDateTimeForCal(reservation.date, startTime);
+    const endDt = formatDateTimeForCal(reservation.date, endTime);
+
+    const title = `Aula no ${reservation.roomName} - ${reservation.turma} (${reservation.disciplina})`;
+    const description = buildEventDetails(reservation, schoolName, roomLocation)
+      .replace(/\n/g, '\\n')
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
+    const location = `${reservation.roomName}, ${schoolName}${roomLocation ? ` (${roomLocation})` : ''}`
+      .replace(/,/g, '\\,')
+      .replace(/;/g, '\\;');
+
+    return [
+      'BEGIN:VEVENT',
+      `UID:reserve-${reservation.id}-${reservation.date}@educacao.mg.gov.br`,
+      `DTSTAMP:${dtStamp}`,
+      `DTSTART:${startDt}`,
+      `DTEND:${endDt}`,
+      `SUMMARY:${title}`,
+      `DESCRIPTION:${description}`,
+      `LOCATION:${location}`,
+      'STATUS:CONFIRMED',
+      'TRANSP:OPAQUE',
+      'SEQUENCE:0',
+      'BEGIN:VALARM',
+      'TRIGGER:-PT30M',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Lembrete de aula no laboratório agendado pelo RESERVE',
+      'END:VALARM',
+      'END:VEVENT',
+    ].join('\r\n');
+  });
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//RESERVE Gestao de Laboratorios Escolares//PT-BR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:RESERVE - Periodo de Reservas Escolares',
+    'X-WR-TIMEZONE:America/Sao_Paulo',
+    ...events,
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+/**
+ * Triggers instant download of multi-reservation .ics calendar file in the browser
+ */
+export function downloadMultipleReservationsIcs(
+  reservations: Reservation[],
+  schoolName: string = 'Escola da Rede',
+  roomLocation?: string
+): void {
+  if (!reservations || reservations.length === 0) return;
+  try {
+    const icsData = generateMultipleIcsContent(reservations, schoolName, roomLocation);
+    const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    const first = reservations[0];
+    const last = reservations[reservations.length - 1];
+    const cleanRoom = (first.roomName || 'lab').replace(/[^a-zA-Z0-9]/g, '_');
+    link.href = url;
+    link.download = `periodo_reservas_${first.date}_a_${last.date}_${cleanRoom}.ics`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Erro ao gerar arquivo .ics de período:', err);
+  }
 }
 
 /**

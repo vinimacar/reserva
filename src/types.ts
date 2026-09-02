@@ -54,7 +54,7 @@ export interface Room {
   rules?: string[];
 }
 
-export type ShiftType = 'MANHA' | 'TARDE' | 'NOITE';
+export type ShiftType = 'MANHA' | 'TARDE' | 'NOITE' | 'INTEGRAL';
 
 export interface TimePeriod {
   id: string;

@@ -787,8 +787,8 @@ export const AdminSchoolsTab: React.FC<{
                   <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Turnos de Atendimento:
                   </label>
-                  <div className="flex items-center space-x-2 pt-1">
-                    {(['MANHA', 'TARDE', 'NOITE'] as ShiftType[]).map((shift) => {
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {(['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]).map((shift) => {
                       const isChecked = formData.shifts.includes(shift);
                       return (
                         <button
@@ -801,7 +801,13 @@ export const AdminSchoolsTab: React.FC<{
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                           }`}
                         >
-                          {shift === 'MANHA' ? 'Manhã' : shift === 'TARDE' ? 'Tarde' : 'Noite'}
+                          {shift === 'MANHA'
+                            ? 'Manhã'
+                            : shift === 'TARDE'
+                            ? 'Tarde'
+                            : shift === 'NOITE'
+                            ? 'Noite'
+                            : 'Integral'}
                         </button>
                       );
                     })}

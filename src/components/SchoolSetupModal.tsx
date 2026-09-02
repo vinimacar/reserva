@@ -382,11 +382,12 @@ export const SchoolSetupModal: React.FC<SchoolSetupModalProps> = ({
               2. Turnos com Aulas e Laboratórios Ativos
             </h4>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'MANHA' as ShiftType, label: 'Manhã', time: '07:00 às 12:20' },
                 { id: 'TARDE' as ShiftType, label: 'Tarde', time: '13:00 às 18:20' },
                 { id: 'NOITE' as ShiftType, label: 'Noite', time: '19:00 às 22:10' },
+                { id: 'INTEGRAL' as ShiftType, label: 'Integral', time: '07:30 às 16:35' },
               ].map((t) => {
                 const isSelected = selectedShifts.includes(t.id);
                 return (

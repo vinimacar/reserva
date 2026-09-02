@@ -430,6 +430,17 @@ export const TIME_PERIODS: TimePeriod[] = [
   { id: 'n2', number: 2, name: '2ª Aula', startTime: '19:45', endTime: '20:30', shift: 'NOITE' },
   { id: 'n3', number: 3, name: '3ª Aula', startTime: '20:40', endTime: '21:25', shift: 'NOITE' },
   { id: 'n4', number: 4, name: '4ª Aula', startTime: '21:25', endTime: '22:10', shift: 'NOITE' },
+
+  // TEMPO INTEGRAL (EMTI / Educação Integral)
+  { id: 'i1', number: 1, name: '1ª Aula', startTime: '07:30', endTime: '08:20', shift: 'INTEGRAL' },
+  { id: 'i2', number: 2, name: '2ª Aula', startTime: '08:20', endTime: '09:10', shift: 'INTEGRAL' },
+  { id: 'i3', number: 3, name: '3ª Aula', startTime: '09:25', endTime: '10:15', shift: 'INTEGRAL' },
+  { id: 'i4', number: 4, name: '4ª Aula', startTime: '10:15', endTime: '11:05', shift: 'INTEGRAL' },
+  { id: 'i5', number: 5, name: '5ª Aula', startTime: '11:05', endTime: '11:55', shift: 'INTEGRAL' },
+  { id: 'i6', number: 6, name: '6ª Aula', startTime: '13:00', endTime: '13:50', shift: 'INTEGRAL' },
+  { id: 'i7', number: 7, name: '7ª Aula', startTime: '13:50', endTime: '14:40', shift: 'INTEGRAL' },
+  { id: 'i8', number: 8, name: '8ª Aula', startTime: '14:55', endTime: '15:45', shift: 'INTEGRAL' },
+  { id: 'i9', number: 9, name: '9ª Aula', startTime: '15:45', endTime: '16:35', shift: 'INTEGRAL' },
 ];
 
 export const SCHOOL_DISCIPLINES = [
@@ -450,22 +461,76 @@ export const SCHOOL_DISCIPLINES = [
 ];
 
 export const SCHOOL_CLASSES = [
+  // Ensino Fundamental II (6º ao 9º Ano - A, B, C, D, E, Integral)
   '6º Ano A',
   '6º Ano B',
+  '6º Ano C',
+  '6º Ano D',
+  '6º Ano E',
+  '6º Ano Integral 1',
+  '6º Ano Integral 2',
   '7º Ano A',
   '7º Ano B',
+  '7º Ano C',
+  '7º Ano D',
+  '7º Ano E',
+  '7º Ano Integral 1',
+  '7º Ano Integral 2',
   '8º Ano A',
   '8º Ano B',
+  '8º Ano C',
+  '8º Ano D',
+  '8º Ano E',
+  '8º Ano Integral 1',
+  '8º Ano Integral 2',
   '9º Ano A',
   '9º Ano B',
-  '1º Ano E.M. 01',
-  '1º Ano E.M. 02',
-  '2º Ano E.M. 01',
-  '2º Ano E.M. 02',
-  '3º Ano E.M. 01',
-  '3º Ano E.M. 02',
+  '9º Ano C',
+  '9º Ano D',
+  '9º Ano E',
+  '9º Ano Integral 1',
+  '9º Ano Integral 2',
+
+  // Ensino Médio Regular e EMTI
+  '1º Ano E.M. A',
+  '1º Ano E.M. B',
+  '1º Ano E.M. C',
+  '1º Ano E.M. D',
+  '1º Ano EMTI Integral 1',
+  '1º Ano EMTI Integral 2',
+  '2º Ano E.M. A',
+  '2º Ano E.M. B',
+  '2º Ano E.M. C',
+  '2º Ano E.M. D',
+  '2º Ano EMTI Integral 1',
+  '2º Ano EMTI Integral 2',
+  '3º Ano E.M. A',
+  '3º Ano E.M. B',
+  '3º Ano E.M. C',
+  '3º Ano E.M. D',
+  '3º Ano EMTI Integral 1',
+  '3º Ano EMTI Integral 2',
+
+  // Anos Iniciais (1º ao 5º Ano)
+  '1º Ano Fundamental',
+  '2º Ano Fundamental',
+  '3º Ano Fundamental',
+  '4º Ano Fundamental',
+  '5º Ano Fundamental',
+
+  // EJA & Noturno
+  'EJA - Fundamental (Módulo 1/2)',
+  'EJA - Fundamental (Módulo 3/4)',
   'EJA - Médio 1',
   'EJA - Médio 2',
+  'EJA - Médio 3',
+
+  // Cursos Técnicos & Projetos
+  'Técnico em Informática 1º Módulo',
+  'Técnico em Informática 2º Módulo',
+  'Técnico em Administração',
+  'Itinerário Formativo / Eletiva',
+  'Turma / Clube de Robótica',
 ];
 
 export const AVAILABLE_EQUIPMENT = [

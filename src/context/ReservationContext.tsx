@@ -87,6 +87,16 @@ interface ReservationContextType {
   addReservation: (
     data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
   ) => Promise<{ success: boolean; error?: string; reservation?: Reservation }>;
+  addBatchReservations: (
+    reservationsData: Array<
+      Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
+    >
+  ) => Promise<{
+    success: boolean;
+    createdReservations: Reservation[];
+    conflicts: Array<{ date: string; message: string }>;
+    error?: string;
+  }>;
   updateReservation: (id: string, data: Partial<Reservation>) => boolean;
   cancelReservation: (id: string, reason?: string) => void;
   deleteReservation: (id: string) => void;
@@ -857,6 +867,127 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return { success: true, reservation: newReservation };
   };
 
+  const addBatchReservations = async (
+    reservationsData: Array<
+      Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
+    >
+  ): Promise<{
+    success: boolean;
+    createdReservations: Reservation[];
+    conflicts: Array<{ date: string; message: string }>;
+    error?: string;
+  }> => {
+    if (!currentUser) {
+      return { success: false, createdReservations: [], conflicts: [], error: 'Você precisa estar autenticado.' };
+    }
+
+    if (!reservationsData || reservationsData.length === 0) {
+      return {
+        success: false,
+        createdReservations: [],
+        conflicts: [],
+        error: 'Nenhuma data informada para o agendamento.',
+      };
+    }
+
+    const createdReservations: Reservation[] = [];
+    const conflicts: Array<{ date: string; message: string }> = [];
+    const initialStatus: ReservationStatus = currentSchool.requireAdminApproval && !isAdmin ? 'PENDING' : 'CONFIRMED';
+
+    for (const data of reservationsData) {
+      const room = rooms.find((r) => r.id === data.roomId);
+      if (!room) {
+        conflicts.push({ date: data.date, message: 'Ambiente ou laboratório não encontrado.' });
+        continue;
+      }
+
+      if (room.status === 'MAINTENANCE') {
+        conflicts.push({ date: data.date, message: 'Este laboratório está temporariamente em manutenção.' });
+        continue;
+      }
+
+      if (room.status === 'INACTIVE') {
+        conflicts.push({ date: data.date, message: 'Este espaço está desativado.' });
+        continue;
+      }
+
+      // Check conflict including already created in this batch
+      const alreadyInBatch = createdReservations.some(
+        (cr) =>
+          cr.roomId === data.roomId &&
+          cr.date === data.date &&
+          cr.periodIds.some((p) => data.periodIds.includes(p))
+      );
+      if (alreadyInBatch) {
+        conflicts.push({ date: data.date, message: 'Conflito com outra reserva no mesmo lote.' });
+        continue;
+      }
+
+      const conflict = checkConflict(data.roomId, data.date, data.periodIds);
+      if (conflict.hasConflict) {
+        conflicts.push({ date: data.date, message: conflict.message || 'Conflito de horário: este período já está ocupado.' });
+        continue;
+      }
+
+      // Format period labels
+      const selectedPeriods = periods.filter((p) => data.periodIds.includes(p.id));
+      selectedPeriods.sort((a, b) => a.number - b.number);
+      const periodNumbers = selectedPeriods.map((p) => p.number);
+      const startHour = selectedPeriods[0]?.startTime || '07:00';
+      const endHour = selectedPeriods[selectedPeriods.length - 1]?.endTime || '12:20';
+
+      let periodLabels = '';
+      if (selectedPeriods.length === 1) {
+        periodLabels = `${selectedPeriods[0].name} (${selectedPeriods[0].startTime} - ${selectedPeriods[0].endTime})`;
+      } else {
+        periodLabels = `${selectedPeriods.map((p) => `${p.number}ª`).join(' e ')} Aula (${startHour} - ${endHour})`;
+      }
+
+      const targetUser = (data.userId && users.find((u) => u.id === data.userId)) || currentUser;
+
+      const newReservation: Reservation = {
+        ...data,
+        id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 6)}_${Math.random().toString(36).substr(2, 3)}`,
+        schoolId: currentSchoolId,
+        roomName: room.name,
+        userId: targetUser.id,
+        userName: targetUser.name,
+        userEmail: targetUser.email,
+        userAvatar: targetUser.avatar,
+        periodNumbers,
+        periodLabels,
+        status: initialStatus,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        const lockResult = await saveReservationWithLockToCloud(newReservation);
+        if (!lockResult.success && lockResult.conflictError) {
+          conflicts.push({ date: data.date, message: lockResult.conflictError });
+          continue;
+        }
+      } catch (e: any) {
+        console.warn('Erro ao travar reserva em lote no banco:', e);
+      }
+
+      createdReservations.push(newReservation);
+    }
+
+    if (createdReservations.length > 0) {
+      setAllReservations((prev) => [...createdReservations, ...prev]);
+    }
+
+    return {
+      success: createdReservations.length > 0,
+      createdReservations,
+      conflicts,
+      error:
+        createdReservations.length === 0
+          ? 'Nenhuma reserva pôde ser confirmada devido a conflitos de horários em todas as datas.'
+          : undefined,
+    };
+  };
+
   const updateReservation = (id: string, data: Partial<Reservation>): boolean => {
     const existing = allReservations.find((r) => r.id === id);
     if (!existing) return false;
@@ -1039,17 +1170,21 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const roomRes = reservations.filter((r) => r.roomId === room.id && r.status !== 'CANCELLED');
       const totalBookings = roomRes.length;
 
-      const shiftsCount = { MANHA: 0, TARDE: 0, NOITE: 0 };
+      const shiftsCount: Record<ShiftType, number> = { MANHA: 0, TARDE: 0, NOITE: 0, INTEGRAL: 0 };
       roomRes.forEach((r) => {
-        shiftsCount[r.shift] = (shiftsCount[r.shift] || 0) + 1;
+        if (r.shift && shiftsCount[r.shift] !== undefined) {
+          shiftsCount[r.shift] = (shiftsCount[r.shift] || 0) + 1;
+        }
       });
 
       let popularShift: ShiftType = 'MANHA';
-      if (shiftsCount.TARDE > shiftsCount.MANHA && shiftsCount.TARDE > shiftsCount.NOITE) {
-        popularShift = 'TARDE';
-      } else if (shiftsCount.NOITE > shiftsCount.MANHA) {
-        popularShift = 'NOITE';
-      }
+      let maxCount = shiftsCount.MANHA;
+      (['TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]).forEach((s) => {
+        if (shiftsCount[s] > maxCount) {
+          maxCount = shiftsCount[s];
+          popularShift = s;
+        }
+      });
 
       const occupancyRate = Math.min(100, Math.round((totalBookings / 15) * 100));
 
@@ -1187,6 +1322,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setSelectedShift,
         setSearchQuery,
         addReservation,
+        addBatchReservations,
         updateReservation,
         cancelReservation,
         deleteReservation,

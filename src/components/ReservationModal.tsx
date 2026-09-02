@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Calendar,
@@ -16,16 +16,31 @@ import {
   User as UserIcon,
   School,
   CalendarPlus,
+  CalendarRange,
+  Repeat,
   Download,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { ShiftType, Room, User, Reservation } from '../types';
 import { SCHOOL_CLASSES, SCHOOL_DISCIPLINES, AVAILABLE_EQUIPMENT } from '../data/initialData';
 import { TeacherAvatar } from './TeacherAvatar';
-import { formatLocalDateToISO, getRelativeDays, formatDateBR } from '../lib/dateUtils';
-import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
+import {
+  formatLocalDateToISO,
+  getRelativeDays,
+  formatDateBR,
+  addDaysToISO,
+  generateDateRange,
+  generateRecurringDates,
+} from '../lib/dateUtils';
+import {
+  getGoogleCalendarUrl,
+  downloadIcsFile,
+  downloadMultipleReservationsIcs,
+} from '../lib/calendarExport';
+import { PeriodBookingSelector, BookingType } from './PeriodBookingSelector';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -42,7 +57,17 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   initialDate,
   initialPeriodId,
 }) => {
-  const { rooms, periods, addReservation, checkConflict, selectedRoomId, schools, currentSchoolId, currentSchool } = useReservations();
+  const {
+    rooms,
+    periods,
+    addReservation,
+    addBatchReservations,
+    checkConflict,
+    selectedRoomId,
+    schools,
+    currentSchoolId,
+    currentSchool,
+  } = useReservations();
   const { currentUser, users, addUser, switchUser, isAdmin } = useAuth();
 
   // Teacher / User selection state
@@ -60,6 +85,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [shift, setShift] = useState<ShiftType>('MANHA');
   const [selectedPeriodIds, setSelectedPeriodIds] = useState<string[]>([]);
   const [turma, setTurma] = useState<string>('9º Ano A');
+  const [customTurma, setCustomTurma] = useState<string>('');
+  const [isAddingNewTurma, setIsAddingNewTurma] = useState<boolean>(false);
+  const [schoolCustomClasses, setSchoolCustomClasses] = useState<string[]>([]);
   const [disciplina, setDisciplina] = useState<string>('Tecnologia & Robótica');
   const [customDisciplina, setCustomDisciplina] = useState<string>('');
   const [subjectTopic, setSubjectTopic] = useState<string>('');
@@ -70,6 +98,50 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+
+  // Period / Multi-Day / Recurring Booking State
+  const [bookingType, setBookingType] = useState<BookingType>('SINGLE');
+  const [startDate, setStartDate] = useState<string>(initialDate || formatLocalDateToISO());
+  const [endDate, setEndDate] = useState<string>(() => addDaysToISO(initialDate || formatLocalDateToISO(), 7));
+  const [weekdaysOnly, setWeekdaysOnly] = useState<boolean>(true);
+  const [recurringDaysOfWeek, setRecurringDaysOfWeek] = useState<number[]>([1]); // default Mon
+  const [recurringDurationType, setRecurringDurationType] = useState<'WEEKS' | 'UNTIL_DATE'>('WEEKS');
+  const [recurringWeeksCount, setRecurringWeeksCount] = useState<number>(4);
+  const [recurringEndDate, setRecurringEndDate] = useState<string>(() => addDaysToISO(initialDate || formatLocalDateToISO(), 28));
+  const [skipConflictDates, setSkipConflictDates] = useState<boolean>(true);
+  const [createdBatchReservations, setCreatedBatchReservations] = useState<Reservation[]>([]);
+  const [batchSkippedConflicts, setBatchSkippedConflicts] = useState<Array<{ date: string; message: string }>>([]);
+
+  // Load saved custom classes for this school from localStorage
+  useEffect(() => {
+    try {
+      const storageKey = `reserve_custom_classes_${currentSchoolId || 'default'}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setSchoolCustomClasses(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [currentSchoolId]);
+
+  const saveCustomClass = (newClass: string) => {
+    const trimmed = newClass.trim();
+    if (!trimmed) return;
+    if (!schoolCustomClasses.includes(trimmed) && !SCHOOL_CLASSES.includes(trimmed)) {
+      const updated = [trimmed, ...schoolCustomClasses];
+      setSchoolCustomClasses(updated);
+      try {
+        const storageKey = `reserve_custom_classes_${currentSchoolId || 'default'}`;
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+    }
+  };
 
   // Sync initial props when opened
   useEffect(() => {
@@ -164,7 +236,67 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     );
   };
 
-  // Live Conflict Check
+  // Target dates computation based on mode
+  const targetDates: string[] = useMemo(() => {
+    if (bookingType === 'SINGLE') {
+      return [date];
+    } else if (bookingType === 'DATE_RANGE') {
+      return generateDateRange(startDate, endDate, weekdaysOnly, 60);
+    } else {
+      return generateRecurringDates(
+        startDate,
+        recurringDaysOfWeek,
+        recurringDurationType === 'WEEKS'
+          ? { weeksCount: recurringWeeksCount }
+          : { endDateIso: recurringEndDate },
+        60
+      );
+    }
+  }, [
+    bookingType,
+    date,
+    startDate,
+    endDate,
+    weekdaysOnly,
+    recurringDaysOfWeek,
+    recurringDurationType,
+    recurringWeeksCount,
+    recurringEndDate,
+  ]);
+
+  // Batch conflict analysis
+  const batchConflictAnalysis = useMemo(() => {
+    if (bookingType === 'SINGLE') {
+      const c = checkConflict(roomId, date, selectedPeriodIds);
+      return {
+        hasConflict: c.hasConflict,
+        availableDates: c.hasConflict ? [] : [date],
+        conflictingDates: c.hasConflict ? [{ date, message: c.message || 'Horário ocupado' }] : [],
+        totalDates: 1,
+      };
+    }
+
+    const availableDates: string[] = [];
+    const conflictingDates: Array<{ date: string; message: string }> = [];
+
+    targetDates.forEach((d) => {
+      const c = checkConflict(roomId, d, selectedPeriodIds);
+      if (c.hasConflict) {
+        conflictingDates.push({ date: d, message: c.message || 'Horário ocupado por outra aula' });
+      } else {
+        availableDates.push(d);
+      }
+    });
+
+    return {
+      hasConflict: conflictingDates.length > 0,
+      availableDates,
+      conflictingDates,
+      totalDates: targetDates.length,
+    };
+  }, [bookingType, date, targetDates, roomId, selectedPeriodIds, checkConflict]);
+
+  // Live Conflict Check for single mode
   const conflict = checkConflict(roomId, date, selectedPeriodIds);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,9 +315,15 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       return;
     }
 
-    if (!turma.trim()) {
-      setErrorMessage('Informe a turma escolar.');
+    const finalTurma = (turma === 'OUTRA' || isAddingNewTurma) ? customTurma.trim() : turma;
+    if (!finalTurma) {
+      setErrorMessage('Informe ou selecione a turma escolar.');
       return;
+    }
+
+    // Save custom class to school list for future reuse
+    if (turma === 'OUTRA' || isAddingNewTurma) {
+      saveCustomClass(finalTurma);
     }
 
     const finalDisciplina = disciplina === 'OUTRA' ? customDisciplina : disciplina;
@@ -201,25 +339,69 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const result = await addReservation({
-        roomId,
-        date,
-        shift,
-        periodIds: selectedPeriodIds,
-        turma,
-        disciplina: finalDisciplina,
-        subjectTopic,
-        numberOfStudents,
-        requestedEquipment,
-        observations,
-        userId: reservingUser.id,
-      });
+      if (bookingType === 'SINGLE') {
+        const result = await addReservation({
+          roomId,
+          date,
+          shift,
+          periodIds: selectedPeriodIds,
+          turma: finalTurma,
+          disciplina: finalDisciplina,
+          subjectTopic,
+          numberOfStudents,
+          requestedEquipment,
+          observations,
+          userId: reservingUser.id,
+        });
 
-      if (!result.success) {
-        setErrorMessage(result.error || 'Erro ao realizar a reserva.');
+        if (!result.success) {
+          setErrorMessage(result.error || 'Erro ao realizar a reserva.');
+        } else {
+          setCreatedReservation(result.reservation || null);
+          setCreatedBatchReservations(result.reservation ? [result.reservation] : []);
+          setBatchSkippedConflicts([]);
+          setSuccessMessage('Reserva confirmada com sucesso!');
+        }
       } else {
-        setCreatedReservation(result.reservation || null);
-        setSuccessMessage('Reserva confirmada com sucesso!');
+        // Multi-day / Period / Recurring Booking
+        const datesToBook = skipConflictDates
+          ? batchConflictAnalysis.availableDates
+          : targetDates;
+
+        if (datesToBook.length === 0) {
+          setErrorMessage('Nenhuma data disponível para reserva no período selecionado.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const reservationsPayload = datesToBook.map((d) => ({
+          roomId,
+          date: d,
+          shift,
+          periodIds: selectedPeriodIds,
+          turma: finalTurma,
+          disciplina: finalDisciplina,
+          subjectTopic,
+          numberOfStudents,
+          requestedEquipment,
+          observations,
+          userId: reservingUser.id,
+        }));
+
+        const batchResult = await addBatchReservations(reservationsPayload);
+
+        if (batchResult.successCount === 0) {
+          setErrorMessage(
+            batchResult.errors[0] || 'Não foi possível agendar nenhuma data devido a conflitos.'
+          );
+        } else {
+          setCreatedBatchReservations(batchResult.createdReservations);
+          setCreatedReservation(batchResult.createdReservations[0] || null);
+          setBatchSkippedConflicts(batchResult.conflicts);
+          setSuccessMessage(
+            `${batchResult.successCount} reservas confirmadas no período com sucesso!`
+          );
+        }
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro inesperado ao salvar reserva.');
@@ -260,17 +442,21 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
         {/* Modal Body / Scrollable Form or Success Screen */}
         {createdReservation ? (
-          <div className="p-6 sm:p-8 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
+          <div className="p-6 sm:p-8 space-y-5 text-center animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
             <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
               <CheckCircle className="w-8 h-8" />
             </div>
 
             <div className="space-y-1">
               <h4 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                Reserva Confirmada com Sucesso!
+                {createdBatchReservations.length > 1
+                  ? `${createdBatchReservations.length} Reservas Confirmadas no Período!`
+                  : 'Reserva Confirmada com Sucesso!'}
               </h4>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                O espaço está garantido e protegido contra agendamentos simultâneos.
+                {createdBatchReservations.length > 1
+                  ? 'Todas as aulas do período foram agendadas e protegidas contra concorrência.'
+                  : 'O espaço está garantido e protegido contra agendamentos simultâneos.'}
               </p>
             </div>
 
@@ -280,15 +466,70 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 <span className="text-slate-500 dark:text-slate-400">Ambiente:</span>
                 <span className="font-bold text-slate-900 dark:text-slate-100">{createdReservation.roomName}</span>
               </div>
-              <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700">
-                <span className="text-slate-500 dark:text-slate-400">Data e Horário:</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100">{formatDateBR(createdReservation.date)} • {createdReservation.periodLabels}</span>
-              </div>
+
+              {createdBatchReservations.length > 1 ? (
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 dark:text-slate-400">Período Agendado:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {formatDateBR(createdBatchReservations[0].date, false)} até{' '}
+                    {formatDateBR(
+                      createdBatchReservations[createdBatchReservations.length - 1].date,
+                      false
+                    )}{' '}
+                    ({createdBatchReservations.length} aulas)
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 dark:text-slate-400">Data e Horário:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {formatDateBR(createdReservation.date)} • {createdReservation.periodLabels}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 dark:text-slate-400">Turma e Disciplina:</span>
-                <span className="font-bold text-slate-900 dark:text-slate-100">{createdReservation.turma} • {createdReservation.disciplina}</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  {createdReservation.turma} • {createdReservation.disciplina}
+                </span>
               </div>
             </div>
+
+            {/* If Batch: List all booked dates */}
+            {createdBatchReservations.length > 1 && (
+              <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-2xl border border-blue-200/70 dark:border-blue-900/50 text-left space-y-1.5">
+                <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200">
+                  Datas Agendadas no Período:
+                </span>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {createdBatchReservations.map((res) => (
+                    <span
+                      key={res.id}
+                      className="px-2 py-0.5 bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-md text-[10px] font-bold"
+                    >
+                      {formatDateBR(res.date, false)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Warning if any conflicts were skipped */}
+            {batchSkippedConflicts.length > 0 && (
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-left text-[11px] text-amber-900 dark:text-amber-200 space-y-1">
+                <span className="font-bold">
+                  ⚠️ {batchSkippedConflicts.length} data(s) não foram reservadas devido a choque de horário:
+                </span>
+                <ul className="list-disc list-inside pl-1 text-[10px] text-amber-800 dark:text-amber-300">
+                  {batchSkippedConflicts.map((c) => (
+                    <li key={c.date}>
+                      {formatDateBR(c.date, false)}: {c.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Calendar Integration Box */}
             <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/40 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 space-y-3 text-left">
@@ -298,7 +539,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                   <span>Sincronizar com seu Calendário Pessoal</span>
                 </h5>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Adicione um lembrete direto no Google Agenda ou baixe o arquivo de calendário (.ics)
+                  {createdBatchReservations.length > 1
+                    ? 'Baixe o arquivo .ics com todas as datas do período em 1 clique ou adicione a 1ª aula no Google Agenda.'
+                    : 'Adicione um lembrete direto no Google Agenda ou baixe o arquivo de calendário (.ics)'}
                 </p>
               </div>
 
@@ -306,24 +549,49 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const url = getGoogleCalendarUrl(createdReservation, currentSchool?.name || 'Escola da Rede', currentRoom?.location);
+                    const first = createdBatchReservations[0] || createdReservation;
+                    const url = getGoogleCalendarUrl(
+                      first,
+                      currentSchool?.name || 'Escola da Rede',
+                      currentRoom?.location
+                    );
                     window.open(url, '_blank', 'noopener,noreferrer');
                   }}
                   className="flex items-center justify-center space-x-2 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                 >
                   <CalendarPlus className="w-4 h-4" />
-                  <span>Adicionar ao Google Agenda</span>
+                  <span>
+                    {createdBatchReservations.length > 1
+                      ? 'Adicionar 1ª Aula ao Google'
+                      : 'Adicionar ao Google Agenda'}
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    downloadIcsFile(createdReservation, currentSchool?.name || 'Escola da Rede', currentRoom?.location);
+                    if (createdBatchReservations.length > 1) {
+                      downloadMultipleReservationsIcs(
+                        createdBatchReservations,
+                        currentSchool?.name || 'Escola da Rede',
+                        currentRoom?.location
+                      );
+                    } else {
+                      downloadIcsFile(
+                        createdReservation,
+                        currentSchool?.name || 'Escola da Rede',
+                        currentRoom?.location
+                      );
+                    }
                   }}
                   className="flex items-center justify-center space-x-2 py-2.5 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-98 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
                 >
                   <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span>Baixar (.ics)</span>
+                  <span>
+                    {createdBatchReservations.length > 1
+                      ? `Baixar Todas (.ics)`
+                      : 'Baixar (.ics)'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -582,79 +850,88 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             </div>
           </div>
 
-          {/* 2. Data e Turno */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Data */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide mb-1.5">
-                2. Data do Agendamento:
-              </label>
-              <input
-                id="reservation-date-input"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                min={formatLocalDateToISO()}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
-                required
-              />
-              <div className="flex items-center space-x-1.5 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setQuickDate(0)}
-                  className="px-2 py-0.8 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-bold cursor-pointer"
-                >
-                  Hoje
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuickDate(1)}
-                  className="px-2 py-0.8 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-bold cursor-pointer"
-                >
-                  Amanhã
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuickDate(2)}
-                  className="px-2 py-0.8 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[10px] font-bold cursor-pointer"
-                >
-                  Em 2 dias
-                </button>
-              </div>
-            </div>
+          {/* 2. Modo e Período de Agendamento */}
+          <PeriodBookingSelector
+            bookingType={bookingType}
+            setBookingType={setBookingType}
+            singleDate={date}
+            setSingleDate={(d) => {
+              setDate(d);
+              setStartDate(d);
+            }}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            weekdaysOnly={weekdaysOnly}
+            setWeekdaysOnly={setWeekdaysOnly}
+            recurringDaysOfWeek={recurringDaysOfWeek}
+            setRecurringDaysOfWeek={setRecurringDaysOfWeek}
+            recurringDurationType={recurringDurationType}
+            setRecurringDurationType={setRecurringDurationType}
+            recurringWeeksCount={recurringWeeksCount}
+            setRecurringWeeksCount={setRecurringWeeksCount}
+            recurringEndDate={recurringEndDate}
+            setRecurringEndDate={setRecurringEndDate}
+            targetDates={targetDates}
+            conflictingDates={batchConflictAnalysis.conflictingDates}
+            skipConflictDates={skipConflictDates}
+            setSkipConflictDates={setSkipConflictDates}
+          />
 
-            {/* Turno */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide mb-1.5">
-                3. Turno:
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(['MANHA', 'TARDE', 'NOITE'] as ShiftType[]).map((s) => {
-                  const label = s === 'MANHA' ? 'Manhã' : s === 'TARDE' ? 'Tarde' : 'Noite';
-                  const isSelected = shift === s;
-                  return (
-                    <button
-                      type="button"
-                      key={s}
-                      onClick={() => {
-                        setShift(s);
-                        // reset selected periods to first period of that shift
-                        const newPeriods = periods.filter((p) => p.shift === s);
-                        if (newPeriods.length > 0) {
-                          setSelectedPeriodIds([newPeriods[0].id]);
-                        }
-                      }}
-                      className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+          {/* 3. Turno de Funcionamento */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide mb-1.5">
+              3. Turno Escolar:
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {(['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]).map((s) => {
+                const label =
+                  s === 'MANHA'
+                    ? 'Manhã'
+                    : s === 'TARDE'
+                    ? 'Tarde'
+                    : s === 'NOITE'
+                    ? 'Noite'
+                    : 'Integral';
+                const timeLabel =
+                  s === 'MANHA'
+                    ? '07:00'
+                    : s === 'TARDE'
+                    ? '13:00'
+                    : s === 'NOITE'
+                    ? '19:00'
+                    : '07:30';
+                const isSelected = shift === s;
+                return (
+                  <button
+                    type="button"
+                    key={s}
+                    onClick={() => {
+                      setShift(s);
+                      // reset selected periods to first period of that shift
+                      const newPeriods = periods.filter((p) => p.shift === s);
+                      if (newPeriods.length > 0) {
+                        setSelectedPeriodIds([newPeriods[0].id]);
+                      }
+                    }}
+                    className={`py-2 px-1.5 rounded-xl text-center border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      isSelected
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <span className="font-bold text-xs leading-none">{label}</span>
+                    <span
+                      className={`text-[9px] mt-0.5 font-mono ${
+                        isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
                       }`}
                     >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+                      {timeLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -709,22 +986,129 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Turma */}
             <div>
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide mb-1.5">
-                5. Turma Escolar:
-              </label>
-              <select
-                id="turma-select"
-                value={turma}
-                onChange={(e) => setTurma(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
-                required
-              >
-                {SCHOOL_CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                  5. Turma Escolar:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingNewTurma(!isAddingNewTurma);
+                    if (!isAddingNewTurma && !customTurma) {
+                      setCustomTurma('6º Ano C');
+                    }
+                  }}
+                  className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer flex items-center gap-1"
+                >
+                  {isAddingNewTurma ? '← Escolher da lista' : '➕ Incluir nova turma'}
+                </button>
+              </div>
+
+              {!isAddingNewTurma ? (
+                <>
+                  <select
+                    id="turma-select"
+                    value={turma}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTurma(val);
+                      if (val === 'OUTRA') {
+                        setIsAddingNewTurma(true);
+                      }
+                    }}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
+                    required
+                  >
+                    {schoolCustomClasses.length > 0 && (
+                      <optgroup label="⭐ Turmas Cadastradas da Escola">
+                        {schoolCustomClasses.map((c) => (
+                          <option key={`custom-${c}`} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    <optgroup label="☀️ Ensino Fundamental (Anos Finais)">
+                      {SCHOOL_CLASSES.filter((c) => c.includes('Fundamental') || c.includes('º Ano ')).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="🎓 Ensino Médio Regular & EMTI">
+                      {SCHOOL_CLASSES.filter((c) => c.includes('E.M.') || c.includes('EMTI')).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="🌙 EJA, Técnicos & Eletivas">
+                      {SCHOOL_CLASSES.filter(
+                        (c) =>
+                          c.includes('EJA') ||
+                          c.includes('Técnico') ||
+                          c.includes('Itinerário') ||
+                          c.includes('Robótica')
+                      ).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <option value="OUTRA">➕ Outra Turma / Digitar Personalizada...</option>
+                  </select>
+                </>
+              ) : (
+                <div className="space-y-2 bg-blue-50/50 dark:bg-blue-950/30 p-2.5 rounded-xl border border-blue-200 dark:border-blue-900/60">
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Ex: 7º Ano C, 1º EMTI C, 9º E..."
+                      value={customTurma}
+                      onChange={(e) => setCustomTurma(e.target.value)}
+                      className="flex-1 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customTurma.trim()) {
+                          saveCustomClass(customTurma.trim());
+                          setTurma(customTurma.trim());
+                          setIsAddingNewTurma(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer"
+                    >
+                      Salvar
+                    </button>
+                  </div>
+
+                  {/* Quick Class Suffix Helpers */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 mr-1">Atalhos rápidos:</span>
+                    {['6º C', '6º D', '7º C', '7º D', '8º C', '8º D', '9º C', '9º D', '1º C', '2º C', '3º C', 'EMTI 1', 'Integral A'].map(
+                      (quick) => (
+                        <button
+                          key={quick}
+                          type="button"
+                          onClick={() => {
+                            const val = `${quick}`;
+                            setCustomTurma(val);
+                          }}
+                          className="px-1.5 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-md transition-colors cursor-pointer"
+                        >
+                          {quick}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Disciplina */}
@@ -851,9 +1235,21 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             <button
               id="confirm-reservation-btn"
               onClick={handleSubmit}
-              disabled={conflict.hasConflict || isSubmitting}
+              disabled={
+                isSubmitting ||
+                (bookingType === 'SINGLE'
+                  ? conflict.hasConflict
+                  : skipConflictDates
+                  ? batchConflictAnalysis.availableDates.length === 0
+                  : batchConflictAnalysis.hasConflict)
+              }
               className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-lg transition-all flex items-center space-x-2 cursor-pointer ${
-                conflict.hasConflict || isSubmitting
+                isSubmitting ||
+                (bookingType === 'SINGLE'
+                  ? conflict.hasConflict
+                  : skipConflictDates
+                  ? batchConflictAnalysis.availableDates.length === 0
+                  : batchConflictAnalysis.hasConflict)
                   ? 'bg-slate-400 cursor-not-allowed opacity-70'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 shadow-blue-500/25'
               }`}
@@ -861,12 +1257,30 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Salvando com Trava no Banco...</span>
+                  <span>
+                    {targetDates.length > 1
+                      ? `Salvando ${skipConflictDates ? batchConflictAnalysis.availableDates.length : targetDates.length} Reservas no Banco...`
+                      : 'Salvando com Trava no Banco...'}
+                  </span>
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4" />
-                  <span>Confirmar Agendamento</span>
+                  <span>
+                    {targetDates.length > 1
+                      ? `Confirmar Agendamento (${
+                          skipConflictDates
+                            ? batchConflictAnalysis.availableDates.length
+                            : targetDates.length
+                        } ${
+                          (skipConflictDates
+                            ? batchConflictAnalysis.availableDates.length
+                            : targetDates.length) === 1
+                            ? 'aula'
+                            : 'aulas no período'
+                        })`
+                      : 'Confirmar Agendamento'}
+                  </span>
                 </>
               )}
             </button>
