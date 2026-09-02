@@ -15,6 +15,7 @@ import {
   where,
   orderBy,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -41,4 +42,5 @@ export {
   where,
   orderBy,
   writeBatch,
+  runTransaction,
 };

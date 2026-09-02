@@ -16,12 +16,15 @@ import {
   AlertTriangle,
   Shield,
   Tag,
+  CalendarPlus,
+  Download,
 } from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { formatDateBR } from '../lib/dateUtils';
+import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
 
 interface ReservationDetailsModalProps {
   reservation: Reservation | null;
@@ -36,8 +39,15 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   onClose,
   onOpenReceipt,
 }) => {
-  const { cancelReservation, deleteReservation, approveReservation, rejectReservation, rooms } =
-    useReservations();
+  const {
+    cancelReservation,
+    deleteReservation,
+    approveReservation,
+    rejectReservation,
+    rooms,
+    currentSchool,
+    settings,
+  } = useReservations();
   const { currentUser, isAdmin } = useAuth();
   const [cancelReason, setCancelReason] = useState<string>('');
   const [showCancelPrompt, setShowCancelPrompt] = useState<boolean>(false);
@@ -47,9 +57,19 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
 
   if (!isOpen || !reservation) return null;
 
+  const schoolName = currentSchool?.name || settings?.schoolName || 'Escola da Rede';
   const room = rooms.find((r) => r.id === reservation.roomId);
   const isOwner = currentUser && currentUser.id === reservation.userId;
   const canManage = isAdmin || isOwner;
+
+  const handleOpenGoogleCalendar = () => {
+    const url = getGoogleCalendarUrl(reservation, schoolName, room?.location);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadIcs = () => {
+    downloadIcsFile(reservation, schoolName, room?.location);
+  };
 
   const handleCancel = () => {
     cancelReservation(reservation.id, cancelReason);
@@ -215,6 +235,48 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
                     {eq}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Calendar Integration Card */}
+          {reservation.status !== 'CANCELLED' && (
+            <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/40 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-600 dark:bg-blue-500 text-white flex items-center justify-center shadow-xs">
+                    <CalendarPlus className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                      Sincronização com Sua Agenda
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Adicione lembretes desta aula ao seu Google Agenda ou celular
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenGoogleCalendar}
+                  className="flex-1 min-w-[170px] flex items-center justify-center space-x-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all active:scale-98 cursor-pointer"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                  <span>Adicionar ao Google Agenda</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadIcs}
+                  className="flex items-center justify-center space-x-1.5 px-3 py-2 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 shadow-xs transition-colors cursor-pointer"
+                  title="Baixar arquivo compatível com Outlook, Apple Calendar e Celulares"
+                >
+                  <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Baixar (.ics)</span>
+                </button>
               </div>
             </div>
           )}

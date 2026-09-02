@@ -25,6 +25,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Slot Locks: Concurrency control for preventing simultaneous double-booking of same period
+    match /slot_locks/{lockId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Users: Profiles accessible for educational workflow
     match /users/{userId} {
       allow read: if true;

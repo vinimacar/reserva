@@ -35,6 +35,8 @@ import {
   saveRoomToCloud,
   deleteRoomFromCloud,
   saveReservationToCloud,
+  saveReservationWithLockToCloud,
+  releaseReservationLocksFromCloud,
   deleteReservationFromCloud,
   saveAnnouncementToCloud,
   deleteAnnouncementFromCloud,
@@ -82,7 +84,9 @@ interface ReservationContextType {
   setSearchQuery: (query: string) => void;
 
   // Reservation Actions
-  addReservation: (data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>) => { success: boolean; error?: string; reservation?: Reservation };
+  addReservation: (
+    data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
+  ) => Promise<{ success: boolean; error?: string; reservation?: Reservation }>;
   updateReservation: (id: string, data: Partial<Reservation>) => boolean;
   cancelReservation: (id: string, reason?: string) => void;
   deleteReservation: (id: string) => void;
@@ -781,9 +785,9 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     );
   };
 
-  const addReservation = (
+  const addReservation = async (
     data: Omit<Reservation, 'id' | 'createdAt' | 'status' | 'roomName' | 'userName' | 'userEmail' | 'periodLabels'>
-  ) => {
+  ): Promise<{ success: boolean; error?: string; reservation?: Reservation }> => {
     if (!currentUser) {
       return { success: false, error: 'Você precisa estar autenticado.' };
     }
@@ -801,7 +805,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Este espaço está desativado.' };
     }
 
-    // Check conflict
+    // 1. Memory check
     const conflict = checkConflict(data.roomId, data.date, data.periodIds);
     if (conflict.hasConflict) {
       return { success: false, error: conflict.message || 'Conflito de horário: este período já está ocupado.' };
@@ -839,8 +843,17 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       createdAt: new Date().toISOString(),
     };
 
+    // 2. Concurrency Lock: Atomic check and lock reservation in Firestore
+    try {
+      const lockResult = await saveReservationWithLockToCloud(newReservation);
+      if (!lockResult.success && lockResult.conflictError) {
+        return { success: false, error: lockResult.conflictError };
+      }
+    } catch (e: any) {
+      console.warn('Erro ao travar horário no banco:', e);
+    }
+
     setAllReservations((prev) => [newReservation, ...prev]);
-    saveReservationToCloud(newReservation).catch((e) => console.warn('Cloud save reservation error:', e));
     return { success: true, reservation: newReservation };
   };
 
@@ -862,11 +875,15 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const updated = { ...existing, ...data };
     setAllReservations((prev) => prev.map((r) => (r.id === id ? updated : r)));
-    saveReservationToCloud(updated).catch((e) => console.warn('Cloud update reservation error:', e));
+    saveReservationWithLockToCloud(updated).catch((e) => console.warn('Cloud update reservation error:', e));
     return true;
   };
 
   const cancelReservation = (id: string, reason?: string) => {
+    const existing = allReservations.find((r) => r.id === id);
+    if (existing) {
+      releaseReservationLocksFromCloud(existing).catch(() => {});
+    }
     setAllReservations((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -875,7 +892,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
             status: 'CANCELLED',
             adminNote: reason ? `Cancelado: ${reason}` : r.adminNote,
           };
-          saveReservationToCloud(updated).catch(() => {});
+          saveReservationWithLockToCloud(updated).catch(() => {});
           return updated;
         }
         return r;
@@ -884,8 +901,12 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteReservation = (id: string) => {
+    const target = allReservations.find((r) => r.id === id);
+    if (target) {
+      releaseReservationLocksFromCloud(target).catch(() => {});
+    }
     setAllReservations((prev) => prev.filter((r) => r.id !== id));
-    deleteReservationFromCloud(id).catch((e) => console.warn('Cloud delete reservation error:', e));
+    deleteReservationFromCloud(id, target).catch((e) => console.warn('Cloud delete reservation error:', e));
   };
 
   const approveReservation = (id: string, note?: string) => {

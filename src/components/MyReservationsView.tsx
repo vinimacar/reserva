@@ -14,12 +14,15 @@ import {
   Users,
   Wrench,
   AlertCircle,
+  CalendarPlus,
+  Download,
 } from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
+import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
 
 interface MyReservationsViewProps {
   onOpenNewReservation: () => void;
@@ -32,7 +35,7 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
   onSelectReservation,
   onOpenReceipt,
 }) => {
-  const { reservations, rooms } = useReservations();
+  const { reservations, rooms, currentSchool, settings } = useReservations();
   const { currentUser } = useAuth();
   const [filterTab, setFilterTab] = useState<'UPCOMING' | 'PAST' | 'ALL' | 'CANCELLED'>('UPCOMING');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -302,14 +305,56 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
                 </div>
 
                 {/* Bottom Actions */}
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <button
-                    onClick={() => onOpenReceipt(res)}
-                    className="flex items-center space-x-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Ficha de Reserva</span>
-                  </button>
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2.5">
+                    <button
+                      onClick={() => onOpenReceipt(res)}
+                      className="flex items-center space-x-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                      title="Imprimir Ficha de Reserva"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Ficha</span>
+                    </button>
+
+                    {!isCancelled && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const room = rooms.find((r) => r.id === res.roomId);
+                            const url = getGoogleCalendarUrl(
+                              res,
+                              currentSchool?.name || settings?.schoolName || 'Escola da Rede',
+                              room?.location
+                            );
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          }}
+                          className="flex items-center space-x-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer"
+                          title="Adicionar ao Google Agenda"
+                        >
+                          <CalendarPlus className="w-3.5 h-3.5" />
+                          <span>Agenda</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const room = rooms.find((r) => r.id === res.roomId);
+                            downloadIcsFile(
+                              res,
+                              currentSchool?.name || settings?.schoolName || 'Escola da Rede',
+                              room?.location
+                            );
+                          }}
+                          className="flex items-center space-x-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+                          title="Baixar arquivo .ics para celular ou Outlook"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>.ics</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => onSelectReservation(res)}

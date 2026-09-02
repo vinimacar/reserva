@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, Printer, School, CheckCircle, Calendar, Clock, MapPin, User, Users, BookOpen, Shield } from 'lucide-react';
+import { X, Printer, School, CheckCircle, Calendar, Clock, MapPin, User, Users, BookOpen, Shield, CalendarPlus, Download } from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
+import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
 
 interface ReservationReceiptModalProps {
   reservation: Reservation | null;
@@ -14,14 +15,24 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
   isOpen,
   onClose,
 }) => {
-  const { settings, rooms } = useReservations();
+  const { settings, rooms, currentSchool } = useReservations();
 
   if (!isOpen || !reservation) return null;
 
+  const schoolName = currentSchool?.name || settings?.schoolName || 'Escola da Rede';
   const room = rooms.find((r) => r.id === reservation.roomId);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleOpenGoogleCalendar = () => {
+    const url = getGoogleCalendarUrl(reservation, schoolName, room?.location);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownloadIcs = () => {
+    downloadIcsFile(reservation, schoolName, room?.location);
   };
 
   const formatDateBR = (isoDate: string) => {
@@ -196,20 +207,43 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
         </div>
 
         {/* Footer actions - Screen only */}
-        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end space-x-3 print:hidden">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold"
-          >
-            Fechar
-          </button>
-          <button
-            onClick={handlePrint}
-            className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow transition-all cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir / Salvar PDF</span>
-          </button>
+        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 print:hidden">
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleOpenGoogleCalendar}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-xs font-bold transition-colors cursor-pointer"
+            >
+              <CalendarPlus className="w-4 h-4 text-blue-600" />
+              <span>Google Agenda</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadIcs}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 text-xs font-bold transition-colors cursor-pointer"
+              title="Baixar arquivo .ics para celular, Outlook ou Apple Calendar"
+            >
+              <Download className="w-4 h-4 text-slate-600" />
+              <span>Baixar (.ics)</span>
+            </button>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow transition-all cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir / Salvar PDF</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

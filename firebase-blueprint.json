@@ -110,6 +110,26 @@
         "targetRoomId": { "type": "string", "description": "Optional specific room ID" }
       },
       "required": ["id", "title", "content", "date", "author", "important"]
+    },
+    "slot_locks": {
+      "title": "Slot Locks",
+      "description": "Atomic concurrency locks to prevent double-booking identical room and period slots",
+      "type": "object",
+      "properties": {
+        "lockId": { "type": "string", "description": "Unique lock key" },
+        "schoolId": { "type": "string", "description": "School ID" },
+        "roomId": { "type": "string", "description": "Room ID" },
+        "date": { "type": "string", "description": "Date YYYY-MM-DD" },
+        "periodId": { "type": "string", "description": "Period ID" },
+        "reservationId": { "type": "string", "description": "Associated reservation ID" },
+        "userName": { "type": "string", "description": "Name of booking user" },
+        "userEmail": { "type": "string", "description": "Email of booking user" },
+        "turma": { "type": "string", "description": "Class grade" },
+        "disciplina": { "type": "string", "description": "Discipline" },
+        "active": { "type": "boolean", "description": "Active lock flag" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["lockId", "schoolId", "roomId", "date", "periodId", "reservationId", "active", "updatedAt"]
     }
   },
   "enums": {

@@ -15,13 +15,17 @@ import {
   UserPlus,
   User as UserIcon,
   School,
+  CalendarPlus,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
-import { ShiftType, Room, User } from '../types';
+import { ShiftType, Room, User, Reservation } from '../types';
 import { SCHOOL_CLASSES, SCHOOL_DISCIPLINES, AVAILABLE_EQUIPMENT } from '../data/initialData';
 import { TeacherAvatar } from './TeacherAvatar';
-import { formatLocalDateToISO, getRelativeDays } from '../lib/dateUtils';
+import { formatLocalDateToISO, getRelativeDays, formatDateBR } from '../lib/dateUtils';
+import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -64,6 +68,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [observations, setObservations] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
 
   // Sync initial props when opened
   useEffect(() => {
@@ -95,6 +101,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       setErrorMessage(null);
       setSuccessMessage(null);
       setIsCreatingNewUser(false);
+      setIsSubmitting(false);
+      setCreatedReservation(null);
     }
   }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods, currentUser, users]);
 
@@ -159,7 +167,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   // Live Conflict Check
   const conflict = checkConflict(roomId, date, selectedPeriodIds);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -191,27 +199,32 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       return;
     }
 
-    const result = addReservation({
-      roomId,
-      date,
-      shift,
-      periodIds: selectedPeriodIds,
-      turma,
-      disciplina: finalDisciplina,
-      subjectTopic,
-      numberOfStudents,
-      requestedEquipment,
-      observations,
-      userId: reservingUser.id,
-    });
+    setIsSubmitting(true);
+    try {
+      const result = await addReservation({
+        roomId,
+        date,
+        shift,
+        periodIds: selectedPeriodIds,
+        turma,
+        disciplina: finalDisciplina,
+        subjectTopic,
+        numberOfStudents,
+        requestedEquipment,
+        observations,
+        userId: reservingUser.id,
+      });
 
-    if (!result.success) {
-      setErrorMessage(result.error || 'Erro ao realizar a reserva.');
-    } else {
-      setSuccessMessage('Reserva confirmada com sucesso!');
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      if (!result.success) {
+        setErrorMessage(result.error || 'Erro ao realizar a reserva.');
+      } else {
+        setCreatedReservation(result.reservation || null);
+        setSuccessMessage('Reserva confirmada com sucesso!');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Erro inesperado ao salvar reserva.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -245,8 +258,99 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body / Scrollable Form */}
+        {/* Modal Body / Scrollable Form or Success Screen */}
+        {createdReservation ? (
+          <div className="p-6 sm:p-8 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200 overflow-y-auto">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <h4 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Reserva Confirmada com Sucesso!
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                O espaço está garantido e protegido contra agendamentos simultâneos.
+              </p>
+            </div>
+
+            {/* Summary Card */}
+            <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-left space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="text-slate-500 dark:text-slate-400">Ambiente:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{createdReservation.roomName}</span>
+              </div>
+              <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-700">
+                <span className="text-slate-500 dark:text-slate-400">Data e Horário:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{formatDateBR(createdReservation.date)} • {createdReservation.periodLabels}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 dark:text-slate-400">Turma e Disciplina:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">{createdReservation.turma} • {createdReservation.disciplina}</span>
+              </div>
+            </div>
+
+            {/* Calendar Integration Box */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-indigo-950/40 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 space-y-3 text-left">
+              <div>
+                <h5 className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <CalendarPlus className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span>Sincronizar com seu Calendário Pessoal</span>
+                </h5>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Adicione um lembrete direto no Google Agenda ou baixe o arquivo de calendário (.ics)
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = getGoogleCalendarUrl(createdReservation, currentSchool?.name || 'Escola da Rede', currentRoom?.location);
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="flex items-center justify-center space-x-2 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                  <span>Adicionar ao Google Agenda</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadIcsFile(createdReservation, currentSchool?.name || 'Escola da Rede', currentRoom?.location);
+                  }}
+                  className="flex items-center justify-center space-x-2 py-2.5 px-3 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-98 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Baixar (.ics)</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-3 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md cursor-pointer"
+              >
+                Concluir e Ver no Painel
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 dark:text-slate-300 flex-1">
+          {/* Error Message Display */}
+          {errorMessage && (
+            <div className="p-3.5 bg-red-50 dark:bg-red-950/50 border border-red-300 dark:border-red-800 rounded-2xl flex items-start space-x-2.5 text-red-800 dark:text-red-200 animate-in fade-in duration-150">
+              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold text-xs">Atenção ao agendar:</p>
+                <p className="text-[11px] text-red-700 dark:text-red-300 mt-0.5">{errorMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* Teacher identity & creation card */}
           <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 space-y-3">
             <div className="flex items-center justify-between">
@@ -730,31 +834,44 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             </div>
           </div>
         </form>
+        )}
 
-        {/* Modal Footer */}
-        <div className="bg-slate-50 dark:bg-slate-850 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 transition-colors">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-          >
-            Cancelar
-          </button>
+        {/* Modal Footer (only when not in success screen) */}
+        {!createdReservation && (
+          <div className="bg-slate-50 dark:bg-slate-850 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 transition-colors">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Cancelar
+            </button>
 
-          <button
-            id="confirm-reservation-btn"
-            onClick={handleSubmit}
-            disabled={conflict.hasConflict || !!successMessage}
-            className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-lg transition-all flex items-center space-x-2 cursor-pointer ${
-              conflict.hasConflict
-                ? 'bg-slate-400 cursor-not-allowed opacity-70'
-                : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 shadow-blue-500/25'
-            }`}
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Confirmar Agendamento</span>
-          </button>
-        </div>
+            <button
+              id="confirm-reservation-btn"
+              onClick={handleSubmit}
+              disabled={conflict.hasConflict || isSubmitting}
+              className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-lg transition-all flex items-center space-x-2 cursor-pointer ${
+                conflict.hasConflict || isSubmitting
+                  ? 'bg-slate-400 cursor-not-allowed opacity-70'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 shadow-blue-500/25'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Salvando com Trava no Banco...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Confirmar Agendamento</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

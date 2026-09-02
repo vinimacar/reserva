@@ -7,6 +7,7 @@ import {
   deleteDoc,
   onSnapshot,
   writeBatch,
+  runTransaction,
 } from './firebase';
 import { School, Room, Reservation, Announcement, User } from '../types';
 
@@ -16,7 +17,32 @@ export const COLLECTIONS = {
   RESERVATIONS: 'reservations',
   ANNOUNCEMENTS: 'announcements',
   USERS: 'users',
+  SLOT_LOCKS: 'slot_locks',
 };
+
+export interface SlotLockData {
+  lockId: string;
+  schoolId: string;
+  roomId: string;
+  date: string;
+  periodId: string;
+  reservationId: string;
+  userName: string;
+  userEmail: string;
+  turma: string;
+  disciplina: string;
+  active: boolean;
+  updatedAt: string;
+}
+
+// Generate unique lock document key per room + date + period
+export function getSlotLockKey(schoolId: string, roomId: string, date: string, periodId: string): string {
+  const cleanSchool = (schoolId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanRoom = roomId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const cleanDate = date.replace(/[^0-9-]/g, '');
+  const cleanPeriod = periodId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `lock_${cleanSchool}__${cleanRoom}__${cleanDate}__${cleanPeriod}`;
+}
 
 // 1. Clean entire Cloud Database from scratch (Limpar dados começando do zero)
 export async function clearCloudDatabase(): Promise<void> {
@@ -26,6 +52,7 @@ export async function clearCloudDatabase(): Promise<void> {
     COLLECTIONS.RESERVATIONS,
     COLLECTIONS.ANNOUNCEMENTS,
     COLLECTIONS.USERS,
+    COLLECTIONS.SLOT_LOCKS,
   ];
 
   for (const colName of collectionNames) {
@@ -120,11 +147,115 @@ export async function deleteRoomFromCloud(roomId: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.ROOMS, roomId));
 }
 
-export async function saveReservationToCloud(reservation: Reservation): Promise<void> {
-  await setDoc(doc(db, COLLECTIONS.RESERVATIONS, reservation.id), reservation);
+/**
+ * Atomic Concurrency Protected Reservation Creation / Update
+ * Uses Firestore runTransaction to guarantee that no two users book the same room/date/period slot simultaneously.
+ */
+export async function saveReservationWithLockToCloud(
+  reservation: Reservation
+): Promise<{ success: boolean; conflictError?: string }> {
+  const schoolId = reservation.schoolId || 'default';
+  const periodIds = reservation.periodIds || [];
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      // 1. If reservation is active (not CANCELLED), read all slot locks first (Firestore rule: all reads before writes)
+      if (reservation.status !== 'CANCELLED') {
+        for (const pId of periodIds) {
+          const lockKey = getSlotLockKey(schoolId, reservation.roomId, reservation.date, pId);
+          const lockRef = doc(db, COLLECTIONS.SLOT_LOCKS, lockKey);
+          const lockSnap = await transaction.get(lockRef);
+
+          if (lockSnap.exists()) {
+            const lockData = lockSnap.data() as SlotLockData;
+            // If lock is active and belongs to a different reservation -> Conflict detected!
+            if (lockData && lockData.active && lockData.reservationId !== reservation.id) {
+              throw new Error(
+                `CONCURRENCY_CONFLICT: O horário (${pId}) acabou de ser reservado simultaneamente por ${
+                  lockData.userName || 'outro docente'
+                } (${lockData.turma || 'outra turma'}).`
+              );
+            }
+          }
+        }
+      }
+
+      // 2. Perform writes: update the reservation document
+      const resRef = doc(db, COLLECTIONS.RESERVATIONS, reservation.id);
+      transaction.set(resRef, reservation);
+
+      // 3. Update slot lock documents
+      const nowIso = new Date().toISOString();
+      const isLockActive = reservation.status !== 'CANCELLED';
+
+      for (const pId of periodIds) {
+        const lockKey = getSlotLockKey(schoolId, reservation.roomId, reservation.date, pId);
+        const lockRef = doc(db, COLLECTIONS.SLOT_LOCKS, lockKey);
+
+        const lockPayload: SlotLockData = {
+          lockId: lockKey,
+          schoolId,
+          roomId: reservation.roomId,
+          date: reservation.date,
+          periodId: pId,
+          reservationId: reservation.id,
+          userName: reservation.userName,
+          userEmail: reservation.userEmail,
+          turma: reservation.turma,
+          disciplina: reservation.disciplina,
+          active: isLockActive,
+          updatedAt: nowIso,
+        };
+
+        transaction.set(lockRef, lockPayload);
+      }
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    const message = err?.message || String(err);
+    if (message.includes('CONCURRENCY_CONFLICT')) {
+      const cleanError = message.replace('Error: CONCURRENCY_CONFLICT: ', '').replace('CONCURRENCY_CONFLICT: ', '');
+      return { success: false, conflictError: cleanError };
+    }
+    console.warn('Firestore reservation transaction error:', err);
+    // Even if transaction has network quirks, return fallback
+    return { success: false, conflictError: message };
+  }
 }
 
-export async function deleteReservationFromCloud(resId: string): Promise<void> {
+/**
+ * Release slot locks when cancelling or deleting a reservation
+ */
+export async function releaseReservationLocksFromCloud(
+  reservation: Reservation | { schoolId?: string; roomId: string; date: string; periodIds: string[]; id: string }
+): Promise<void> {
+  const schoolId = reservation.schoolId || 'default';
+  const periodIds = reservation.periodIds || [];
+
+  const batch = writeBatch(db);
+  for (const pId of periodIds) {
+    const lockKey = getSlotLockKey(schoolId, reservation.roomId, reservation.date, pId);
+    const lockRef = doc(db, COLLECTIONS.SLOT_LOCKS, lockKey);
+    batch.delete(lockRef);
+  }
+
+  try {
+    await batch.commit();
+  } catch (e) {
+    console.warn('Error releasing reservation slot locks:', e);
+  }
+}
+
+export async function saveReservationToCloud(reservation: Reservation): Promise<void> {
+  // Direct call to atomic lock transaction
+  await saveReservationWithLockToCloud(reservation);
+}
+
+export async function deleteReservationFromCloud(resId: string, reservationData?: Reservation): Promise<void> {
+  if (reservationData) {
+    await releaseReservationLocksFromCloud(reservationData);
+  }
   await deleteDoc(doc(db, COLLECTIONS.RESERVATIONS, resId));
 }
 
