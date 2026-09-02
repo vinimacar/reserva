@@ -197,21 +197,22 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   };
 
   // Stats calculation
-  const totalSchoolsCount = schools.length;
-  const totalRoomsCount = allRooms.length;
-  const totalReservationsCount = allReservations.filter((r) => r.status !== 'CANCELLED').length;
-  const totalUsersCount = users.length;
-  const totalAdminsCount = users.filter((u) => u.role === 'ADMIN').length;
+  const totalSchoolsCount = (schools || []).length;
+  const totalRoomsCount = (allRooms || []).length;
+  const totalReservationsCount = (allReservations || []).filter((r) => r && r.status !== 'CANCELLED').length;
+  const totalUsersCount = (users || []).length;
+  const totalAdminsCount = (users || []).filter((u) => u && u.role === 'ADMIN').length;
 
   // Filtered schools
   const filteredSchools = useMemo(() => {
-    return schools.filter((s) => {
+    return (schools || []).filter((s) => {
+      if (!s) return false;
       const q = clientSearchQuery.toLowerCase().trim();
       const matchQuery =
         !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.shortName.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q) ||
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.shortName && s.shortName.toLowerCase().includes(q)) ||
+        (s.city && s.city.toLowerCase().includes(q)) ||
         (s.inepCode && s.inepCode.toLowerCase().includes(q)) ||
         (s.code && s.code.toLowerCase().includes(q));
 
@@ -224,12 +225,12 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   // Handle Shift checkbox toggle
   const handleShiftToggle = (shift: ShiftType) => {
     setOnboardingForm((prev) => {
-      const exists = prev.shifts.includes(shift);
+      const exists = (prev.shifts || []).includes(shift);
       if (exists) {
-        if (prev.shifts.length === 1) return prev; // Keep at least one
-        return { ...prev, shifts: prev.shifts.filter((s) => s !== shift) };
+        if ((prev.shifts || []).length === 1) return prev; // Keep at least one
+        return { ...prev, shifts: (prev.shifts || []).filter((s) => s !== shift) };
       } else {
-        return { ...prev, shifts: [...prev.shifts, shift] };
+        return { ...prev, shifts: [...(prev.shifts || []), shift] };
       }
     });
   };
@@ -1142,9 +1143,10 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
             {/* School Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSchools.map((school) => {
-                const schoolRooms = allRooms.filter((r) => r.schoolId === school.id);
-                const schoolReservations = allReservations.filter((r) => r.schoolId === school.id && r.status !== 'CANCELLED');
-                const schoolTeachers = users.filter((u) => u.schoolId === school.id);
+                if (!school) return null;
+                const schoolRooms = (allRooms || []).filter((r) => r && r.schoolId === school.id);
+                const schoolReservations = (allReservations || []).filter((r) => r && r.schoolId === school.id && r.status !== 'CANCELLED');
+                const schoolTeachers = (users || []).filter((u) => u && u.schoolId === school.id);
                 const isCurrent = school.id === currentSchoolId;
 
                 return (
@@ -1283,10 +1285,10 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {users
-                    .filter((u) => u.role === 'ADMIN')
+                  {(users || [])
+                    .filter((u) => u && u.role === 'ADMIN')
                     .map((admin) => {
-                      const userSchool = schools.find((s) => s.id === admin.schoolId);
+                      const userSchool = (schools || []).find((s) => s && s.id === admin.schoolId);
 
                       return (
                         <tr key={admin.id} className="hover:bg-slate-800/40 transition-colors">
@@ -1707,19 +1709,19 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                       <div className="p-2 bg-slate-950/80 rounded-xl border border-rose-900/40">
                         <span className="text-[10px] text-slate-400 block">Salas</span>
                         <span className="text-xs font-bold text-white">
-                          {allRooms.filter((r) => r.schoolId === schoolToDelete.id).length}
+                          {(allRooms || []).filter((r) => r && schoolToDelete && r.schoolId === schoolToDelete.id).length}
                         </span>
                       </div>
                       <div className="p-2 bg-slate-950/80 rounded-xl border border-rose-900/40">
                         <span className="text-[10px] text-slate-400 block">Reservas</span>
                         <span className="text-xs font-bold text-white">
-                          {allReservations.filter((r) => r.schoolId === schoolToDelete.id).length}
+                          {(allReservations || []).filter((r) => r && schoolToDelete && r.schoolId === schoolToDelete.id).length}
                         </span>
                       </div>
                       <div className="p-2 bg-slate-950/80 rounded-xl border border-rose-900/40">
                         <span className="text-[10px] text-slate-400 block">Avisos</span>
                         <span className="text-xs font-bold text-white">
-                          {allAnnouncements.filter((a) => a.schoolId === schoolToDelete.id).length}
+                          {(allAnnouncements || []).filter((a) => a && schoolToDelete && a.schoolId === schoolToDelete.id).length}
                         </span>
                       </div>
                     </div>

@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
 
-  const importantAnnouncementsCount = announcements.filter((a) => a.important).length;
+  const importantAnnouncementsCount = (announcements || []).filter((a) => a && a.important).length;
 
   return (
     <header id="app-header" className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">

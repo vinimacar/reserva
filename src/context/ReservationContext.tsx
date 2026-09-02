@@ -280,35 +280,35 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Derived tenant-scoped slices
   const defaultSchoolId = DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
 
-  const rooms: Room[] = allRooms.filter(
-    (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+  const rooms: Room[] = (allRooms || []).filter(
+    (r) => r && (r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId))
   );
 
-  const reservations: Reservation[] = allReservations.filter(
-    (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+  const reservations: Reservation[] = (allReservations || []).filter(
+    (r) => r && (r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId))
   );
 
-  const announcements: Announcement[] = allAnnouncements.filter(
-    (a) => a.schoolId === currentSchoolId || (!a.schoolId && currentSchoolId === defaultSchoolId)
+  const announcements: Announcement[] = (allAnnouncements || []).filter(
+    (a) => a && (a.schoolId === currentSchoolId || (!a.schoolId && currentSchoolId === defaultSchoolId))
   );
 
   // Derived School Settings dynamically generated from the active School tenant
   const settings: SchoolSettings = {
-    schoolName: currentSchool.name,
-    shortName: currentSchool.shortName,
-    city: currentSchool.city,
-    state: currentSchool.state,
-    inepCode: currentSchool.inepCode || currentSchool.code,
-    networkType: currentSchool.networkType,
-    shifts: currentSchool.shifts,
-    requireAdminApproval: currentSchool.requireAdminApproval || false,
-    maxAdvanceDays: currentSchool.maxAdvanceDays || 30,
-    allowWeekendBooking: currentSchool.allowWeekendBooking || false,
-    contactEmail: currentSchool.contactEmail,
-    phone: currentSchool.phone,
-    directorName: currentSchool.directorName,
+    schoolName: currentSchool?.name || 'Escola',
+    shortName: currentSchool?.shortName || currentSchool?.name || 'Escola',
+    city: currentSchool?.city || 'Belo Horizonte',
+    state: currentSchool?.state || 'MG',
+    inepCode: currentSchool?.inepCode || currentSchool?.code || '',
+    networkType: currentSchool?.networkType || 'Estadual',
+    shifts: currentSchool?.shifts || DEFAULT_SETTINGS.shifts || ['MANHA', 'TARDE', 'NOITE'],
+    requireAdminApproval: currentSchool?.requireAdminApproval || false,
+    maxAdvanceDays: currentSchool?.maxAdvanceDays || 30,
+    allowWeekendBooking: currentSchool?.allowWeekendBooking || false,
+    contactEmail: currentSchool?.contactEmail || '',
+    phone: currentSchool?.phone || '',
+    directorName: currentSchool?.directorName || '',
     isConfigured: true,
-    configuredAt: currentSchool.createdAt,
+    configuredAt: currentSchool?.createdAt || new Date().toISOString(),
   };
 
   // UI state for active school
@@ -319,11 +319,11 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // When active school changes, ensure selected room is updated to a room belonging to the new school
   useEffect(() => {
-    const schoolRooms = allRooms.filter(
-      (r) => r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId)
+    const schoolRooms = (allRooms || []).filter(
+      (r) => r && (r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId))
     );
     if (schoolRooms.length > 0) {
-      const exists = schoolRooms.some((r) => r.id === selectedRoomId);
+      const exists = schoolRooms.some((r) => r && r.id === selectedRoomId);
       if (!exists) {
         setSelectedRoomId(schoolRooms[0].id);
       }
@@ -648,27 +648,33 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const deleteSchool = (id: string): boolean => {
-    if (schools.length <= 1) {
+    if ((schools || []).length <= 1) {
       return false; // Cannot delete the only remaining school
     }
 
     // Delete school and all its child documents from Cloud
     deleteSchoolFromCloud(id).catch(console.error);
-    allRooms.filter((r) => r.schoolId === id).forEach((r) => deleteRoomFromCloud(r.id).catch(console.error));
-    allReservations.filter((res) => res.schoolId === id).forEach((res) => deleteReservationFromCloud(res.id).catch(console.error));
-    allAnnouncements.filter((ann) => ann.schoolId === id).forEach((ann) => deleteAnnouncementFromCloud(ann.id).catch(console.error));
+    (allRooms || []).filter((r) => r && r.schoolId === id).forEach((r) => deleteRoomFromCloud(r.id).catch(console.error));
+    (allReservations || []).filter((res) => res && res.schoolId === id).forEach((res) => deleteReservationFromCloud(res.id).catch(console.error));
+    (allAnnouncements || []).filter((ann) => ann && ann.schoolId === id).forEach((ann) => deleteAnnouncementFromCloud(ann.id).catch(console.error));
 
-    setSchools((prev) => prev.filter((s) => s.id !== id));
-    setAllRooms((prev) => prev.filter((r) => r.schoolId !== id));
-    setAllReservations((prev) => prev.filter((res) => res.schoolId !== id));
-    setAllAnnouncements((prev) => prev.filter((ann) => ann.schoolId !== id));
+    const remainingSchools = (schools || []).filter((s) => s && s.id !== id);
+    const nextSchool = remainingSchools[0] || DEFAULT_SCHOOLS[0];
 
-    if (currentSchoolId === id) {
-      const nextSchool = schools.find((s) => s.id !== id);
-      if (nextSchool) {
-        setCurrentSchoolId(nextSchool.id);
+    if (currentSchoolId === id && nextSchool) {
+      setCurrentSchoolId(nextSchool.id);
+      try {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_SCHOOL, nextSchool.id);
+      } catch {
+        // ignore
       }
     }
+
+    setSchools(remainingSchools);
+    setAllRooms((prev) => (prev || []).filter((r) => r && r.schoolId !== id));
+    setAllReservations((prev) => (prev || []).filter((res) => res && res.schoolId !== id));
+    setAllAnnouncements((prev) => (prev || []).filter((ann) => ann && ann.schoolId !== id));
+
     return true;
   };
 

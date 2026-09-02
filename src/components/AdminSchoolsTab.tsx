@@ -102,13 +102,14 @@ export const AdminSchoolsTab: React.FC<{
 
   const stats = getNetworkOverviewStats();
 
-  const filteredSchools = schools.filter((s) => {
+  const filteredSchools = (schools || []).filter((s) => {
+    if (!s) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     return (
-      s.name.toLowerCase().includes(q) ||
-      s.shortName.toLowerCase().includes(q) ||
-      s.city.toLowerCase().includes(q) ||
+      (s.name && s.name.toLowerCase().includes(q)) ||
+      (s.shortName && s.shortName.toLowerCase().includes(q)) ||
+      (s.city && s.city.toLowerCase().includes(q)) ||
       (s.code && s.code.toLowerCase().includes(q)) ||
       (s.inepCode && s.inepCode.toLowerCase().includes(q)) ||
       (s.directorName && s.directorName.toLowerCase().includes(q))
@@ -270,12 +271,12 @@ export const AdminSchoolsTab: React.FC<{
 
   const toggleShift = (shift: ShiftType) => {
     setFormData((prev) => {
-      const exists = prev.shifts.includes(shift);
+      const exists = (prev.shifts || []).includes(shift);
       if (exists) {
-        if (prev.shifts.length <= 1) return prev; // Keep at least one
-        return { ...prev, shifts: prev.shifts.filter((s) => s !== shift) };
+        if ((prev.shifts || []).length <= 1) return prev; // Keep at least one
+        return { ...prev, shifts: (prev.shifts || []).filter((s) => s !== shift) };
       } else {
-        return { ...prev, shifts: [...prev.shifts, shift] };
+        return { ...prev, shifts: [...(prev.shifts || []), shift] };
       }
     });
   };
@@ -423,10 +424,11 @@ export const AdminSchoolsTab: React.FC<{
       {/* Schools Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredSchools.map((school) => {
+          if (!school) return null;
           const isCurrentActive = school.id === currentSchoolId;
-          const schoolRooms = allRooms.filter((r) => r.schoolId === school.id);
-          const schoolReservations = allReservations.filter((r) => r.schoolId === school.id && r.status !== 'CANCELLED');
-          const schoolTeachers = users.filter((u) => u.schoolId === school.id);
+          const schoolRooms = (allRooms || []).filter((r) => r && r.schoolId === school.id);
+          const schoolReservations = (allReservations || []).filter((r) => r && r.schoolId === school.id && r.status !== 'CANCELLED');
+          const schoolTeachers = (users || []).filter((u) => u && u.schoolId === school.id);
 
           return (
             <div

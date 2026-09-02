@@ -170,17 +170,18 @@ export const AdminPanel: React.FC<{
   };
 
   // Filtered Reservations for Admin table
-  const filteredReservations = reservations.filter((r) => {
+  const filteredReservations = (reservations || []).filter((r) => {
+    if (!r) return false;
     if (filterRoomId !== 'ALL' && r.roomId !== filterRoomId) return false;
     if (filterStatus !== 'ALL' && r.status !== filterStatus) return false;
     if (searchBooking) {
       const q = searchBooking.toLowerCase();
       return (
-        r.userName.toLowerCase().includes(q) ||
-        r.userEmail.toLowerCase().includes(q) ||
-        r.turma.toLowerCase().includes(q) ||
-        r.disciplina.toLowerCase().includes(q) ||
-        r.roomName.toLowerCase().includes(q)
+        (r.userName && r.userName.toLowerCase().includes(q)) ||
+        (r.userEmail && r.userEmail.toLowerCase().includes(q)) ||
+        (r.turma && r.turma.toLowerCase().includes(q)) ||
+        (r.disciplina && r.disciplina.toLowerCase().includes(q)) ||
+        (r.roomName && r.roomName.toLowerCase().includes(q))
       );
     }
     return true;
@@ -976,7 +977,7 @@ export const AdminPanel: React.FC<{
                 </div>
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded-xl border border-amber-100 dark:border-amber-900/50 text-center">
                   <p className="text-2xl font-black text-amber-900 dark:text-amber-100">
-                    {reservations.filter((r) => r.status === 'CONFIRMED').length}
+                    {(reservations || []).filter((r) => r && r.status === 'CONFIRMED').length}
                   </p>
                   <p className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300 mt-0.5">Aulas Confirmadas</p>
                 </div>
@@ -988,7 +989,8 @@ export const AdminPanel: React.FC<{
 
       {/* TAB 4: USERS & ADMIN ROLES */}
       {activeTab === 'USERS' && (() => {
-        const filteredUsers = users.filter((u) => {
+        const filteredUsers = (users || []).filter((u) => {
+          if (!u) return false;
           // School filter
           if (filterUserSchool !== 'ALL' && (u.schoolId || 'school_milton_campos') !== filterUserSchool) {
             return false;
@@ -997,8 +999,8 @@ export const AdminPanel: React.FC<{
           if (!searchUser.trim()) return true;
           const q = searchUser.toLowerCase().trim();
           return (
-            u.name.toLowerCase().includes(q) ||
-            u.email.toLowerCase().includes(q) ||
+            (u.name && u.name.toLowerCase().includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q)) ||
             (u.subject && u.subject.toLowerCase().includes(q)) ||
             (u.schoolName && u.schoolName.toLowerCase().includes(q))
           );
@@ -1030,7 +1032,7 @@ export const AdminPanel: React.FC<{
             {/* Filter Bar for Teachers */}
             <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs transition-colors">
               <div className="flex flex-wrap items-center gap-2.5">
-                {schools.length > 1 && (
+                {(schools || []).length > 1 && (
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Filtrar por Escola:</label>
                     <select
@@ -1038,9 +1040,10 @@ export const AdminPanel: React.FC<{
                       onChange={(e) => setFilterUserSchool(e.target.value)}
                       className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-1.5 font-semibold focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="ALL">Todas as Escolas ({users.length} professores)</option>
-                      {schools.map((s) => {
-                        const count = users.filter((u) => (u.schoolId || 'school_milton_campos') === s.id).length;
+                      <option value="ALL">Todas as Escolas ({(users || []).length} professores)</option>
+                      {(schools || []).map((s) => {
+                        if (!s) return null;
+                        const count = (users || []).filter((u) => u && (u.schoolId || 'school_milton_campos') === s.id).length;
                         return (
                           <option key={s.id} value={s.id}>
                             {s.shortName || s.name} ({count})
