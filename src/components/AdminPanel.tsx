@@ -1848,23 +1848,25 @@ export const AdminPanel: React.FC<{
       )}
 
       {/* User Registration & Edit Modal */}
-      <UserRegistrationModal
-        isOpen={isUserModalOpen}
-        userToEdit={editingUser}
-        onClose={() => {
-          setIsUserModalOpen(false);
-          setEditingUser(null);
-        }}
-        onSuccess={(savedUser) => {
-          showToast(
-            editingUser
-              ? `Professor "${savedUser.name}" atualizado com sucesso!`
-              : `Professor "${savedUser.name}" cadastrado com sucesso!`
-          );
-          setIsUserModalOpen(false);
-          setEditingUser(null);
-        }}
-      />
+      {isUserModalOpen && (
+        <UserRegistrationModal
+          isOpen={isUserModalOpen}
+          userToEdit={editingUser}
+          onClose={() => {
+            setIsUserModalOpen(false);
+            setEditingUser(null);
+          }}
+          onSuccess={(savedUser) => {
+            showToast(
+              editingUser
+                ? `Professor "${savedUser.name}" atualizado com sucesso!`
+                : `Professor "${savedUser.name}" cadastrado com sucesso!`
+            );
+            setIsUserModalOpen(false);
+            setEditingUser(null);
+          }}
+        />
+      )}
     </div>
   );
 };

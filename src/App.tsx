@@ -208,65 +208,83 @@ function ReserveAppContent() {
       </footer>
 
       {/* Modals */}
-      <SchoolSetupModal
-        isOpen={isSchoolSetupModalOpen}
-        onClose={() => setIsSchoolSetupModalOpen(false)}
-        isFirstTime={isFirstTimeSetup}
-      />
+      {isSchoolSetupModalOpen && (
+        <SchoolSetupModal
+          isOpen={isSchoolSetupModalOpen}
+          onClose={() => setIsSchoolSetupModalOpen(false)}
+          isFirstTime={isFirstTimeSetup}
+        />
+      )}
 
-      <ReservationModal
-        isOpen={isReservationModalOpen}
-        onClose={() => setIsReservationModalOpen(false)}
-        initialRoomId={selectedSlotData.roomId}
-        initialDate={selectedSlotData.date}
-        initialPeriodId={selectedSlotData.periodId}
-      />
+      {isReservationModalOpen && (
+        <ReservationModal
+          isOpen={isReservationModalOpen}
+          onClose={() => setIsReservationModalOpen(false)}
+          initialRoomId={selectedSlotData.roomId}
+          initialDate={selectedSlotData.date}
+          initialPeriodId={selectedSlotData.periodId}
+        />
+      )}
 
-      <ReservationDetailsModal
-        isOpen={!!viewingReservation}
-        reservation={viewingReservation}
-        onClose={() => setViewingReservation(null)}
-        onOpenReceipt={handleOpenReceipt}
-      />
+      {viewingReservation && (
+        <ReservationDetailsModal
+          isOpen={!!viewingReservation}
+          reservation={viewingReservation}
+          onClose={() => setViewingReservation(null)}
+          onOpenReceipt={handleOpenReceipt}
+        />
+      )}
 
-      <ReservationReceiptModal
-        isOpen={!!receiptReservation}
-        reservation={receiptReservation}
-        onClose={() => setReceiptReservation(null)}
-      />
+      {receiptReservation && (
+        <ReservationReceiptModal
+          isOpen={!!receiptReservation}
+          reservation={receiptReservation}
+          onClose={() => setReceiptReservation(null)}
+        />
+      )}
 
-      <GoogleLoginModal
-        isOpen={isGoogleLoginModalOpen}
-        onClose={() => setIsGoogleLoginModalOpen(false)}
-        onOpenRegister={() => {
-          setIsGoogleLoginModalOpen(false);
-          setIsUserRegistrationModalOpen(true);
-        }}
-      />
+      {isGoogleLoginModalOpen && (
+        <GoogleLoginModal
+          isOpen={isGoogleLoginModalOpen}
+          onClose={() => setIsGoogleLoginModalOpen(false)}
+          onOpenRegister={() => {
+            setIsGoogleLoginModalOpen(false);
+            setIsUserRegistrationModalOpen(true);
+          }}
+        />
+      )}
 
-      <UserRegistrationModal
-        isOpen={isUserRegistrationModalOpen}
-        onClose={() => setIsUserRegistrationModalOpen(false)}
-      />
+      {isUserRegistrationModalOpen && (
+        <UserRegistrationModal
+          isOpen={isUserRegistrationModalOpen}
+          onClose={() => setIsUserRegistrationModalOpen(false)}
+        />
+      )}
 
-      <ChangePasswordModal
-        isOpen={isChangePasswordModalOpen}
-        onClose={() => setIsChangePasswordModalOpen(false)}
-      />
+      {isChangePasswordModalOpen && (
+        <ChangePasswordModal
+          isOpen={isChangePasswordModalOpen}
+          onClose={() => setIsChangePasswordModalOpen(false)}
+        />
+      )}
 
-      <DeveloperAuthModal
-        isOpen={isDevAuthModalOpen}
-        onClose={() => setIsDevAuthModalOpen(false)}
-        onSuccess={() => {
-          setIsDevAuthModalOpen(false);
-          setShowDeveloperPortal(true);
-        }}
-      />
+      {isDevAuthModalOpen && (
+        <DeveloperAuthModal
+          isOpen={isDevAuthModalOpen}
+          onClose={() => setIsDevAuthModalOpen(false)}
+          onSuccess={() => {
+            setIsDevAuthModalOpen(false);
+            setShowDeveloperPortal(true);
+          }}
+        />
+      )}
 
-      <TutorialModal
-        isOpen={isTutorialModalOpen}
-        onClose={() => setIsTutorialModalOpen(false)}
-      />
+      {isTutorialModalOpen && (
+        <TutorialModal
+          isOpen={isTutorialModalOpen}
+          onClose={() => setIsTutorialModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

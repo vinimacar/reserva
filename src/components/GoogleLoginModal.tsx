@@ -2,20 +2,20 @@ import React, { useState } from 'react';
 import {
   X,
   Shield,
-  Check,
-  School,
-  ArrowRight,
+  LogOut,
   UserPlus,
-  Sparkles,
   BookOpen,
   Mail,
   User as UserIcon,
   CheckCircle2,
+  AlertCircle,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
 import { SCHOOL_DISCIPLINES } from '../data/initialData';
 import { UserRole } from '../types';
+import { signInWithGooglePopup } from '../services/firebaseAuthService';
 
 interface GoogleLoginModalProps {
   isOpen: boolean;
@@ -26,19 +26,14 @@ interface GoogleLoginModalProps {
 export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
   isOpen,
   onClose,
-  onOpenRegister,
 }) => {
-  const { currentUser, users, switchUser, addUser, loginWithGoogleEmail, isAdmin } = useAuth();
-  const { settings } = useReservations();
+  const { currentUser, addUser, loginWithGoogleEmail, logout, isAdmin } = useAuth();
+  const { settings, currentSchool } = useReservations();
 
   const [activeMode, setActiveMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
 
-  // Custom quick login state
-  const [customEmail, setCustomEmail] = useState<string>('');
-  const [customName, setCustomName] = useState<string>('');
-  const [showCustomForm, setShowCustomForm] = useState<boolean>(false);
-
-  // Full Register state
+  // Full Register state for administrators
   const [regName, setRegName] = useState<string>('');
   const [regEmail, setRegEmail] = useState<string>('');
   const [regSubject, setRegSubject] = useState<string>(SCHOOL_DISCIPLINES[0] || 'Matemática');
@@ -48,11 +43,53 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleCustomLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customEmail.trim()) return;
-    loginWithGoogleEmail(customEmail, customName);
-    onClose();
+  const handleGoogleAuth = async () => {
+    setFeedbackMsg(null);
+    setIsLoadingGoogle(true);
+
+    try {
+      const googleRes = await signInWithGooglePopup();
+      if (googleRes.success && googleRes.user && googleRes.user.email) {
+        const verifiedEmail = googleRes.user.email.trim().toLowerCase();
+
+        // Strict: only authenticate into the account of the verified Google user
+        loginWithGoogleEmail(
+          verifiedEmail,
+          googleRes.user.displayName || undefined,
+          currentSchool?.id || settings.schoolId,
+          currentSchool?.name || settings.schoolName
+        );
+
+        setFeedbackMsg({
+          type: 'success',
+          text: `Autenticado com sucesso como ${googleRes.user.displayName || verifiedEmail}!`,
+        });
+
+        setTimeout(() => {
+          onClose();
+        }, 800);
+      } else {
+        const rawError = (googleRes.error || '').toLowerCase();
+        if (rawError.includes('popup-closed-by-user') || rawError.includes('cancelled')) {
+          setFeedbackMsg({
+            type: 'error',
+            text: 'Autenticação com o Google cancelada. Selecione sua própria conta institucional para acessar.',
+          });
+        } else {
+          setFeedbackMsg({
+            type: 'error',
+            text: googleRes.error || 'Falha ao autenticar com o Google. Verifique sua conexão e tente novamente.',
+          });
+        }
+      }
+    } catch (err: any) {
+      setFeedbackMsg({
+        type: 'error',
+        text: 'Erro ao abrir janela do Google. Certifique-se de que pop-ups estão habilitados no navegador.',
+      });
+    } finally {
+      setIsLoadingGoogle(false);
+    }
   };
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
@@ -75,7 +112,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
     if (!isAdmin) {
       setFeedbackMsg({
         type: 'error',
-        text: 'Apenas administradores do sistema têm permissão para cadastrar novos professores.',
+        text: 'Apenas administradores da escola têm permissão para cadastrar novos professores.',
       });
       return;
     }
@@ -88,22 +125,23 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
         email: trimmedEmail,
         subject: finalSubject,
         role: regRole,
-        schoolName: settings.schoolName || 'E.E. Governador Milton Campos',
+        schoolId: currentSchool?.id || settings.schoolId,
+        schoolName: currentSchool?.name || settings.schoolName || 'Escola Estadual',
       },
-      true // autoLogin
+      false // Do not switch current user automatically
     );
 
     setFeedbackMsg({
       type: 'success',
-      text: `Professor "${created.name}" cadastrado e conectado com sucesso!`,
+      text: `Professor(a) "${created.name}" cadastrado(a) com sucesso!`,
     });
 
     setTimeout(() => {
-      onClose();
       setRegName('');
       setRegEmail('');
+      setActiveMode('LOGIN');
       setFeedbackMsg(null);
-    }, 1000);
+    }, 1200);
   };
 
   return (
@@ -141,12 +179,12 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
           </div>
 
           <h3 className="text-base font-black text-slate-900 dark:text-slate-100">
-            {activeMode === 'LOGIN' ? 'Autenticação de Docente' : 'Cadastrar Novo Professor'}
+            {activeMode === 'LOGIN' ? 'Autenticação Google Individual' : 'Cadastrar Novo Professor'}
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {activeMode === 'LOGIN'
-              ? 'Selecione ou entre com sua conta institucional para fazer reservas'
-              : 'Cadastre seus dados para começar a agendar os laboratórios da escola'}
+              ? 'Acesso seguro e individual com conta Google institucional'
+              : 'Pré-cadastro de professores para agendamento dos laboratórios'}
           </p>
 
           {/* Mode Switch Tabs (only show Register tab for Admins) */}
@@ -161,7 +199,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                Trocar Usuário
+                Minha Conta
               </button>
               <button
                 type="button"
@@ -178,8 +216,8 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
             </div>
           ) : (
             <div className="mt-3 flex items-center justify-center space-x-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <Shield className="w-3.5 h-3.5 text-amber-500" />
-              <span>Novos cadastros de professores são gerenciados pela coordenação escolar</span>
+              <Shield className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Sessão protegida por autenticação individual</span>
             </div>
           )}
         </div>
@@ -195,165 +233,114 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
           >
             {feedbackMsg.type === 'success' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : null}
+            ) : (
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            )}
             <span>{feedbackMsg.text}</span>
           </div>
         )}
 
-        {/* TAB 1: LOGIN / SELECT REGISTERED USER */}
+        {/* TAB 1: CURRENT USER SESSION & GOOGLE LOGIN */}
         {activeMode === 'LOGIN' && (
           <div className="p-6 space-y-4 text-xs">
-            {/* Quick Account Selector */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Professores Cadastrados na Escola ({users.length}):
-                </span>
-                {isAdmin && (
+            {/* Current Logged User Info */}
+            {currentUser && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    Sessão Ativa Conectada
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                      currentUser.role === 'ADMIN'
+                        ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300'
+                        : 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
+                    }`}
+                  >
+                    {currentUser.role === 'ADMIN' ? 'Coordenador / Admin' : 'Professor'}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-3">
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-12 h-12 rounded-full border border-slate-200 dark:border-slate-700 object-cover shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
+                      {currentUser.name}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {currentUser.email}
+                    </p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                      {currentUser.subject || 'Geral'} • {currentUser.schoolName || 'Escola da Rede'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center space-x-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Conta protegida e isolada</span>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setActiveMode('REGISTER')}
-                    className="text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    onClick={() => {
+                      logout();
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
                   >
-                    + Criar Novo
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {users.map((user) => {
-                  const isCurrent = currentUser?.id === user.id;
-
-                  return (
-                    <button
-                      key={user.id}
-                      onClick={() => {
-                        switchUser(user.id);
-                        onClose();
-                      }}
-                      className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                        isCurrent
-                          ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500 shadow-xs ring-1 ring-blue-500'
-                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={user.avatar}
-                          alt={user.name}
-                          className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700 object-cover shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-1.5">
-                            <p className="font-bold text-slate-900 dark:text-slate-100 text-xs truncate">
-                              {user.name}
-                            </p>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase shrink-0 ${
-                                user.role === 'ADMIN'
-                                  ? 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300'
-                                  : 'bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300'
-                              }`}
-                            >
-                              {user.role === 'ADMIN' ? 'Admin' : 'Docente'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
-                            {user.subject || 'Geral'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {isCurrent && <Check className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-              <span className="flex-shrink mx-3 text-slate-400 dark:text-slate-500 text-[10px] uppercase font-bold">
-                Ou
-              </span>
-              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-            </div>
-
-            {/* Custom Google Email Form */}
-            {!showCustomForm ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setActiveMode('REGISTER')}
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold transition-all flex items-center justify-center space-x-2 cursor-pointer shadow-md shadow-blue-500/20"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>Cadastrar Novo Professor / Criar Usuário</span>
-                </button>
-
-                <button
-                  onClick={() => setShowCustomForm(true)}
-                  className="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 text-slate-600 dark:text-slate-300 hover:text-blue-700 dark:hover:text-blue-400 font-medium transition-all text-[11px] flex items-center justify-center space-x-1.5 cursor-pointer"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Entrar com Outro E-mail Google</span>
-                </button>
-              </div>
-            ) : (
-              <form
-                onSubmit={handleCustomLogin}
-                className="space-y-3 bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700"
-              >
-                <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">
-                  Entrar com E-mail Google:
-                </p>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    Nome Completo:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Profa. Juliana Mendes"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                    E-mail Google:
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="nome.sobrenome@educacao.mg.gov.br"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl font-mono text-[11px]"
-                    required
-                  />
-                </div>
-                <div className="flex space-x-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomForm(false)}
-                    className="flex-1 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow cursor-pointer"
-                  >
-                    Entrar
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sair da Conta</span>
                   </button>
                 </div>
-              </form>
+              </div>
             )}
+
+            {/* Google Authentication Button */}
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                disabled={isLoadingGoogle}
+                onClick={handleGoogleAuth}
+                className="w-full py-3 px-4 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-100 font-bold border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow transition-all flex items-center justify-center space-x-3 cursor-pointer disabled:opacity-50"
+              >
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>{isLoadingGoogle ? 'Conectando ao Google...' : 'Entrar com Conta Google Institucional'}</span>
+              </button>
+
+              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+                <span className="font-bold text-blue-900 dark:text-blue-300 block mb-0.5">
+                  Proteção de Privacidade:
+                </span>
+                Cada professor deve se autenticar com sua própria conta Google oficial. Não é permitido entrar ou fazer reservas no nome de outro professor.
+              </div>
+            </div>
           </div>
         )}
 
-        {/* TAB 2: REGISTER NEW TEACHER / USER */}
+        {/* TAB 2: REGISTER NEW TEACHER (ADMIN ONLY) */}
         {activeMode === 'REGISTER' && (
           <form onSubmit={handleRegisterSubmit} className="p-6 space-y-3.5 text-xs">
             <div>
@@ -474,7 +461,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
                 className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl font-black shadow-md shadow-blue-500/25 flex items-center space-x-1.5 cursor-pointer transform active:scale-95"
               >
                 <UserPlus className="w-4 h-4" />
-                <span>Salvar & Entrar</span>
+                <span>Cadastrar Docente</span>
               </button>
             </div>
           </form>
@@ -482,10 +469,9 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
 
         {/* Footer info */}
         <div className="bg-slate-50 dark:bg-slate-850 p-4 border-t border-slate-200 dark:border-slate-800 text-center text-[10px] text-slate-400 dark:text-slate-500 transition-colors">
-          🔒 Conexão segura e gerenciamento de perfis da Secretaria de Educação.
+          🔒 Conexão segura e isolamento de contas da Secretaria de Estado de Educação de Minas Gerais.
         </div>
       </div>
     </div>
   );
 };
-

@@ -52,10 +52,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
   const [isLoading, setIsLoading] = useState(false);
   const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [isGoogleWorkspaceModalOpen, setIsGoogleWorkspaceModalOpen] = useState(false);
-  const [googleWorkspaceEmail, setGoogleWorkspaceEmail] = useState('');
-  const [googleWorkspaceName, setGoogleWorkspaceName] = useState('');
-  const [googleModalError, setGoogleModalError] = useState<string | null>(null);
 
   // Selected school object
   const activeSelectedSchool = useMemo(() => {
@@ -157,8 +153,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
   };
 
   const handleSelectQuickUser = (user: User) => {
+    // Fill the email only so the user can identify themselves, but NEVER prefill passwords
+    // to strictly prevent one user from entering another user's account!
     setEmail(user.email);
-    setPassword(user.password || 'educacao123');
+    setPassword('');
     setErrorMessage(null);
 
     if (user.schoolId && user.schoolId !== selectedSchoolId) {
@@ -168,51 +166,56 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
   };
 
   const handleGoogleQuickLogin = async () => {
+    setErrorMessage(null);
     setIsLoading(true);
+
     try {
       const googleRes = await signInWithGooglePopup();
+
       if (googleRes.success && googleRes.user && googleRes.user.email) {
-        loginWithGoogleEmail(
-          googleRes.user.email,
+        const verifiedGoogleEmail = googleRes.user.email.trim().toLowerCase();
+
+        // STRICT SECURITY: A user can ONLY log into the account corresponding
+        // to the verified email returned by Google OAuth.
+        // It is strictly forbidden to fall back to an unverified email typed in the UI.
+        const loggedUser = loginWithGoogleEmail(
+          verifiedGoogleEmail,
           googleRes.user.displayName || undefined,
           selectedSchoolId,
           activeSelectedSchool?.name
         );
+
+        if (loggedUser.schoolId) {
+          switchSchool(loggedUser.schoolId);
+        }
         setIsLoading(false);
         return;
       }
-    } catch (popupErr) {
-      console.warn('Google popup note:', popupErr);
+
+      // Handle user cancellation or authentication failures with clear security guidance
+      const rawError = (googleRes.error || '').toLowerCase();
+      if (rawError.includes('popup-closed-by-user') || rawError.includes('cancelled')) {
+        setErrorMessage(
+          'Login com o Google não concluído. Para proteger o sigilo e segurança das contas, selecione sua própria conta Google institucional na janela do Google.'
+        );
+      } else if (rawError.includes('popup-blocked')) {
+        setErrorMessage(
+          'A janela pop-up do Google foi bloqueada pelo navegador. Permita pop-ups para este site ou abra a aplicação em uma nova aba para entrar com sua conta Google oficial.'
+        );
+      } else {
+        setErrorMessage(
+          googleRes.error ||
+          'Não foi possível autenticar com o Google. Por segurança, cada usuário deve acessar exclusivamente com sua conta verificada.'
+        );
+      }
+    } catch (popupErr: any) {
+      console.warn('Google popup error:', popupErr);
+      setErrorMessage(
+        'Erro ao iniciar autenticação Google. Certifique-se de que pop-ups estão permitidos no seu navegador.'
+      );
     } finally {
       setIsLoading(false);
     }
-
-    const trimmed = email.trim().toLowerCase();
-    if (trimmed && trimmed.includes('@')) {
-      loginWithGoogleEmail(trimmed, undefined, selectedSchoolId, activeSelectedSchool?.name);
-    } else {
-      setGoogleWorkspaceEmail(trimmed);
-      setGoogleModalError(null);
-      setIsGoogleWorkspaceModalOpen(true);
-    }
-  };
-
-  const handleConfirmGoogleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setGoogleModalError(null);
-    const trimmed = googleWorkspaceEmail.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes('@')) {
-      setGoogleModalError('Por favor, informe seu e-mail institucional (@educacao.mg.gov.br ou similar).');
-      return;
-    }
-
-    loginWithGoogleEmail(
-      trimmed,
-      googleWorkspaceName.trim() || undefined,
-      selectedSchoolId,
-      activeSelectedSchool?.name
-    );
-    setIsGoogleWorkspaceModalOpen(false);
   };
 
   return (
@@ -579,13 +582,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
             </div>
 
             {/* Helper Info Card */}
-            <div className="mt-4 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <div className="mt-4 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1.5">
               <div className="flex items-center space-x-1.5 font-bold text-slate-300">
-                <HelpCircle className="w-3.5 h-3.5 text-blue-400" />
-                <span>Multi-Escolas & Docentes</span>
+                <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Segurança e Isolamento de Contas</span>
               </div>
               <p className="text-[10px] text-slate-400 leading-relaxed">
-                Clique em qualquer professor da lista para preencher as credenciais instantaneamente ou digite seu e-mail institucional.
+                Clique no seu nome na lista para preencher seu e-mail e em seguida informe sua senha individual, ou clique em <strong>Entrar com Google</strong>. Cada docente possui acesso individual protegido; não é permitido acessar a conta de outro professor.
               </p>
             </div>
           </div>
@@ -666,13 +669,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
             <div className="mt-5 pt-3 border-t border-slate-800 flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  setPassword('educacao123');
-                  setIsHelpModalOpen(false);
-                }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+                onClick={() => setIsHelpModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
               >
-                Preencher Senha Padrão
+                Entendi / Fechar
               </button>
             </div>
           </div>
@@ -690,111 +690,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
           }
         }}
       />
-
-      {/* Google Workspace Login Modal */}
-      {isGoogleWorkspaceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-slate-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0">
-                  <svg className="w-6 h-6" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-white">Google Workspace</h3>
-                  <p className="text-xs text-slate-400">Acesso individual institucional</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsGoogleWorkspaceModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmGoogleLogin} className="space-y-3.5">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Digite seu e-mail institucional para acessar sua própria conta de professor e gerenciar seus horários em{' '}
-                <strong className="text-blue-400">{activeSelectedSchool?.shortName || activeSelectedSchool?.name}</strong>:
-              </p>
-
-              {googleModalError && (
-                <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-300 flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                  <span>{googleModalError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  E-mail Institucional (@educacao.mg.gov.br):
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    value={googleWorkspaceEmail}
-                    onChange={(e) => setGoogleWorkspaceEmail(e.target.value)}
-                    placeholder="seu.nome@educacao.mg.gov.br"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  Nome Completo (como aparecerá nas reservas):
-                </label>
-                <input
-                  type="text"
-                  value={googleWorkspaceName}
-                  onChange={(e) => setGoogleWorkspaceName(e.target.value)}
-                  placeholder="Ex: Profa. Maria Silva"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div className="pt-2 flex items-center justify-end space-x-2 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setIsGoogleWorkspaceModalOpen(false)}
-                  className="px-3.5 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-2"
-                >
-                  <span>Entrar com esta Conta</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

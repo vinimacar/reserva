@@ -235,11 +235,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const expectedPassword = found.password || 'educacao123';
     const providedPassword = (password || '').trim();
 
-    // If password provided and does not match
-    if (providedPassword && providedPassword !== expectedPassword) {
+    // Require password for credential login to prevent unauthorized access
+    if (!providedPassword) {
       return {
         success: false,
-        error: 'Senha incorreta para esta conta de professor. A senha padrão inicial é "educacao123".',
+        error: 'Por favor, informe sua senha de acesso. Por segurança, não é permitido acessar sem senha.',
+      };
+    }
+
+    // If password does not match
+    if (providedPassword !== expectedPassword) {
+      return {
+        success: false,
+        error: 'Senha incorreta para esta conta de professor. A senha padrão inicial é "educacao123". Se você alterou sua senha e esqueceu, solicite redefinição ao administrador da escola.',
       };
     }
 
@@ -393,6 +401,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchUser = (userId: string) => {
+    // Only allow direct user switching if Developer Mode is active for testing
+    if (!isDeveloperMode) {
+      console.warn('Troca direta de usuário bloqueada por segurança. Cada usuário deve autenticar individualmente.');
+      return;
+    }
     const found = users.find((u) => u.id === userId);
     if (found) {
       setCurrentUser(normalizeUser(found));
