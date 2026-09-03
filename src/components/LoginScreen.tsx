@@ -29,6 +29,7 @@ import { useReservations } from '../context/ReservationContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { DeveloperAuthModal } from './DeveloperAuthModal';
 import { User, School } from '../types';
+import { signInWithGooglePopup } from '../services/firebaseAuthService';
 
 interface LoginScreenProps {
   onOpenDeveloperPortal?: () => void;
@@ -166,7 +167,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
     }
   };
 
-  const handleGoogleQuickLogin = () => {
+  const handleGoogleQuickLogin = async () => {
+    setIsLoading(true);
+    try {
+      const googleRes = await signInWithGooglePopup();
+      if (googleRes.success && googleRes.user && googleRes.user.email) {
+        loginWithGoogleEmail(
+          googleRes.user.email,
+          googleRes.user.displayName || undefined,
+          selectedSchoolId,
+          activeSelectedSchool?.name
+        );
+        setIsLoading(false);
+        return;
+      }
+    } catch (popupErr) {
+      console.warn('Google popup note:', popupErr);
+    } finally {
+      setIsLoading(false);
+    }
+
     const trimmed = email.trim().toLowerCase();
     if (trimmed && trimmed.includes('@')) {
       loginWithGoogleEmail(trimmed, undefined, selectedSchoolId, activeSelectedSchool?.name);

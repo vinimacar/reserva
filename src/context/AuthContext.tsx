@@ -7,6 +7,13 @@ import {
   saveUserToCloud,
   deleteUserFromCloud,
 } from '../services/firestoreSync';
+import {
+  registerInFirebaseAuth,
+  authenticateWithFirebaseAuth,
+  signOutFromFirebaseAuth,
+  syncAllUsersToFirebaseAuth,
+  AuthSyncResult,
+} from '../services/firebaseAuthService';
 
 export interface LoginResult {
   success: boolean;
@@ -34,6 +41,7 @@ interface AuthContextType {
   updateSchoolNameForAllUsers: (schoolName: string, schoolId?: string) => void;
   switchUser: (userId: string) => void;
   resetUsersToDefault: () => void;
+  syncUsersToFirebaseAuth: (onProgress?: (current: number, total: number, email: string) => void) => Promise<AuthSyncResult>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -166,6 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsDeveloperMode(false);
     localStorage.removeItem(STORAGE_KEY_USER);
     localStorage.removeItem(STORAGE_KEY_DEV_MODE);
+    signOutFromFirebaseAuth();
   };
 
   const loginWithCredentials = (
@@ -202,6 +211,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUsers((prev) => [...prev, autoUser]);
         setCurrentUser(autoUser);
+        registerInFirebaseAuth(autoUser.email, autoUser.password, autoUser.name).catch((err) =>
+          console.warn('Auto admin Firebase Auth sync note:', err)
+        );
         return { success: true, user: autoUser };
       }
 
@@ -233,6 +245,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const normalized = normalizeUser(found);
     setCurrentUser(normalized);
+
+    // Asynchronously authenticate or register in Firebase Authentication
+    authenticateWithFirebaseAuth(
+      trimmedEmail,
+      providedPassword || expectedPassword,
+      normalized.name
+    ).catch((authErr) => {
+      console.warn('Firebase Auth background authentication note:', authErr);
+    });
+
     return {
       success: true,
       user: normalized,
@@ -251,6 +273,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (existing) {
       const normalized = normalizeUser(existing);
       setCurrentUser(normalized);
+      // Ensure user is in Firebase Auth
+      registerInFirebaseAuth(normalized.email, normalized.password, normalized.name).catch((e) =>
+        console.warn('Firebase Auth sync note:', e)
+      );
       return normalized;
     }
 
@@ -290,6 +316,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
     setCurrentUser(newUser);
+
+    // Save to Firestore and also register in Firebase Authentication
+    saveUserToCloud(newUser).catch((e) => console.warn('Cloud user save warning:', e));
+    registerInFirebaseAuth(newUser.email, newUser.password, newUser.name).catch((e) =>
+      console.warn('Firebase Auth registration warning:', e)
+    );
+
     return newUser;
   };
 
@@ -433,6 +466,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
     saveUserToCloud(newUser).catch((e) => console.warn('Cloud user save warning:', e));
+    registerInFirebaseAuth(newUser.email, newUser.password, newUser.name).catch((e) =>
+      console.warn('Firebase Auth user registration note:', e)
+    );
     if (autoLogin) {
       setCurrentUser(newUser);
     }
@@ -448,6 +484,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCurrentUser(updated);
           }
           saveUserToCloud(updated).catch((e) => console.warn('Cloud user update warning:', e));
+          if (data.password) {
+            registerInFirebaseAuth(updated.email, data.password, updated.name).catch((e) =>
+              console.warn('Firebase Auth password update note:', e)
+            );
+          }
           return updated;
         }
         return u;
@@ -480,6 +521,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem(STORAGE_KEY_USERS);
     defaultNormalized.forEach((u) => {
       saveUserToCloud(u).catch(() => {});
+      registerInFirebaseAuth(u.email, u.password, u.name).catch(() => {});
     });
   };
 
@@ -500,6 +542,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser && (!schoolId || currentUser.schoolId === schoolId)) {
       setCurrentUser((prev) => (prev ? { ...prev, schoolName } : null));
     }
+  };
+
+  const syncUsersToFirebaseAuth = async (
+    onProgress?: (current: number, total: number, email: string) => void
+  ): Promise<AuthSyncResult> => {
+    return await syncAllUsersToFirebaseAuth(users, onProgress);
   };
 
   return (
@@ -524,6 +572,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateSchoolNameForAllUsers,
         switchUser,
         resetUsersToDefault,
+        syncUsersToFirebaseAuth,
       }}
     >
       {children}

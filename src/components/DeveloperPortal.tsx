@@ -75,6 +75,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
     exitDeveloperMode,
     changePassword,
     addUser,
+    syncUsersToFirebaseAuth,
   } = useAuth();
 
   const {
@@ -193,6 +194,35 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
       });
     } finally {
       setIsDeletingClient(false);
+    }
+  };
+
+  // Firebase Auth sync state
+  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
+  const [syncAuthResult, setSyncAuthResult] = useState<{
+    total: number;
+    created: number;
+    alreadyExisted: number;
+    failed: number;
+    errors: string[];
+    providerNotEnabled?: boolean;
+  } | null>(null);
+  const [syncAuthProgress, setSyncAuthProgress] = useState<string | null>(null);
+
+  const handleSyncFirebaseAuth = async () => {
+    setIsSyncingAuth(true);
+    setSyncAuthResult(null);
+    setSyncAuthProgress('Iniciando sincronização com Firebase Authentication...');
+    try {
+      const result = await syncUsersToFirebaseAuth((current, total, email) => {
+        setSyncAuthProgress(`Sincronizando ${current}/${total}: ${email}`);
+      });
+      setSyncAuthResult(result);
+    } catch (err) {
+      console.warn('Developer portal sync error:', err);
+    } finally {
+      setIsSyncingAuth(false);
+      setSyncAuthProgress(null);
     }
   };
 
@@ -1265,14 +1295,68 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
         {/* TAB 3: ADMINS & CREDENTIALS MANAGEMENT */}
         {activeTab === 'ADMINS_CREDENTIALS' && (
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
               <div>
-                <h2 className="text-lg font-black text-white">Central de Gestores & Credenciais</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-black text-white">Central de Gestores & Credenciais</h2>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-bold">
+                    Firebase Auth
+                  </span>
+                </div>
                 <p className="text-xs text-slate-400">
-                  Lista unificada de todos os administradores e responsáveis de cada escola com opção de reset de senha imediato.
+                  Lista unificada de todos os administradores e responsáveis com sincronização no Google Firebase Authentication.
                 </p>
               </div>
+
+              <button
+                id="dev-sync-firebase-auth-btn"
+                type="button"
+                onClick={handleSyncFirebaseAuth}
+                disabled={isSyncingAuth}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2 shrink-0 shadow-md shadow-blue-500/20"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAuth ? 'animate-spin' : ''}`} />
+                <span>{isSyncingAuth ? 'Sincronizando...' : 'Sincronizar no Firebase Auth'}</span>
+              </button>
             </div>
+
+            {syncAuthProgress && (
+              <div className="p-3 bg-blue-950/50 border border-blue-800/80 rounded-2xl text-xs text-blue-200 flex items-center space-x-2">
+                <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>{syncAuthProgress}</span>
+              </div>
+            )}
+
+            {syncAuthResult && (
+              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {syncAuthResult.created} novos usuários criados no Firebase Auth
+                  </span>
+                  <span className="text-blue-400 font-medium">
+                    • {syncAuthResult.alreadyExisted} já existentes
+                  </span>
+                  <span className="text-slate-400">
+                    • Total verificado: {syncAuthResult.total}
+                  </span>
+                </div>
+
+                {syncAuthResult.providerNotEnabled && (
+                  <div className="p-3 bg-amber-950/60 border border-amber-800/80 rounded-xl text-amber-200 text-[11px] flex items-start space-x-2 mt-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <strong>Aviso do Firebase Console (votofacil-30139):</strong>
+                      <p className="mt-0.5">
+                        O provedor de <strong>Email/Senha</strong> precisa estar ativado no Firebase Console para aceitar cadastros por senha:
+                        <br />
+                        Acesse <em>Firebase Console &gt; Authentication &gt; Sign-in method &gt; Email/Password &gt; Ativar &gt; Salvar</em>.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">

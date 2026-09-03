@@ -29,6 +29,7 @@ import {
   Phone,
   UserPlus,
   UserCheck,
+  ShieldCheck,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -72,7 +73,7 @@ export const AdminPanel: React.FC<{
     resetToDefaultData,
   } = useReservations();
 
-  const { users, currentUser, updateUserRole, addUser, deleteUser } = useAuth();
+  const { users, currentUser, updateUserRole, addUser, deleteUser, syncUsersToFirebaseAuth } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -106,6 +107,43 @@ export const AdminPanel: React.FC<{
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Firebase Auth sync state
+  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
+  const [syncAuthResult, setSyncAuthResult] = useState<{
+    total: number;
+    created: number;
+    alreadyExisted: number;
+    failed: number;
+    errors: string[];
+    providerNotEnabled?: boolean;
+  } | null>(null);
+  const [syncAuthProgress, setSyncAuthProgress] = useState<string | null>(null);
+
+  const handleSyncFirebaseAuth = async () => {
+    setIsSyncingAuth(true);
+    setSyncAuthResult(null);
+    setSyncAuthProgress('Iniciando sincronização com Firebase Authentication...');
+    try {
+      const result = await syncUsersToFirebaseAuth((current, total, email) => {
+        setSyncAuthProgress(`Sincronizando ${current}/${total}: ${email}`);
+      });
+      setSyncAuthResult(result);
+      if (result.providerNotEnabled) {
+        showToast('Aviso: Provedor Email/Senha desativado no Firebase Console.');
+      } else if (result.created > 0) {
+        showToast(`${result.created} usuário(s) criados no Firebase Authentication com sucesso!`);
+      } else {
+        showToast('Todos os usuários já estão no Firebase Authentication!');
+      }
+    } catch (err: any) {
+      console.warn('Sync error:', err);
+      showToast('Erro ao sincronizar com Firebase Authentication.');
+    } finally {
+      setIsSyncingAuth(false);
+      setSyncAuthProgress(null);
+    }
   };
 
   const [newRoomForm, setNewRoomForm] = useState<Partial<Room>>({
@@ -1027,6 +1065,86 @@ export const AdminPanel: React.FC<{
                 <UserPlus className="w-4 h-4" />
                 <span>+ Cadastrar Novo Professor</span>
               </button>
+            </div>
+
+            {/* Firebase Authentication Sync Card */}
+            <div className="bg-gradient-to-r from-blue-900/10 via-indigo-900/10 to-slate-900/20 dark:from-blue-950/30 dark:via-indigo-950/30 dark:to-slate-900/40 border border-blue-500/25 dark:border-blue-500/30 rounded-2xl p-4 transition-all">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-start space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-500 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        Firebase Authentication (Google Authenticator)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20 text-[10px] font-bold font-mono">
+                        votofacil-30139
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-2xl">
+                      Sincronize todos os <strong>{users.length} professores</strong> com o serviço <strong>Firebase Authentication</strong> para que suas contas apareçam listadas diretamente na aba <em>Authentication &gt; Users</em> do Firebase Console do Google.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+                  <button
+                    id="admin-sync-firebase-auth-btn"
+                    type="button"
+                    onClick={handleSyncFirebaseAuth}
+                    disabled={isSyncingAuth}
+                    className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center space-x-2"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingAuth ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingAuth ? 'Sincronizando...' : 'Sincronizar no Firebase Auth'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {syncAuthProgress && (
+                <div className="mt-3 p-2.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs text-blue-800 dark:text-blue-200 flex items-center space-x-2">
+                  <div className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span>{syncAuthProgress}</span>
+                </div>
+              )}
+
+              {syncAuthResult && (
+                <div className="mt-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs space-y-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {syncAuthResult.created} novos criados
+                    </span>
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">
+                      • {syncAuthResult.alreadyExisted} já cadastrados
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      • Total verificado: {syncAuthResult.total}
+                    </span>
+                    {syncAuthResult.failed > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                        • {syncAuthResult.failed} com pendência
+                      </span>
+                    )}
+                  </div>
+
+                  {syncAuthResult.providerNotEnabled && (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 rounded-lg text-amber-900 dark:text-amber-200 text-[11px] flex items-start space-x-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
+                      <div>
+                        <strong>Aviso de Configuração do Firebase Console:</strong>
+                        <p className="mt-0.5">
+                          Para aceitar contas com senha, certifique-se de que o provedor <strong>Email/Senha</strong> está ativado no Firebase Console:
+                          <br />
+                          <em>Authentication &gt; Sign-in method &gt; Email/Password &gt; Ativar &gt; Salvar</em>.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Filter Bar for Teachers */}
