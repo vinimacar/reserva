@@ -104,11 +104,6 @@ export const AdminPanel: React.FC<{
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
   // Firebase Auth sync state
   const [isSyncingAuth, setIsSyncingAuth] = useState(false);
   const [syncAuthResult, setSyncAuthResult] = useState<{
@@ -120,6 +115,30 @@ export const AdminPanel: React.FC<{
     providerNotEnabled?: boolean;
   } | null>(null);
   const [syncAuthProgress, setSyncAuthProgress] = useState<string | null>(null);
+
+  const [newRoomForm, setNewRoomForm] = useState<Partial<Room>>({
+    name: '',
+    type: 'INFORMATICA',
+    capacity: 35,
+    location: '',
+    description: '',
+    status: 'ACTIVE',
+    color: 'blue',
+    iconName: 'Monitor',
+    equipment: ['Computadores', 'Projetor', 'Internet Fibra'],
+    rules: ['Proibido alimentos', 'Desligar após o uso'],
+  });
+
+  // Announcement state
+  const [annTitle, setAnnTitle] = useState<string>('');
+  const [annContent, setAnnContent] = useState<string>('');
+  const [annImportant, setAnnImportant] = useState<boolean>(true);
+  const [annTargetRoom, setAnnTargetRoom] = useState<string>('');
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   const handleSyncFirebaseAuth = async () => {
     setIsSyncingAuth(true);
@@ -145,25 +164,6 @@ export const AdminPanel: React.FC<{
       setSyncAuthProgress(null);
     }
   };
-
-  const [newRoomForm, setNewRoomForm] = useState<Partial<Room>>({
-    name: '',
-    type: 'INFORMATICA',
-    capacity: 35,
-    location: '',
-    description: '',
-    status: 'ACTIVE',
-    color: 'blue',
-    iconName: 'Monitor',
-    equipment: ['Computadores', 'Projetor', 'Internet Fibra'],
-    rules: ['Proibido alimentos', 'Desligar após o uso'],
-  });
-
-  // Announcement state
-  const [annTitle, setAnnTitle] = useState<string>('');
-  const [annContent, setAnnContent] = useState<string>('');
-  const [annImportant, setAnnImportant] = useState<boolean>(true);
-  const [annTargetRoom, setAnnTargetRoom] = useState<string>('');
 
   // Export CSV Helper
   const handleExportCSV = () => {

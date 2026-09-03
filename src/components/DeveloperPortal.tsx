@@ -158,6 +158,18 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   } | null>(null);
   const [isDeletingClient, setIsDeletingClient] = useState(false);
 
+  // Firebase Auth sync state
+  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
+  const [syncAuthResult, setSyncAuthResult] = useState<{
+    total: number;
+    created: number;
+    alreadyExisted: number;
+    failed: number;
+    errors: string[];
+    providerNotEnabled?: boolean;
+  } | null>(null);
+  const [syncAuthProgress, setSyncAuthProgress] = useState<string | null>(null);
+
   const handleConfirmDeleteSchool = () => {
     if (!schoolToDelete) return;
     if (schools.length <= 1) {
@@ -196,18 +208,6 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
       setIsDeletingClient(false);
     }
   };
-
-  // Firebase Auth sync state
-  const [isSyncingAuth, setIsSyncingAuth] = useState(false);
-  const [syncAuthResult, setSyncAuthResult] = useState<{
-    total: number;
-    created: number;
-    alreadyExisted: number;
-    failed: number;
-    errors: string[];
-    providerNotEnabled?: boolean;
-  } | null>(null);
-  const [syncAuthProgress, setSyncAuthProgress] = useState<string | null>(null);
 
   const handleSyncFirebaseAuth = async () => {
     setIsSyncingAuth(true);

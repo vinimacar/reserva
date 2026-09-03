@@ -178,6 +178,76 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     }
   }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods, currentUser, users]);
 
+  // Target dates computation based on mode
+  const targetDates: string[] = useMemo(() => {
+    if (!isOpen) return [];
+    if (bookingType === 'SINGLE') {
+      return [date];
+    } else if (bookingType === 'DATE_RANGE') {
+      return generateDateRange(startDate, endDate, weekdaysOnly, 60);
+    } else {
+      return generateRecurringDates(
+        startDate,
+        recurringDaysOfWeek,
+        recurringDurationType === 'WEEKS'
+          ? { weeksCount: recurringWeeksCount }
+          : { endDateIso: recurringEndDate },
+        60
+      );
+    }
+  }, [
+    isOpen,
+    bookingType,
+    date,
+    startDate,
+    endDate,
+    weekdaysOnly,
+    recurringDaysOfWeek,
+    recurringDurationType,
+    recurringWeeksCount,
+    recurringEndDate,
+  ]);
+
+  // Batch conflict analysis
+  const batchConflictAnalysis = useMemo(() => {
+    if (!isOpen) {
+      return {
+        hasConflict: false,
+        availableDates: [],
+        conflictingDates: [],
+        totalDates: 0,
+      };
+    }
+    if (bookingType === 'SINGLE') {
+      const c = checkConflict(roomId, date, selectedPeriodIds);
+      return {
+        hasConflict: c.hasConflict,
+        availableDates: c.hasConflict ? [] : [date],
+        conflictingDates: c.hasConflict ? [{ date, message: c.message || 'Horário ocupado' }] : [],
+        totalDates: 1,
+      };
+    }
+
+    const availableDates: string[] = [];
+    const conflictingDates: Array<{ date: string; message: string }> = [];
+
+    targetDates.forEach((d) => {
+      const c = checkConflict(roomId, d, selectedPeriodIds);
+      if (c.hasConflict) {
+        conflictingDates.push({ date: d, message: c.message || 'Horário ocupado por outra aula' });
+      } else {
+        availableDates.push(d);
+      }
+    });
+
+    return {
+      hasConflict: conflictingDates.length > 0,
+      availableDates,
+      conflictingDates,
+      totalDates: targetDates.length,
+    };
+  }, [isOpen, bookingType, date, targetDates, roomId, selectedPeriodIds, checkConflict]);
+
   if (!isOpen) return null;
 
   const currentRoom = rooms.find((r) => r.id === roomId) || rooms[0];
@@ -235,66 +305,6 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       prev.includes(eq) ? prev.filter((item) => item !== eq) : [...prev, eq]
     );
   };
-
-  // Target dates computation based on mode
-  const targetDates: string[] = useMemo(() => {
-    if (bookingType === 'SINGLE') {
-      return [date];
-    } else if (bookingType === 'DATE_RANGE') {
-      return generateDateRange(startDate, endDate, weekdaysOnly, 60);
-    } else {
-      return generateRecurringDates(
-        startDate,
-        recurringDaysOfWeek,
-        recurringDurationType === 'WEEKS'
-          ? { weeksCount: recurringWeeksCount }
-          : { endDateIso: recurringEndDate },
-        60
-      );
-    }
-  }, [
-    bookingType,
-    date,
-    startDate,
-    endDate,
-    weekdaysOnly,
-    recurringDaysOfWeek,
-    recurringDurationType,
-    recurringWeeksCount,
-    recurringEndDate,
-  ]);
-
-  // Batch conflict analysis
-  const batchConflictAnalysis = useMemo(() => {
-    if (bookingType === 'SINGLE') {
-      const c = checkConflict(roomId, date, selectedPeriodIds);
-      return {
-        hasConflict: c.hasConflict,
-        availableDates: c.hasConflict ? [] : [date],
-        conflictingDates: c.hasConflict ? [{ date, message: c.message || 'Horário ocupado' }] : [],
-        totalDates: 1,
-      };
-    }
-
-    const availableDates: string[] = [];
-    const conflictingDates: Array<{ date: string; message: string }> = [];
-
-    targetDates.forEach((d) => {
-      const c = checkConflict(roomId, d, selectedPeriodIds);
-      if (c.hasConflict) {
-        conflictingDates.push({ date: d, message: c.message || 'Horário ocupado por outra aula' });
-      } else {
-        availableDates.push(d);
-      }
-    });
-
-    return {
-      hasConflict: conflictingDates.length > 0,
-      availableDates,
-      conflictingDates,
-      totalDates: targetDates.length,
-    };
-  }, [bookingType, date, targetDates, roomId, selectedPeriodIds, checkConflict]);
 
   // Live Conflict Check for single mode
   const conflict = checkConflict(roomId, date, selectedPeriodIds);
