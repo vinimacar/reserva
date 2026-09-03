@@ -22,6 +22,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { DeveloperAuthModal } from './components/DeveloperAuthModal';
 import { DeveloperPortal } from './components/DeveloperPortal';
 import { LoginScreen } from './components/LoginScreen';
+import { TutorialModal } from './components/TutorialModal';
 import { Reservation } from './types';
 import { School, Terminal } from 'lucide-react';
 
@@ -37,6 +38,7 @@ function ReserveAppContent() {
   // Developer Portal state
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
   const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
+  const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false);
 
   // Modals state
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -105,7 +107,10 @@ function ReserveAppContent() {
   if (!currentUser) {
     return (
       <>
-        <LoginScreen onOpenDeveloperPortal={() => setShowDeveloperPortal(true)} />
+        <LoginScreen
+          onOpenDeveloperPortal={() => setShowDeveloperPortal(true)}
+          onOpenTutorial={() => setIsTutorialModalOpen(true)}
+        />
         <DeveloperAuthModal
           isOpen={isDevAuthModalOpen}
           onClose={() => setIsDevAuthModalOpen(false)}
@@ -113,6 +118,10 @@ function ReserveAppContent() {
             setIsDevAuthModalOpen(false);
             setShowDeveloperPortal(true);
           }}
+        />
+        <TutorialModal
+          isOpen={isTutorialModalOpen}
+          onClose={() => setIsTutorialModalOpen(false)}
         />
       </>
     );
@@ -137,6 +146,7 @@ function ReserveAppContent() {
         onOpenRegisterTeacher={() => setIsUserRegistrationModalOpen(true)}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
         onOpenDeveloperPortal={() => setShowDeveloperPortal(true)}
+        onOpenTutorial={() => setIsTutorialModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -251,6 +261,11 @@ function ReserveAppContent() {
           setIsDevAuthModalOpen(false);
           setShowDeveloperPortal(true);
         }}
+      />
+
+      <TutorialModal
+        isOpen={isTutorialModalOpen}
+        onClose={() => setIsTutorialModalOpen(false)}
       />
     </div>
   );

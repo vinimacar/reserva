@@ -17,6 +17,7 @@ import {
   KeyRound,
   GraduationCap,
   Terminal,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
@@ -33,6 +34,7 @@ interface HeaderProps {
   onOpenRegisterTeacher?: () => void;
   onOpenChangePassword?: () => void;
   onOpenDeveloperPortal?: () => void;
+  onOpenTutorial?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRegisterTeacher,
   onOpenChangePassword,
   onOpenDeveloperPortal,
+  onOpenTutorial,
 }) => {
   const { currentUser, isAdmin, logout } = useAuth();
   const { announcements, settings, schools, currentSchoolId, switchSchool } = useReservations();
@@ -239,6 +242,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <Moon className="w-4 h-4 text-amber-800 animate-in spin-in-180 duration-200" />
               )}
             </button>
+
+            {/* Tutorial / Manual PDF Button */}
+            {onOpenTutorial && (
+              <button
+                id="header-tutorial-btn"
+                type="button"
+                onClick={onOpenTutorial}
+                className="p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center border shadow-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700"
+                title="Abrir Manual / Tutorial em PDF"
+                aria-label="Abrir Tutorial"
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Quick New Reservation Button */}
             <button
@@ -441,6 +458,20 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
+                      {onOpenTutorial && (
+                        <button
+                          id="profile-tutorial-btn"
+                          onClick={() => {
+                            onOpenTutorial();
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-950/40 text-left transition-colors cursor-pointer"
+                        >
+                          <FileText className="w-4 h-4 text-blue-400" />
+                          <span>Manual / Tutorial de Uso (PDF)</span>
+                        </button>
+                      )}
+
                       {onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
@@ -459,14 +490,15 @@ export const Header: React.FC<HeaderProps> = ({
                     <div className="h-px bg-slate-800 my-1"></div>
 
                     <button
+                      id="profile-logout-btn"
                       onClick={() => {
                         logout();
                         setShowProfileMenu(false);
                       }}
-                      className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 text-left transition-colors font-bold cursor-pointer"
+                      className="w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs text-red-400 hover:text-white hover:bg-red-600/80 text-left transition-all font-bold cursor-pointer border border-red-500/20"
                     >
                       <LogOut className="w-4 h-4" />
-                      <span>Sair / Trocar de Conta</span>
+                      <span>Sair da Conta (Desconectar)</span>
                     </button>
                   </div>
                 )}

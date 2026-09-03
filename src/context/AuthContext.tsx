@@ -137,6 +137,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
+  // Listen for ?logout=true, ?sair=true, or ?limpar=true in URL to clear stored sessions
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.location.search) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('logout') === 'true' || params.get('sair') === 'true' || params.get('limpar') === 'true') {
+          setCurrentUser(null);
+          setIsDeveloperMode(false);
+          localStorage.removeItem(STORAGE_KEY_USER);
+          localStorage.removeItem(STORAGE_KEY_DEV_MODE);
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const login = (user: User) => {
     const normalized = normalizeUser(user);
     setCurrentUser(normalized);
@@ -144,7 +163,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setCurrentUser(null);
+    setIsDeveloperMode(false);
     localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_DEV_MODE);
   };
 
   const loginWithCredentials = (

@@ -32,9 +32,10 @@ import { User, School } from '../types';
 
 interface LoginScreenProps {
   onOpenDeveloperPortal?: () => void;
+  onOpenTutorial?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal, onOpenTutorial }) => {
   const { users, loginWithCredentials, loginWithGoogleEmail, isDeveloperMode } = useAuth();
   const { schools, currentSchoolId, switchSchool } = useReservations();
 
@@ -50,6 +51,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
   const [isLoading, setIsLoading] = useState(false);
   const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isGoogleWorkspaceModalOpen, setIsGoogleWorkspaceModalOpen] = useState(false);
+  const [googleWorkspaceEmail, setGoogleWorkspaceEmail] = useState('');
+  const [googleWorkspaceName, setGoogleWorkspaceName] = useState('');
+  const [googleModalError, setGoogleModalError] = useState<string | null>(null);
 
   // Selected school object
   const activeSelectedSchool = useMemo(() => {
@@ -162,14 +167,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
   };
 
   const handleGoogleQuickLogin = () => {
-    if (!email.trim()) {
-      const defaultUser = teachersForSelectedSchool[0] || users[0];
-      if (defaultUser) {
-        loginWithGoogleEmail(defaultUser.email, defaultUser.name, selectedSchoolId, activeSelectedSchool?.name);
-      }
+    const trimmed = email.trim().toLowerCase();
+    if (trimmed && trimmed.includes('@')) {
+      loginWithGoogleEmail(trimmed, undefined, selectedSchoolId, activeSelectedSchool?.name);
     } else {
-      loginWithGoogleEmail(email.trim(), undefined, selectedSchoolId, activeSelectedSchool?.name);
+      setGoogleWorkspaceEmail(trimmed);
+      setGoogleModalError(null);
+      setIsGoogleWorkspaceModalOpen(true);
     }
+  };
+
+  const handleConfirmGoogleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setGoogleModalError(null);
+    const trimmed = googleWorkspaceEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes('@')) {
+      setGoogleModalError('Por favor, informe seu e-mail institucional (@educacao.mg.gov.br ou similar).');
+      return;
+    }
+
+    loginWithGoogleEmail(
+      trimmed,
+      googleWorkspaceName.trim() || undefined,
+      selectedSchoolId,
+      activeSelectedSchool?.name
+    );
+    setIsGoogleWorkspaceModalOpen(false);
   };
 
   return (
@@ -203,6 +226,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
             <Building2 className="w-3.5 h-3.5 text-blue-400" />
             <span>{schools.length} Escolas Conectadas</span>
           </div>
+
+          {onOpenTutorial && (
+            <button
+              id="login-tutorial-btn"
+              type="button"
+              onClick={onOpenTutorial}
+              className="px-3 py-1.5 bg-blue-950/70 hover:bg-blue-900/90 text-blue-300 hover:text-white rounded-xl text-xs font-bold border border-blue-500/30 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Abrir Manual e Tutorial Completo do Usuário"
+            >
+              <Info className="w-3.5 h-3.5 text-blue-400" />
+              <span>Manual / Tutorial</span>
+            </button>
+          )}
 
           <button
             id="dev-portal-top-btn"
@@ -634,6 +670,111 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal 
           }
         }}
       />
+
+      {/* Google Workspace Login Modal */}
+      {isGoogleWorkspaceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl text-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md shrink-0">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Google Workspace</h3>
+                  <p className="text-xs text-slate-400">Acesso individual institucional</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGoogleWorkspaceModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmGoogleLogin} className="space-y-3.5">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Digite seu e-mail institucional para acessar sua própria conta de professor e gerenciar seus horários em{' '}
+                <strong className="text-blue-400">{activeSelectedSchool?.shortName || activeSelectedSchool?.name}</strong>:
+              </p>
+
+              {googleModalError && (
+                <div className="p-3 bg-red-950/60 border border-red-800 rounded-xl text-xs text-red-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{googleModalError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  E-mail Institucional (@educacao.mg.gov.br):
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    value={googleWorkspaceEmail}
+                    onChange={(e) => setGoogleWorkspaceEmail(e.target.value)}
+                    placeholder="seu.nome@educacao.mg.gov.br"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  Nome Completo (como aparecerá nas reservas):
+                </label>
+                <input
+                  type="text"
+                  value={googleWorkspaceName}
+                  onChange={(e) => setGoogleWorkspaceName(e.target.value)}
+                  placeholder="Ex: Profa. Maria Silva"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end space-x-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsGoogleWorkspaceModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl text-xs text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-2"
+                >
+                  <span>Entrar com esta Conta</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
