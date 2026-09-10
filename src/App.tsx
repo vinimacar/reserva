@@ -88,9 +88,9 @@ function ReserveAppContent() {
 
   const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
-  // If Developer Portal is explicitly open or developer mode is active
+  // If Developer Portal is explicitly open
   // STRICT: Only administrators or developer mode can access the Developer Portal. Teachers are never allowed.
-  if ((showDeveloperPortal || isDeveloperMode) && (isAdmin || isDeveloperMode || !currentUser)) {
+  if (showDeveloperPortal && (isAdmin || isDeveloperMode || !currentUser)) {
     return (
       <DeveloperPortal
         onBackToApp={() => {
@@ -98,6 +98,7 @@ function ReserveAppContent() {
         }}
         onSelectClientToView={(schoolId) => {
           switchSchool(schoolId);
+          setCurrentView('SCHEDULE');
           setShowDeveloperPortal(false);
         }}
       />
@@ -146,7 +147,7 @@ function ReserveAppContent() {
         onOpenSchoolSettings={isAdmin ? () => setIsSchoolSetupModalOpen(true) : undefined}
         onOpenRegisterTeacher={isAdmin ? () => setIsUserRegistrationModalOpen(true) : undefined}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-        onOpenDeveloperPortal={isAdmin ? () => setShowDeveloperPortal(true) : undefined}
+        onOpenDeveloperPortal={isAdmin || isDeveloperMode ? () => setShowDeveloperPortal(true) : undefined}
         onOpenTutorial={() => setIsTutorialModalOpen(true)}
       />
 

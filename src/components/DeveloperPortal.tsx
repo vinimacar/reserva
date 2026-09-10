@@ -77,6 +77,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
     changePassword,
     addUser,
     syncUsersToFirebaseAuth,
+    login,
   } = useAuth();
 
   const {
@@ -372,6 +373,31 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
   // Switch to client context and open app
   const handleAccessClientInstance = (schoolId: string) => {
     switchSchool(schoolId);
+    const targetSchool = schools.find((s) => s.id === schoolId);
+    if (targetSchool) {
+      if (currentUser) {
+        login({
+          ...currentUser,
+          schoolId: schoolId,
+          schoolName: targetSchool.name,
+        });
+      } else {
+        const devUser: User = {
+          id: 'user_master_developer',
+          name: 'Desenvolvedor Master',
+          email: 'dev@reserve.sistema.gov.br',
+          avatar: 'icon:tech',
+          iconKey: 'icon:tech',
+          password: 'devmaster2026#',
+          role: 'ADMIN',
+          gender: 'MALE',
+          schoolId: schoolId,
+          schoolName: targetSchool.name,
+          subject: 'Arquiteto de Software & Infraestrutura',
+        };
+        login(devUser);
+      }
+    }
     if (onSelectClientToView) {
       onSelectClientToView(schoolId);
     } else {
@@ -1300,6 +1326,7 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                       </div>
 
                       <button
+                        id={`access-client-env-btn-${school.id}`}
                         type="button"
                         onClick={() => handleAccessClientInstance(school.id)}
                         className="px-3 py-1.5 rounded-lg bg-indigo-600/90 hover:bg-indigo-500 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"

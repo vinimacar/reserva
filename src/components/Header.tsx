@@ -49,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDeveloperPortal,
   onOpenTutorial,
 }) => {
-  const { currentUser, isAdmin, logout } = useAuth();
+  const { currentUser, isAdmin, isDeveloperMode, logout } = useAuth();
   const { announcements, settings, schools, currentSchoolId, switchSchool } = useReservations();
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -254,6 +254,20 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-label="Abrir Tutorial"
               >
                 <FileText className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Quick Developer Portal Button */}
+            {(isAdmin || isDeveloperMode) && onOpenDeveloperPortal && (
+              <button
+                id="header-quick-dev-portal-btn"
+                type="button"
+                onClick={onOpenDeveloperPortal}
+                className="hidden sm:flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 hover:text-white text-xs font-bold transition-all border border-indigo-500/40 shadow-xs cursor-pointer"
+                title="Abrir Console do Desenvolvedor"
+              >
+                <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Console Dev</span>
               </button>
             )}
 
@@ -472,7 +486,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
-                      {isAdmin && onOpenDeveloperPortal && (
+                      {(isAdmin || isDeveloperMode) && onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
                           onClick={() => {
