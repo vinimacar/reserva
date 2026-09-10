@@ -12,6 +12,7 @@ import {
 import { School, Room, Reservation, Announcement, User } from '../types';
 
 export const COLLECTIONS = {
+  ESCOLAS: 'escolas',
   SCHOOLS: 'schools',
   ROOMS: 'rooms',
   RESERVATIONS: 'reservations',
@@ -47,6 +48,7 @@ export function getSlotLockKey(schoolId: string, roomId: string, date: string, p
 // 1. Clean entire Cloud Database from scratch (Limpar dados começando do zero)
 export async function clearCloudDatabase(): Promise<void> {
   const collectionNames = [
+    COLLECTIONS.ESCOLAS,
     COLLECTIONS.SCHOOLS,
     COLLECTIONS.ROOMS,
     COLLECTIONS.RESERVATIONS,
@@ -71,14 +73,29 @@ export async function clearCloudDatabase(): Promise<void> {
 
 // 2. Real-time sync subscriptions
 export function subscribeToSchools(callback: (schools: School[]) => void) {
+  // Primary listener on the 'escolas' collection
   return onSnapshot(
-    collection(db, COLLECTIONS.SCHOOLS),
+    collection(db, COLLECTIONS.ESCOLAS),
     (snapshot) => {
       const list: School[] = [];
-      snapshot.forEach((d) => list.push(d.data() as School));
-      callback(list);
+      snapshot.forEach((d) => {
+        const data = d.data() as School;
+        list.push(data);
+      });
+      if (list.length > 0) {
+        callback(list);
+      } else {
+        // Fallback to 'schools' if 'escolas' is empty during migration
+        getDocs(collection(db, COLLECTIONS.SCHOOLS)).then((fbSnap) => {
+          if (!fbSnap.empty) {
+            const fbList: School[] = [];
+            fbSnap.forEach((d) => fbList.push(d.data() as School));
+            callback(fbList);
+          }
+        }).catch(() => {});
+      }
     },
-    (err) => console.warn('Firestore schools listener error:', err)
+    (err) => console.warn('Firestore escolas listener error:', err)
   );
 }
 
@@ -131,20 +148,49 @@ export function subscribeToUsers(callback: (users: User[]) => void) {
 }
 
 // 3. Document write helpers
-export async function saveSchoolToCloud(school: School): Promise<void> {
-  await setDoc(doc(db, COLLECTIONS.SCHOOLS, school.id), school);
+export async function saveSchoolToCloud(school: School, extraData?: { rooms?: Room[]; users?: User[] }): Promise<void> {
+  const payload = {
+    ...school,
+    ultimaAtualizacao: new Date().toISOString(),
+    ...(extraData?.rooms ? { salas: extraData.rooms, totalSalas: extraData.rooms.length } : {}),
+    ...(extraData?.users ? { usuarios: extraData.users, totalUsuarios: extraData.users.length } : {}),
+  };
+
+  // Write to both 'escolas' and 'schools' collections
+  await Promise.all([
+    setDoc(doc(db, COLLECTIONS.ESCOLAS, school.id), payload, { merge: true }),
+    setDoc(doc(db, COLLECTIONS.SCHOOLS, school.id), school),
+  ]);
 }
 
 export async function deleteSchoolFromCloud(schoolId: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTIONS.SCHOOLS, schoolId));
+  await Promise.all([
+    deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId)),
+    deleteDoc(doc(db, COLLECTIONS.SCHOOLS, schoolId)),
+  ]);
 }
 
 export async function saveRoomToCloud(room: Room): Promise<void> {
+  // Save to root rooms collection and link to escola subcollection
   await setDoc(doc(db, COLLECTIONS.ROOMS, room.id), room);
+  if (room.schoolId) {
+    try {
+      await setDoc(doc(db, COLLECTIONS.ESCOLAS, room.schoolId, 'salas', room.id), room);
+    } catch (e) {
+      console.warn('Warning linking room to escola subcollection:', e);
+    }
+  }
 }
 
-export async function deleteRoomFromCloud(roomId: string): Promise<void> {
+export async function deleteRoomFromCloud(roomId: string, schoolId?: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.ROOMS, roomId));
+  if (schoolId) {
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId, 'salas', roomId));
+    } catch (e) {
+      console.warn('Warning unlinking room from escola subcollection:', e);
+    }
+  }
 }
 
 /**
@@ -183,6 +229,12 @@ export async function saveReservationWithLockToCloud(
       // 2. Perform writes: update the reservation document
       const resRef = doc(db, COLLECTIONS.RESERVATIONS, reservation.id);
       transaction.set(resRef, reservation);
+
+      // Also link reservation to school's subcollection
+      if (schoolId && schoolId !== 'default') {
+        const escolaResRef = doc(db, COLLECTIONS.ESCOLAS, schoolId, 'reservas', reservation.id);
+        transaction.set(escolaResRef, reservation);
+      }
 
       // 3. Update slot lock documents
       const nowIso = new Date().toISOString();
@@ -260,22 +312,57 @@ export async function saveReservationToCloud(reservation: Reservation): Promise<
 export async function deleteReservationFromCloud(resId: string, reservationData?: Reservation): Promise<void> {
   if (reservationData) {
     await releaseReservationLocksFromCloud(reservationData);
+    if (reservationData.schoolId) {
+      try {
+        await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, reservationData.schoolId, 'reservas', resId));
+      } catch (e) {
+        console.warn('Warning unlinking reservation from escola subcollection:', e);
+      }
+    }
   }
   await deleteDoc(doc(db, COLLECTIONS.RESERVATIONS, resId));
 }
 
 export async function saveAnnouncementToCloud(announcement: Announcement): Promise<void> {
   await setDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcement.id), announcement);
+  if (announcement.schoolId) {
+    try {
+      await setDoc(doc(db, COLLECTIONS.ESCOLAS, announcement.schoolId, 'comunicados', announcement.id), announcement);
+    } catch (e) {
+      console.warn('Warning linking announcement to escola subcollection:', e);
+    }
+  }
 }
 
-export async function deleteAnnouncementFromCloud(annId: string): Promise<void> {
+export async function deleteAnnouncementFromCloud(annId: string, schoolId?: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, annId));
+  if (schoolId) {
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId, 'comunicados', annId));
+    } catch (e) {
+      console.warn('Warning unlinking announcement from escola subcollection:', e);
+    }
+  }
 }
 
 export async function saveUserToCloud(user: User): Promise<void> {
   await setDoc(doc(db, COLLECTIONS.USERS, user.id), user);
+  if (user.schoolId) {
+    try {
+      await setDoc(doc(db, COLLECTIONS.ESCOLAS, user.schoolId, 'usuarios', user.id), user);
+    } catch (e) {
+      console.warn('Warning linking user to escola subcollection:', e);
+    }
+  }
 }
 
-export async function deleteUserFromCloud(userId: string): Promise<void> {
+export async function deleteUserFromCloud(userId: string, schoolId?: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTIONS.USERS, userId));
+  if (schoolId) {
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId, 'usuarios', userId));
+    } catch (e) {
+      console.warn('Warning unlinking user from escola subcollection:', e);
+    }
+  }
 }

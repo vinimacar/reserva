@@ -7,6 +7,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Escolas: Coleção principal em português e subcoleções vinculadas
+    match /escolas/{escolaId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /escolas/{escolaId}/{document=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Schools: Publicly readable for tenant selection, writable for institutional setup
     match /schools/{schoolId} {
       allow read: if true;

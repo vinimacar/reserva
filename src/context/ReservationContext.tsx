@@ -656,9 +656,15 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const updateSchool = (id: string, schoolData: Partial<School>) => {
-    setSchools((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...schoolData } : s))
-    );
+    setSchools((prev) => {
+      const updated = prev.map((s) => (s.id === id ? { ...s, ...schoolData } : s));
+      const targetSchool = updated.find((s) => s.id === id);
+      if (targetSchool) {
+        const schoolRooms = (allRooms || []).filter((r) => r && r.schoolId === id);
+        saveSchoolToCloud(targetSchool, { rooms: schoolRooms }).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   const deleteSchool = (id: string): boolean => {
