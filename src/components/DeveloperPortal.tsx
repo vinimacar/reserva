@@ -71,6 +71,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   const {
     currentUser,
     users,
+    isAdmin,
     isDeveloperMode,
     exitDeveloperMode,
     changePassword,
@@ -426,6 +427,28 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
       };
     }
   };
+
+  // STRICT: Teachers are never allowed into the Developer Portal. Only administrators or active developer mode can access.
+  if (currentUser && !isAdmin && !isDeveloperMode) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4 border border-red-500/30">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Acesso Restrito a Administradores</h2>
+        <p className="text-slate-400 max-w-md mb-6 text-sm">
+          O Console do Desenvolvedor é restrito a administradores e desenvolvedores autorizados. Professores não possuem permissão de acesso.
+        </p>
+        <button
+          type="button"
+          onClick={onBackToApp}
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm cursor-pointer transition-all"
+        >
+          Voltar ao Sistema
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-600 selection:text-white">

@@ -430,7 +430,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
-                      {onOpenSchoolSettings && (
+                      {isAdmin && onOpenSchoolSettings && (
                         <button
                           id="profile-school-settings-btn"
                           onClick={() => {
@@ -472,7 +472,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
-                      {onOpenDeveloperPortal && (
+                      {isAdmin && onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
                           onClick={() => {

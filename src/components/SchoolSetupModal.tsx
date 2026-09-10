@@ -74,7 +74,7 @@ export const SchoolSetupModal: React.FC<SchoolSetupModalProps> = ({
   isFirstTime = false,
 }) => {
   const { settings, updateSettings } = useReservations();
-  const { updateSchoolNameForAllUsers } = useAuth();
+  const { updateSchoolNameForAllUsers, isAdmin } = useAuth();
 
   const [schoolName, setSchoolName] = useState<string>('');
   const [shortName, setShortName] = useState<string>('');
@@ -109,6 +109,31 @@ export const SchoolSetupModal: React.FC<SchoolSetupModalProps> = ({
   }, [isOpen, settings]);
 
   if (!isOpen) return null;
+
+  // STRICT: Teachers must never configure school data. Only administrators have permission.
+  if (!isAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-md w-full text-center border border-slate-200 dark:border-slate-800 shadow-2xl">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+            <Shield className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+            Acesso Restrito à Coordenação
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+            Apenas administradores e coordenadores escolares têm permissão para configurar os dados institucionais da escola. Professores não possuem acesso.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleToggleShift = (shift: ShiftType) => {
     setSelectedShifts((prev) => {

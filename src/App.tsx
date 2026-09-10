@@ -46,9 +46,9 @@ function ReserveAppContent() {
   const [isUserRegistrationModalOpen, setIsUserRegistrationModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [isSchoolSetupModalOpen, setIsSchoolSetupModalOpen] = useState<boolean>(() => {
-    // If not configured in settings and not saved in localStorage, open on first use
+    // Only administrators configure school settings; never teachers
     const isConfiguredInStorage = localStorage.getItem('reserve_school_configured');
-    return !settings.isConfigured && !isConfiguredInStorage;
+    return isAdmin && !settings.isConfigured && !isConfiguredInStorage;
   });
 
   const [selectedSlotData, setSelectedSlotData] = useState<{
@@ -59,13 +59,13 @@ function ReserveAppContent() {
   const [viewingReservation, setViewingReservation] = useState<Reservation | null>(null);
   const [receiptReservation, setReceiptReservation] = useState<Reservation | null>(null);
 
-  // Check if school setup is required on mount or if settings change
+  // Check if school setup is required on mount or if settings change (Administrators only)
   useEffect(() => {
     const isConfiguredInStorage = localStorage.getItem('reserve_school_configured');
-    if (!settings.isConfigured && !isConfiguredInStorage) {
+    if (isAdmin && !settings.isConfigured && !isConfiguredInStorage) {
       setIsSchoolSetupModalOpen(true);
     }
-  }, [settings.isConfigured]);
+  }, [isAdmin, settings.isConfigured]);
 
   // Handlers
   const handleOpenSlotBooking = (roomId: string, date: string, periodId: string) => {
@@ -89,7 +89,8 @@ function ReserveAppContent() {
   const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
   // If Developer Portal is explicitly open or developer mode is active
-  if (showDeveloperPortal || isDeveloperMode) {
+  // STRICT: Only administrators or developer mode can access the Developer Portal. Teachers are never allowed.
+  if ((showDeveloperPortal || isDeveloperMode) && (isAdmin || isDeveloperMode || !currentUser)) {
     return (
       <DeveloperPortal
         onBackToApp={() => {
@@ -142,10 +143,10 @@ function ReserveAppContent() {
         onOpenNewReservation={handleOpenNewReservationGeneral}
         onOpenGoogleLogin={() => setIsGoogleLoginModalOpen(true)}
         onOpenAnnouncements={() => setCurrentView('ANNOUNCEMENTS')}
-        onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
-        onOpenRegisterTeacher={() => setIsUserRegistrationModalOpen(true)}
+        onOpenSchoolSettings={isAdmin ? () => setIsSchoolSetupModalOpen(true) : undefined}
+        onOpenRegisterTeacher={isAdmin ? () => setIsUserRegistrationModalOpen(true) : undefined}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-        onOpenDeveloperPortal={() => setShowDeveloperPortal(true)}
+        onOpenDeveloperPortal={isAdmin ? () => setShowDeveloperPortal(true) : undefined}
         onOpenTutorial={() => setIsTutorialModalOpen(true)}
       />
 
@@ -194,21 +195,27 @@ function ReserveAppContent() {
             <span>Autenticação Google Workspace</span>
             <span className="text-slate-600">•</span>
             <span>Secretaria de Estado de Educação</span>
-            <span className="text-slate-600">•</span>
-            <button
-              type="button"
-              onClick={() => setShowDeveloperPortal(true)}
-              className="text-indigo-400 hover:text-indigo-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <Terminal className="w-3 h-3" />
-              <span>Console Dev</span>
-            </button>
+            {isAdmin && (
+              <>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  id="footer-developer-portal-btn"
+                  onClick={() => setShowDeveloperPortal(true)}
+                  className="text-indigo-400 hover:text-indigo-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Acesso restrito a administradores"
+                >
+                  <Terminal className="w-3 h-3" />
+                  <span>Console Dev</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </footer>
 
       {/* Modals */}
-      {isSchoolSetupModalOpen && (
+      {isAdmin && isSchoolSetupModalOpen && (
         <SchoolSetupModal
           isOpen={isSchoolSetupModalOpen}
           onClose={() => setIsSchoolSetupModalOpen(false)}
