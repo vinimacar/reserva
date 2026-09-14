@@ -14,6 +14,14 @@ import {
   syncAllUsersToFirebaseAuth,
   AuthSyncResult,
 } from '../services/firebaseAuthService';
+import {
+  OWNER_EMAIL,
+  OWNER_NAME,
+  isOwnerEmail,
+  verifyTotpCode,
+  isSession2FAVerified,
+  setSession2FAVerified,
+} from '../services/totp';
 
 export interface LoginResult {
   success: boolean;
@@ -26,11 +34,14 @@ interface AuthContextType {
   users: User[];
   isAdmin: boolean;
   isDeveloperMode: boolean;
+  isOwner: boolean;
+  is2FAVerified: boolean;
   login: (user: User) => void;
   logout: () => void;
   loginWithCredentials: (email: string, password?: string, preferredSchoolId?: string) => LoginResult;
   loginWithGoogleEmail: (email: string, name?: string, schoolId?: string, schoolName?: string) => User;
-  developerLogin: (passphrase: string) => { success: boolean; error?: string };
+  developerLogin: (input: { email?: string; totpCode: string; password?: string } | string) => { success: boolean; error?: string };
+  developerLoginWithGoogle: (googleEmail: string, googleDisplayName?: string) => { success: boolean; error?: string };
   exitDeveloperMode: () => void;
   changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
   toggleRole: () => void;
@@ -99,6 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
   });
+
+  const [is2FAVerified, setIs2FAVerified] = useState<boolean>(() => isSession2FAVerified());
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -172,6 +185,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setCurrentUser(null);
     setIsDeveloperMode(false);
+    setIs2FAVerified(false);
+    setSession2FAVerified(false);
     localStorage.removeItem(STORAGE_KEY_USER);
     localStorage.removeItem(STORAGE_KEY_DEV_MODE);
     signOutFromFirebaseAuth();
@@ -281,6 +296,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (existing) {
       const normalized = normalizeUser(existing);
       setCurrentUser(normalized);
+      if (isOwnerEmail(normalized.email)) {
+        setIsDeveloperMode(true);
+        setIs2FAVerified(true);
+        setSession2FAVerified(true);
+      }
       // Ensure user is in Firebase Auth
       registerInFirebaseAuth(normalized.email, normalized.password, normalized.name).catch((e) =>
         console.warn('Firebase Auth sync note:', e)
@@ -334,49 +354,128 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newUser;
   };
 
-  const developerLogin = (passphrase: string): { success: boolean; error?: string } => {
-    const trimmed = passphrase.trim().toLowerCase();
-    const validKeys = [
-      'devmaster',
-      'developer2026',
-      'master2026#',
-      '2026dev',
-      'dev@reserve',
-      'adminmaster',
-      'dev',
-      'developer'
-    ];
+  const developerLogin = (
+    input: { email?: string; totpCode: string; password?: string } | string
+  ): { success: boolean; error?: string } => {
+    let email = '';
+    let totpCode = '';
+    let password = '';
 
-    if (!validKeys.includes(trimmed)) {
+    if (typeof input === 'string') {
+      totpCode = input.trim();
+      email = currentUser?.email || OWNER_EMAIL;
+    } else {
+      email = (input.email || currentUser?.email || '').trim().toLowerCase();
+      totpCode = (input.totpCode || '').trim();
+      password = (input.password || '').trim();
+    }
+
+    // 1. Strict Owner Check: Only vinicius.machado.carvalho@educacao.mg.gov.br
+    if (!isOwnerEmail(email)) {
       return {
         success: false,
-        error: 'Chave Mestra de Desenvolvedor incorreta. Acesso não autorizado.',
+        error: `Acesso negado: O Console do Desenvolvedor é de acesso exclusivo do proprietário (${OWNER_EMAIL}). O e-mail informado não possui autorização.`,
+      };
+    }
+
+    // 2. Google Authenticator TOTP Code Verification
+    if (!totpCode) {
+      return {
+        success: false,
+        error: 'Informe o código dinâmico de 6 dígitos gerado pelo Google Authenticator.',
+      };
+    }
+
+    const totpValidation = verifyTotpCode(totpCode);
+    if (!totpValidation.success) {
+      return {
+        success: false,
+        error: totpValidation.error || 'Código do Google Authenticator inválido ou expirado.',
+      };
+    }
+
+    // 3. Optional password verification if provided or if not already authenticated
+    if (password) {
+      const validKeys = [
+        'educacao123',
+        'devmaster',
+        'developer2026',
+        'master2026#',
+        '2026dev',
+        'adminmaster',
+      ];
+      if (!validKeys.includes(password.toLowerCase())) {
+        return {
+          success: false,
+          error: 'Senha do proprietário incorreta. Verifique suas credenciais.',
+        };
+      }
+    }
+
+    // 4. Set developer mode and session 2FA authorization
+    setIsDeveloperMode(true);
+    setIs2FAVerified(true);
+    setSession2FAVerified(true);
+
+    // Provide Vinicius Carvalho session
+    const ownerUser: User = users.find((u) => isOwnerEmail(u.email)) || normalizeUser({
+      id: 'user_vinicius',
+      name: OWNER_NAME,
+      email: OWNER_EMAIL,
+      avatar: 'icon:tech',
+      iconKey: 'icon:tech',
+      password: 'educacao123',
+      role: 'ADMIN',
+      gender: 'MALE',
+      schoolId: DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos',
+      schoolName: 'E.E. Governador Milton Campos',
+      subject: 'Tecnologia & Robótica',
+    });
+
+    setCurrentUser(ownerUser);
+    return { success: true };
+  };
+
+  const developerLoginWithGoogle = (
+    googleEmail: string,
+    googleDisplayName?: string
+  ): { success: boolean; error?: string } => {
+    const cleanEmail = (googleEmail || '').trim().toLowerCase();
+
+    // STRICT: Only vinicius.machado.carvalho@educacao.mg.gov.br is authorized
+    if (!isOwnerEmail(cleanEmail)) {
+      return {
+        success: false,
+        error: `Acesso negado: O Console do Desenvolvedor é de uso estritamente exclusivo do usuário ${OWNER_EMAIL}. A conta Google conectada (${cleanEmail}) não possui autorização.`,
       };
     }
 
     setIsDeveloperMode(true);
+    setIs2FAVerified(true);
+    setSession2FAVerified(true);
 
-    // Provide developer master session
-    const devUser: User = normalizeUser({
-      id: 'user_master_developer',
-      name: 'Desenvolvedor Master',
-      email: 'dev@reserve.sistema.gov.br',
+    const ownerUser: User = users.find((u) => isOwnerEmail(u.email)) || normalizeUser({
+      id: 'user_vinicius',
+      name: googleDisplayName || OWNER_NAME,
+      email: OWNER_EMAIL,
       avatar: 'icon:tech',
       iconKey: 'icon:tech',
-      password: 'devmaster2026#',
+      password: 'educacao123',
       role: 'ADMIN',
       gender: 'MALE',
       schoolId: DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos',
-      schoolName: 'Ambiente Master de Desenvolvimento',
-      subject: 'Arquiteto de Software & Infraestrutura',
+      schoolName: 'E.E. Governador Milton Campos',
+      subject: 'Tecnologia & Robótica',
     });
 
-    setCurrentUser(devUser);
+    setCurrentUser(ownerUser);
     return { success: true };
   };
 
   const exitDeveloperMode = () => {
     setIsDeveloperMode(false);
+    setIs2FAVerified(false);
+    setSession2FAVerified(false);
     localStorage.removeItem(STORAGE_KEY_DEV_MODE);
   };
 
@@ -570,11 +669,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         users,
         isAdmin: currentUser?.role === 'ADMIN',
         isDeveloperMode,
+        isOwner: isOwnerEmail(currentUser?.email),
+        is2FAVerified,
         login,
         logout,
         loginWithCredentials,
         loginWithGoogleEmail,
         developerLogin,
+        developerLoginWithGoogle,
         exitDeveloperMode,
         changePassword,
         toggleRole,

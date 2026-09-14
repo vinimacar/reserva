@@ -95,17 +95,17 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col transition-colors">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[94vh] sm:max-h-[90vh] transition-colors">
         {/* Header */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+        <div className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Detalhes do Agendamento</h3>
-              <p className="text-xs text-slate-400 font-mono">ID: {reservation.id.slice(0, 14)}</p>
+              <h3 className="text-sm sm:text-base font-bold text-white">Detalhes do Agendamento</h3>
+              <p className="text-[11px] text-slate-400 font-mono">ID: {reservation.id.slice(0, 14)}</p>
             </div>
           </div>
           <button
@@ -117,7 +117,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto max-h-[80vh]">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 text-xs text-slate-700 dark:text-slate-300 overflow-y-auto">
           {/* Status & Lab header banner */}
           <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700">
             <div>
@@ -396,14 +396,14 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-slate-50 dark:bg-slate-850 px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0 transition-colors">
-          <div className="flex items-center space-x-2">
+        <div className="bg-slate-50 dark:bg-slate-850 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0 transition-colors">
+          <div className="flex items-center justify-between sm:justify-start space-x-2">
             <button
               onClick={() => {
                 onOpenReceipt(reservation);
                 onClose();
               }}
-              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs shadow-xs transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               <span>Imprimir Comprovante</span>
@@ -412,7 +412,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
             {isAdmin && (
               <button
                 onClick={() => setShowDeletePrompt(true)}
-                className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors cursor-pointer"
+                className="p-2.5 sm:p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors cursor-pointer shrink-0"
                 title="Excluir Permanentemente (Admin)"
               >
                 <Trash2 className="w-4 h-4" />
@@ -420,18 +420,18 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
             )}
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {isAdmin && reservation.status === 'PENDING' && !showRejectPrompt && (
               <>
                 <button
                   onClick={() => setShowRejectPrompt(true)}
-                  className="px-3.5 py-2 rounded-xl bg-red-100 dark:bg-red-950 hover:bg-red-200 dark:hover:bg-red-900 text-red-800 dark:text-red-200 font-bold text-xs transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial px-3.5 py-2.5 sm:py-2 rounded-xl bg-red-100 dark:bg-red-950 hover:bg-red-200 dark:hover:bg-red-900 text-red-800 dark:text-red-200 font-bold text-xs transition-colors cursor-pointer text-center"
                 >
                   Recusar
                 </button>
                 <button
                   onClick={handleApprove}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-initial px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow transition-colors cursor-pointer text-center"
                 >
                   Aprovar Reserva
                 </button>
@@ -441,7 +441,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
             {canManage && reservation.status !== 'CANCELLED' && !showCancelPrompt && (
               <button
                 onClick={() => setShowCancelPrompt(true)}
-                className="px-4 py-2 rounded-xl bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 font-bold text-xs border border-red-200 dark:border-red-800 transition-colors cursor-pointer"
+                className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 rounded-xl bg-red-50 dark:bg-red-950/50 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 font-bold text-xs border border-red-200 dark:border-red-800 transition-colors cursor-pointer text-center"
               >
                 Cancelar Reserva
               </button>
@@ -449,7 +449,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
 
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2.5 sm:py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors cursor-pointer text-center"
             >
               Fechar
             </button>

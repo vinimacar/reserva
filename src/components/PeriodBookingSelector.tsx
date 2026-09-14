@@ -103,18 +103,21 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 dark:bg-slate-850 rounded-xl">
+        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 p-1 bg-slate-200/80 dark:bg-slate-850 rounded-xl">
           <button
             type="button"
             onClick={() => setBookingType('SINGLE')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 sm:py-1.5 px-1.5 sm:px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               bookingType === 'SINGLE'
                 ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Calendar className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Dia Único</span>
+            <span className="truncate">
+              <span className="hidden sm:inline">Dia Único</span>
+              <span className="sm:hidden">Único</span>
+            </span>
           </button>
 
           <button
@@ -125,27 +128,33 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
                 setEndDate(addDaysToISO(startDate, 7));
               }
             }}
-            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 sm:py-1.5 px-1.5 sm:px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               bookingType === 'DATE_RANGE'
                 ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <CalendarRange className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Intervalo / Período</span>
+            <span className="truncate">
+              <span className="hidden sm:inline">Intervalo</span>
+              <span className="sm:hidden">Período</span>
+            </span>
           </button>
 
           <button
             type="button"
             onClick={() => setBookingType('RECURRING')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 sm:py-1.5 px-1.5 sm:px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
               bookingType === 'RECURRING'
                 ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Repeat className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Recorrência</span>
+            <span className="truncate">
+              <span className="hidden sm:inline">Recorrência</span>
+              <span className="sm:hidden">Semanal</span>
+            </span>
           </button>
         </div>
       </div>

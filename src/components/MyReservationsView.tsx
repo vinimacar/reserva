@@ -102,9 +102,9 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Banner with Teacher Profile & Quick Metrics */}
-      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 sm:space-x-4">
             <TeacherAvatar
               avatar={currentUser.avatar}
               name={currentUser.name}
@@ -113,36 +113,36 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
               size="lg"
               showRoleBadge={true}
             />
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h2 className="text-lg font-black text-white">{currentUser.name}</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-200 border border-blue-400/30">
+                <h2 className="text-base sm:text-lg font-black text-white truncate">{currentUser.name}</h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/30 text-blue-200 border border-blue-400/30 shrink-0">
                   {currentUser.role === 'ADMIN' ? 'Coordenador / Admin' : 'Docente'}
                 </span>
               </div>
-              <p className="text-xs text-blue-200/80 mt-0.5">{currentUser.email}</p>
-              <p className="text-[11px] text-slate-300 mt-1 font-medium">
+              <p className="text-xs text-blue-200/80 mt-0.5 truncate">{currentUser.email}</p>
+              <p className="text-[11px] text-slate-300 mt-1 font-medium truncate">
                 📚 Disciplina principal: <span className="text-white font-bold">{currentUser.subject || 'Geral'}</span>
               </p>
             </div>
           </div>
 
           {/* Quick Counter Badges & Action */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 bg-white/10 p-2 rounded-2xl border border-white/10 backdrop-blur-xs">
-              <div className="px-3 py-1 text-center border-r border-white/10">
-                <p className="text-lg font-black text-white leading-tight">{upcomingCount}</p>
-                <p className="text-[10px] text-blue-200 font-semibold uppercase">Próximas</p>
+          <div className="flex items-center justify-between sm:justify-end space-x-2.5 sm:space-x-3 w-full md:w-auto">
+            <div className="flex items-center space-x-2 bg-white/10 p-1.5 sm:p-2 rounded-2xl border border-white/10 backdrop-blur-xs">
+              <div className="px-2.5 sm:px-3 py-1 text-center border-r border-white/10">
+                <p className="text-base sm:text-lg font-black text-white leading-tight">{upcomingCount}</p>
+                <p className="text-[9px] sm:text-[10px] text-blue-200 font-semibold uppercase">Próximas</p>
               </div>
-              <div className="px-3 py-1 text-center">
-                <p className="text-lg font-black text-white leading-tight">{pastCount}</p>
-                <p className="text-[10px] text-blue-200 font-semibold uppercase">Realizadas</p>
+              <div className="px-2.5 sm:px-3 py-1 text-center">
+                <p className="text-base sm:text-lg font-black text-white leading-tight">{pastCount}</p>
+                <p className="text-[9px] sm:text-[10px] text-blue-200 font-semibold uppercase">Realizadas</p>
               </div>
             </div>
 
             <button
               onClick={onOpenNewReservation}
-              className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs px-4 py-3 rounded-2xl shadow-lg shadow-blue-500/30 transition-all active:scale-95 cursor-pointer shrink-0"
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-blue-500 hover:bg-blue-400 text-white font-bold text-xs px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl shadow-lg shadow-blue-500/30 transition-all active:scale-95 cursor-pointer shrink-0"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Nova Reserva</span>
@@ -152,12 +152,12 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
       </div>
 
       {/* Filter Tabs & Search */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 transition-colors">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-4 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-colors">
         {/* Tabs */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs w-full sm:w-auto">
+        <div className="flex items-center overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs w-full sm:w-auto">
           <button
             onClick={() => setFilterTab('UPCOMING')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition-all ${
+            className={`shrink-0 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
               filterTab === 'UPCOMING'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -167,7 +167,7 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
           </button>
           <button
             onClick={() => setFilterTab('ALL')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition-all ${
+            className={`shrink-0 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
               filterTab === 'ALL'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -177,7 +177,7 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
           </button>
           <button
             onClick={() => setFilterTab('PAST')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition-all ${
+            className={`shrink-0 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
               filterTab === 'PAST'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
@@ -187,7 +187,7 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
           </button>
           <button
             onClick={() => setFilterTab('CANCELLED')}
-            className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg font-bold transition-all ${
+            className={`shrink-0 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
               filterTab === 'CANCELLED'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'

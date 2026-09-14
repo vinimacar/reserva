@@ -25,6 +25,8 @@ import {
   Edit2,
   Shield,
   UserCheck,
+  Smartphone,
+  Layers,
 } from 'lucide-react';
 import { Room, TimePeriod, Reservation, ShiftType } from '../types';
 import { useReservations } from '../context/ReservationContext';
@@ -59,6 +61,18 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [showRoomInfo, setShowRoomInfo] = useState<boolean>(false);
   const [isEditRoomModalOpen, setIsEditRoomModalOpen] = useState<boolean>(false);
+
+  // Mobile day view state: selectedDayIndex (0 = Seg, 1 = Ter, 2 = Qua, 3 = Qui, 4 = Sex)
+  const getInitialDayIndex = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 is Sunday, 1 is Monday... 5 is Friday
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      return dayOfWeek - 1;
+    }
+    return 0; // default to Monday
+  };
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(getInitialDayIndex());
+  const [mobileViewMode, setMobileViewMode] = useState<'DAY' | 'WEEK'>('DAY');
 
   // Helper to get week dates (Monday to Friday)
   const getWeekDates = (offset: number) => {
@@ -165,7 +179,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-6 gap-2 overflow-x-auto no-scrollbar pb-1">
             {rooms.map((room) => {
               const isSelected = room.id === selectedRoomId;
               const isMaintenance = room.status === 'MAINTENANCE';
@@ -175,7 +189,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                   key={room.id}
                   id={`room-tab-${room.id}`}
                   onClick={() => setSelectedRoomId(room.id)}
-                  className={`relative flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`relative flex flex-col items-start p-3 rounded-xl border text-left transition-all cursor-pointer shrink-0 w-36 sm:w-auto ${
                     isSelected
                       ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-600 dark:border-blue-500 shadow-sm ring-1 ring-blue-600 dark:ring-blue-500'
                       : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
@@ -331,9 +345,9 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
       )}
 
       {/* 2. Week Controls & Shift Filters */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-4 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors">
         {/* Week Navigator */}
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2">
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-1 border border-slate-200 dark:border-slate-700">
             <button
               id="prev-week-btn"
@@ -346,7 +360,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             <button
               id="today-btn"
               onClick={() => setWeekOffset(0)}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+              className={`px-2.5 sm:px-3 py-1 text-xs font-bold rounded-lg transition-all ${
                 weekOffset === 0
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
@@ -366,17 +380,17 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
 
           <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
             <CalendarIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            <span>{formattedWeekRange}</span>
+            <span className="truncate">{formattedWeekRange}</span>
           </div>
         </div>
 
         {/* Shift Filter & Search */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Shift Filter Tabs */}
-          <div className="flex flex-wrap items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+          <div className="flex overflow-x-auto no-scrollbar items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
             <button
               onClick={() => setSelectedShift('ALL')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 selectedShift === 'ALL'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -386,7 +400,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             </button>
             <button
               onClick={() => setSelectedShift('MANHA')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 selectedShift === 'MANHA'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -396,7 +410,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             </button>
             <button
               onClick={() => setSelectedShift('TARDE')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 selectedShift === 'TARDE'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -406,7 +420,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             </button>
             <button
               onClick={() => setSelectedShift('NOITE')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 selectedShift === 'NOITE'
                   ? 'bg-purple-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -416,7 +430,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             </button>
             <button
               onClick={() => setSelectedShift('INTEGRAL')}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-all ${
+              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
                 selectedShift === 'INTEGRAL'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -434,7 +448,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
               placeholder="Buscar prof., turma ou matéria..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 w-44 sm:w-56"
+              className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 w-full sm:w-56"
             />
             {searchQuery && (
               <button
@@ -448,14 +462,310 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
         </div>
       </div>
 
-      {/* 3. The Interactive Schedule Matrix */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors">
+      {/* Mobile View Toggle Bar (Only on mobile < md) */}
+      <div className="md:hidden flex items-center justify-between bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+        <button
+          type="button"
+          onClick={() => setMobileViewMode('DAY')}
+          className={`flex-1 py-2 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+            mobileViewMode === 'DAY'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Smartphone className="w-3.5 h-3.5" />
+          <span>Visão por Dia (Diária)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileViewMode('WEEK')}
+          className={`flex-1 py-2 rounded-lg font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+            mobileViewMode === 'WEEK'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Grade Semanal</span>
+        </button>
+      </div>
+
+      {/* Mobile Day View (Rendered when mobileViewMode is DAY) */}
+      {mobileViewMode === 'DAY' && (
+        <div className="md:hidden space-y-3">
+          {/* Day Selector Pills */}
+          <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700">
+            {weekDays.map((d, idx) => {
+              const isSelected = idx === selectedDayIndex;
+              const dayReservations = reservations.filter(
+                (r) => r.roomId === selectedRoomId && r.date === d.date && r.status !== 'CANCELLED'
+              );
+              const hasMyBooking = currentUser && dayReservations.some((r) => r.userId === currentUser.id);
+
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  onClick={() => setSelectedDayIndex(idx)}
+                  className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-500'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-tight">{d.shortName}</span>
+                  <span className={`text-sm font-black my-0.5 ${isSelected ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                    {d.displayDate.split(' ')[0]}
+                  </span>
+                  {d.isToday && (
+                    <span className={`text-[8px] font-bold px-1 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-blue-600 text-white'}`}>
+                      Hoje
+                    </span>
+                  )}
+                  {/* Indicator dots */}
+                  <div className="flex items-center space-x-1 mt-0.5">
+                    {hasMyBooking && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-blue-500'}`} title="Você tem reserva neste dia" />
+                    )}
+                    {dayReservations.length > 0 && !hasMyBooking && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white/60' : 'bg-slate-400'}`} />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected Day Header with Prev/Next Navigation */}
+          {(() => {
+            const curDay = weekDays[selectedDayIndex] || weekDays[0];
+            const curDayReservations = reservations.filter(
+              (r) => r.roomId === selectedRoomId && r.date === curDay.date && r.status !== 'CANCELLED'
+            );
+
+            const handlePrevDay = () => {
+              if (selectedDayIndex > 0) {
+                setSelectedDayIndex(selectedDayIndex - 1);
+              } else {
+                setWeekOffset((prev) => prev - 1);
+                setSelectedDayIndex(4);
+              }
+            };
+
+            const handleNextDay = () => {
+              if (selectedDayIndex < 4) {
+                setSelectedDayIndex(selectedDayIndex + 1);
+              } else {
+                setWeekOffset((prev) => prev + 1);
+                setSelectedDayIndex(0);
+              }
+            };
+
+            return (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrevDay}
+                  className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  title="Dia Anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <div className="text-center min-w-0 flex-1">
+                  <div className="flex items-center justify-center space-x-1.5">
+                    <p className="text-sm font-black text-slate-900 dark:text-white truncate">
+                      {curDay.dayName}
+                    </p>
+                    {curDay.isToday && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-600 text-white shrink-0">
+                        Hoje
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {curDay.displayDate} • {curDayReservations.length} horário(s) agendado(s)
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleNextDay}
+                  className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  title="Próximo Dia"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Selected Day Periods List */}
+          {(() => {
+            const curDay = weekDays[selectedDayIndex] || weekDays[0];
+
+            return (
+              <div className="space-y-3">
+                {activeShifts.map((shift) => {
+                  const shiftPeriods = periods.filter((p) => p.shift === shift);
+                  if (shiftPeriods.length === 0) return null;
+
+                  const shiftTitle =
+                    shift === 'MANHA'
+                      ? '☀️ Turno da Manhã'
+                      : shift === 'TARDE'
+                      ? '🌤️ Turno da Tarde'
+                      : shift === 'NOITE'
+                      ? '🌙 Turno da Noite'
+                      : '🕒 Tempo Integral';
+
+                  return (
+                    <div
+                      key={`mobile-shift-${shift}`}
+                      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs"
+                    >
+                      <div className="bg-slate-100/90 dark:bg-slate-800/90 px-3.5 py-2 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                        <span>{shiftTitle}</span>
+                        <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                          {shiftPeriods[0]?.startTime} às {shiftPeriods[shiftPeriods.length - 1]?.endTime}
+                        </span>
+                      </div>
+
+                      <div className="p-2.5 space-y-2">
+                        {shiftPeriods.map((period) => {
+                          const showInterval =
+                            (shift === 'MANHA' && period.number === 3) ||
+                            (shift === 'TARDE' && period.number === 3) ||
+                            (shift === 'INTEGRAL' && (period.number === 3 || period.number === 5 || period.number === 7));
+
+                          const slotReservation = reservations.find(
+                            (r) =>
+                              r.roomId === selectedRoomId &&
+                              r.date === curDay.date &&
+                              r.status !== 'CANCELLED' &&
+                              r.periodIds.includes(period.id)
+                          );
+
+                          const isUserReservation =
+                            currentUser && slotReservation?.userId === currentUser.id;
+
+                          return (
+                            <React.Fragment key={`mobile-period-${period.id}`}>
+                              {slotReservation ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectReservation(slotReservation)}
+                                  className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                                    isUserReservation
+                                      ? 'bg-blue-50/90 dark:bg-blue-950/60 border-blue-500 shadow-sm'
+                                      : 'bg-indigo-50/70 dark:bg-slate-800/80 border-indigo-200 dark:border-slate-700'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-xs font-black text-slate-800 dark:text-slate-200">
+                                        {period.name}
+                                      </span>
+                                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                                        ({period.startTime} - {period.endTime})
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-1.5 shrink-0">
+                                      <span className="text-xs font-black px-2 py-0.5 rounded-lg bg-blue-600 text-white">
+                                        {slotReservation.turma}
+                                      </span>
+                                      {isUserReservation && (
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-900">
+                                          Sua
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                    {slotReservation.disciplina}
+                                  </p>
+
+                                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-300">
+                                    <div className="flex items-center space-x-1.5 truncate">
+                                      <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                      <span className="truncate font-semibold">{slotReservation.userName}</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 ml-2">
+                                      Ver Detalhes ›
+                                    </span>
+                                  </div>
+
+                                  {slotReservation.requestedEquipment && slotReservation.requestedEquipment.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {slotReservation.requestedEquipment.map((eq, i) => (
+                                        <span
+                                          key={i}
+                                          className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium"
+                                        >
+                                          {eq}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectSlot(selectedRoomId, curDay.date, period.id)}
+                                  className="w-full text-left p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all cursor-pointer min-h-[50px] flex items-center justify-between"
+                                >
+                                  <div>
+                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mr-2">
+                                      {period.name}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                                      {period.startTime} - {period.endTime}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                    <Plus className="w-4 h-4" />
+                                    <span>Disponível</span>
+                                  </div>
+                                </button>
+                              )}
+
+                              {showInterval && (
+                                <div className="py-2 px-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-center text-xs text-amber-900 dark:text-amber-300 font-medium flex items-center justify-center space-x-1.5">
+                                  <span>☕</span>
+                                  <span>
+                                    {shift === 'INTEGRAL' && period.number === 5
+                                      ? 'Horário de Almoço & Tutoria Pedagógica'
+                                      : 'Intervalo Escolar / Recreio'}
+                                  </span>
+                                </div>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* 3. The Interactive Schedule Matrix (Desktop OR Mobile Week Mode) */}
+      <div className={`${mobileViewMode === 'DAY' ? 'hidden md:block' : 'block'} bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800 overflow-hidden transition-colors`}>
+        {/* Mobile Swipe Hint */}
+        <div className="md:hidden p-2 bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 text-xs flex items-center justify-center space-x-1 border-b border-blue-200 dark:border-blue-900/60 font-medium">
+          <span>👉 Deslize para os lados para visualizar todos os dias</span>
+        </div>
+
         {/* Table Header with Weekdays */}
         <div className="overflow-x-auto">
           <div className="min-w-[780px]">
             <div className="grid grid-cols-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 text-slate-800 dark:text-slate-200">
               {/* Horário Column Header */}
-              <div className="p-3 text-center border-r border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+              <div className="p-3 text-center border-r border-slate-200 dark:border-slate-800 flex flex-col justify-center sticky left-0 z-20 bg-slate-50 dark:bg-slate-800 shadow-xs">
                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Horário / Aula</span>
                 <span className="text-[10px] text-slate-400 font-medium">Turno Escolar</span>
               </div>
@@ -516,7 +826,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                       <React.Fragment key={period.id}>
                         <div className="grid grid-cols-6 border-b border-slate-100 dark:border-slate-800/60 last:border-b-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                           {/* Period Title & Time */}
-                          <div className="p-2.5 border-r border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-850 flex flex-col justify-center items-center text-center">
+                          <div className="p-2.5 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col justify-center items-center text-center sticky left-0 z-10 shadow-xs">
                             <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{period.name}</span>
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
                               {period.startTime} - {period.endTime}
@@ -617,7 +927,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                         {/* Interval / Recreio Row */}
                         {showInterval && (
                           <div className="grid grid-cols-6 bg-amber-50/50 dark:bg-amber-950/40 border-b border-amber-200/60 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-[11px] font-semibold py-1">
-                            <div className="p-1 text-center font-mono text-[10px] text-amber-700 dark:text-amber-400">
+                            <div className="p-1 text-center font-mono text-[10px] text-amber-700 dark:text-amber-400 sticky left-0 z-10 bg-amber-50 dark:bg-amber-950 shadow-xs">
                               {shift === 'MANHA'
                                 ? '09:30 - 09:50'
                                 : shift === 'TARDE'

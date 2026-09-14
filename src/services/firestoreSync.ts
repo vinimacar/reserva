@@ -8,6 +8,8 @@ import {
   onSnapshot,
   writeBatch,
   runTransaction,
+  OperationType,
+  handleFirestoreError,
 } from './firebase';
 import { School, Room, Reservation, Announcement, User } from '../types';
 
@@ -95,7 +97,13 @@ export function subscribeToSchools(callback: (schools: School[]) => void) {
         }).catch(() => {});
       }
     },
-    (err) => console.warn('Firestore escolas listener error:', err)
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.ESCOLAS);
+      } else {
+        console.warn('Firestore escolas listener notice:', err);
+      }
+    }
   );
 }
 
@@ -107,7 +115,13 @@ export function subscribeToRooms(callback: (rooms: Room[]) => void) {
       snapshot.forEach((d) => list.push(d.data() as Room));
       callback(list);
     },
-    (err) => console.warn('Firestore rooms listener error:', err)
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.ROOMS);
+      } else {
+        console.warn('Firestore rooms listener notice:', err);
+      }
+    }
   );
 }
 
@@ -119,7 +133,13 @@ export function subscribeToReservations(callback: (reservations: Reservation[]) 
       snapshot.forEach((d) => list.push(d.data() as Reservation));
       callback(list);
     },
-    (err) => console.warn('Firestore reservations listener error:', err)
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.RESERVATIONS);
+      } else {
+        console.warn('Firestore reservations listener notice:', err);
+      }
+    }
   );
 }
 
@@ -131,7 +151,13 @@ export function subscribeToAnnouncements(callback: (announcements: Announcement[
       snapshot.forEach((d) => list.push(d.data() as Announcement));
       callback(list);
     },
-    (err) => console.warn('Firestore announcements listener error:', err)
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.ANNOUNCEMENTS);
+      } else {
+        console.warn('Firestore announcements listener notice:', err);
+      }
+    }
   );
 }
 
@@ -143,24 +169,64 @@ export function subscribeToUsers(callback: (users: User[]) => void) {
       snapshot.forEach((d) => list.push(d.data() as User));
       callback(list);
     },
-    (err) => console.warn('Firestore users listener error:', err)
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.USERS);
+      } else {
+        console.warn('Firestore users listener notice:', err);
+      }
+    }
   );
+}
+
+// Sanitize any undefined values before sending to Firestore to avoid 'Unsupported field value: undefined' errors
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === undefined) {
+    return null as any;
+  }
+  if (data === null || typeof data !== 'object') {
+    return data;
+  }
+  if (data instanceof Date) {
+    return data.toISOString() as any;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as any;
+  }
+  const cleanObj: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      cleanObj[key] = sanitizeForFirestore(value);
+    }
+  }
+  return cleanObj as T;
 }
 
 // 3. Document write helpers
 export async function saveSchoolToCloud(school: School, extraData?: { rooms?: Room[]; users?: User[] }): Promise<void> {
-  const payload = {
-    ...school,
+  const cleanSchool = sanitizeForFirestore(school);
+  const payload = sanitizeForFirestore({
+    ...cleanSchool,
     ultimaAtualizacao: new Date().toISOString(),
     ...(extraData?.rooms ? { salas: extraData.rooms, totalSalas: extraData.rooms.length } : {}),
     ...(extraData?.users ? { usuarios: extraData.users, totalUsuarios: extraData.users.length } : {}),
-  };
+  });
 
-  // Write to both 'escolas' and 'schools' collections
-  await Promise.all([
-    setDoc(doc(db, COLLECTIONS.ESCOLAS, school.id), payload, { merge: true }),
-    setDoc(doc(db, COLLECTIONS.SCHOOLS, school.id), school),
-  ]);
+  try {
+    // Write to both 'escolas' and 'schools' collections with merge: true
+    await Promise.all([
+      setDoc(doc(db, COLLECTIONS.ESCOLAS, cleanSchool.id), payload, { merge: true }),
+      setDoc(doc(db, COLLECTIONS.SCHOOLS, cleanSchool.id), cleanSchool, { merge: true }),
+    ]);
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('permission') || (err as any).code === 'permission-denied')) {
+      handleFirestoreError(err, OperationType.WRITE, `${COLLECTIONS.ESCOLAS}/${cleanSchool.id}`);
+    }
+    console.error('Error in saveSchoolToCloud:', err);
+    throw err;
+  }
 }
 
 export async function deleteSchoolFromCloud(schoolId: string): Promise<void> {
@@ -171,14 +237,23 @@ export async function deleteSchoolFromCloud(schoolId: string): Promise<void> {
 }
 
 export async function saveRoomToCloud(room: Room): Promise<void> {
-  // Save to root rooms collection and link to escola subcollection
-  await setDoc(doc(db, COLLECTIONS.ROOMS, room.id), room);
-  if (room.schoolId) {
-    try {
-      await setDoc(doc(db, COLLECTIONS.ESCOLAS, room.schoolId, 'salas', room.id), room);
-    } catch (e) {
-      console.warn('Warning linking room to escola subcollection:', e);
+  const cleanRoom = sanitizeForFirestore(room);
+  try {
+    // Save to root rooms collection and link to escola subcollection
+    await setDoc(doc(db, COLLECTIONS.ROOMS, cleanRoom.id), cleanRoom, { merge: true });
+    if (cleanRoom.schoolId) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.ESCOLAS, cleanRoom.schoolId, 'salas', cleanRoom.id), cleanRoom, { merge: true });
+      } catch (e) {
+        console.warn('Warning linking room to escola subcollection:', e);
+      }
     }
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('permission') || (err as any).code === 'permission-denied')) {
+      handleFirestoreError(err, OperationType.WRITE, `${COLLECTIONS.ROOMS}/${cleanRoom.id}`);
+    }
+    console.error('Error in saveRoomToCloud:', err);
+    throw err;
   }
 }
 
@@ -190,6 +265,57 @@ export async function deleteRoomFromCloud(roomId: string, schoolId?: string): Pr
     } catch (e) {
       console.warn('Warning unlinking room from escola subcollection:', e);
     }
+  }
+}
+
+export async function saveAnnouncementToCloud(announcement: Announcement): Promise<void> {
+  const cleanAnn = sanitizeForFirestore(announcement);
+  try {
+    await setDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, cleanAnn.id), cleanAnn, { merge: true });
+    if (cleanAnn.schoolId) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.ESCOLAS, cleanAnn.schoolId, 'comunicados', cleanAnn.id), cleanAnn, { merge: true });
+      } catch (e) {
+        console.warn('Warning linking announcement to escola subcollection:', e);
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('permission') || (err as any).code === 'permission-denied')) {
+      handleFirestoreError(err, OperationType.WRITE, `${COLLECTIONS.ANNOUNCEMENTS}/${cleanAnn.id}`);
+    }
+    console.error('Error in saveAnnouncementToCloud:', err);
+    throw err;
+  }
+}
+
+export async function deleteAnnouncementFromCloud(announcementId: string, schoolId?: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcementId));
+  if (schoolId) {
+    try {
+      await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId, 'comunicados', announcementId));
+    } catch (e) {
+      console.warn('Warning unlinking announcement from escola subcollection:', e);
+    }
+  }
+}
+
+export async function saveUserToCloud(user: User): Promise<void> {
+  const cleanUser = sanitizeForFirestore(user);
+  try {
+    await setDoc(doc(db, COLLECTIONS.USERS, cleanUser.id), cleanUser, { merge: true });
+    if (cleanUser.schoolId) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.ESCOLAS, cleanUser.schoolId, 'usuarios', cleanUser.id), cleanUser, { merge: true });
+      } catch (e) {
+        console.warn('Warning linking user to escola subcollection:', e);
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('permission') || (err as any).code === 'permission-denied')) {
+      handleFirestoreError(err, OperationType.WRITE, `${COLLECTIONS.USERS}/${cleanUser.id}`);
+    }
+    console.error('Error in saveUserToCloud:', err);
+    throw err;
   }
 }
 
@@ -321,39 +447,6 @@ export async function deleteReservationFromCloud(resId: string, reservationData?
     }
   }
   await deleteDoc(doc(db, COLLECTIONS.RESERVATIONS, resId));
-}
-
-export async function saveAnnouncementToCloud(announcement: Announcement): Promise<void> {
-  await setDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, announcement.id), announcement);
-  if (announcement.schoolId) {
-    try {
-      await setDoc(doc(db, COLLECTIONS.ESCOLAS, announcement.schoolId, 'comunicados', announcement.id), announcement);
-    } catch (e) {
-      console.warn('Warning linking announcement to escola subcollection:', e);
-    }
-  }
-}
-
-export async function deleteAnnouncementFromCloud(annId: string, schoolId?: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTIONS.ANNOUNCEMENTS, annId));
-  if (schoolId) {
-    try {
-      await deleteDoc(doc(db, COLLECTIONS.ESCOLAS, schoolId, 'comunicados', annId));
-    } catch (e) {
-      console.warn('Warning unlinking announcement from escola subcollection:', e);
-    }
-  }
-}
-
-export async function saveUserToCloud(user: User): Promise<void> {
-  await setDoc(doc(db, COLLECTIONS.USERS, user.id), user);
-  if (user.schoolId) {
-    try {
-      await setDoc(doc(db, COLLECTIONS.ESCOLAS, user.schoolId, 'usuarios', user.id), user);
-    } catch (e) {
-      console.warn('Warning linking user to escola subcollection:', e);
-    }
-  }
 }
 
 export async function deleteUserFromCloud(userId: string, schoolId?: string): Promise<void> {

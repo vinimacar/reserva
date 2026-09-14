@@ -164,7 +164,7 @@ export const AdminSchoolsTab: React.FC<{
     setIsSchoolModalOpen(true);
   };
 
-  const handleSaveSchoolSubmit = (e: React.FormEvent) => {
+  const handleSaveSchoolSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -191,7 +191,7 @@ export const AdminSchoolsTab: React.FC<{
       });
       onShowToast(`Dados da escola "${formData.name}" atualizados com sucesso!`);
     } else {
-      const created = addSchool(
+      const created = await addSchool(
         {
           name: formData.name.trim(),
           shortName: formData.shortName.trim() || formData.name.trim().split('-')[0],

@@ -51,21 +51,22 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-300 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col print:shadow-none print:border-none print:w-full print:max-w-none">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-300 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[94vh] sm:max-h-[90vh] print:shadow-none print:border-none print:w-full print:max-w-none">
         {/* Header - Screen only */}
-        <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between print:hidden">
+        <div className="bg-slate-900 text-white px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between print:hidden shrink-0">
           <div className="flex items-center space-x-2">
-            <School className="w-5 h-5 text-blue-400" />
-            <h3 className="text-sm font-bold text-white">Comprovante de Agendamento Escolar</h3>
+            <School className="w-5 h-5 text-blue-400 shrink-0" />
+            <h3 className="text-xs sm:text-sm font-bold text-white truncate">Comprovante de Agendamento</h3>
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
-              <span>Imprimir Ficha</span>
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Imprimir Ficha</span>
+              <span className="sm:hidden">Imprimir</span>
             </button>
             <button
               onClick={onClose}
@@ -77,7 +78,7 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
         </div>
 
         {/* Printable Voucher Paper */}
-        <div id="printable-voucher" className="p-8 space-y-6 text-slate-800 bg-white">
+        <div id="printable-voucher" className="p-4 sm:p-8 space-y-4 sm:space-y-6 text-slate-800 bg-white overflow-y-auto">
           {/* Official Letterhead */}
           <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
             <div className="space-y-1">

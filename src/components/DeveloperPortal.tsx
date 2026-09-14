@@ -51,6 +51,13 @@ import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
 import { clearCloudDatabase } from '../services/firestoreSync';
 import {
+  OWNER_EMAIL,
+  OWNER_NAME,
+  isOwnerEmail,
+  isSession2FAVerified,
+} from '../services/totp';
+import { DeveloperAuthModal } from './DeveloperAuthModal';
+import {
   School,
   ShiftType,
   RoomPackageType,
@@ -100,6 +107,8 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   const [activeTab, setActiveTab] = useState<
     'ONBOARDING' | 'CLIENTS_LIST' | 'ADMINS_CREDENTIALS' | 'BACKUP_TOOLS' | 'DOCS'
   >('ONBOARDING');
+
+  const [isOwnerAuthModalOpen, setIsOwnerAuthModalOpen] = useState(false);
 
   // Search & Filters for Client List
   const [clientSearchQuery, setClientSearchQuery] = useState('');
@@ -278,7 +287,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   };
 
   // Handle Client Submission
-  const handleOnboardingSubmit = (e: React.FormEvent) => {
+  const handleOnboardingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -298,9 +307,8 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const result = onboardNewClient(onboardingForm);
-      setIsSubmitting(false);
+    try {
+      const result = await onboardNewClient(onboardingForm);
 
       if (!result.success || !result.school) {
         setFormError(result.error || 'Erro ao cadastrar cliente.');
@@ -336,7 +344,12 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
           createWelcomeAnnouncement: true,
         });
       }
-    }, 400);
+    } catch (err: any) {
+      console.error('Error during onboarding submit:', err);
+      setFormError(err?.message || 'Erro inesperado ao salvar no banco de dados.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Copy Welcome Letter
@@ -383,17 +396,17 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
         });
       } else {
         const devUser: User = {
-          id: 'user_master_developer',
-          name: 'Desenvolvedor Master',
-          email: 'dev@reserve.sistema.gov.br',
-          avatar: 'icon:tech',
-          iconKey: 'icon:tech',
-          password: 'devmaster2026#',
+          id: 'user_master_owner',
+          name: OWNER_NAME,
+          email: OWNER_EMAIL,
+          avatar: 'icon:developer',
+          iconKey: 'icon:developer',
+          password: 'educacao123',
           role: 'ADMIN',
           gender: 'MALE',
           schoolId: schoolId,
           schoolName: targetSchool.name,
-          subject: 'Arquiteto de Software & Infraestrutura',
+          subject: 'Proprietário & Desenvolvedor',
         };
         login(devUser);
       }
@@ -454,24 +467,57 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
     }
   };
 
-  // STRICT: Teachers are never allowed into the Developer Portal. Only administrators or active developer mode can access.
-  if (currentUser && !isAdmin && !isDeveloperMode) {
+  // STRICT: Only the system owner (vinicius.machado.carvalho@educacao.mg.gov.br) with 2FA verified is authorized.
+  const isOwnerAuthorized = isOwnerEmail(currentUser?.email) && isSession2FAVerified();
+
+  if (!isOwnerAuthorized) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
-        <div className="w-16 h-16 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mb-4 border border-red-500/30">
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white relative">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4 border border-amber-500/30">
           <ShieldAlert className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-bold mb-2">Acesso Restrito a Administradores</h2>
-        <p className="text-slate-400 max-w-md mb-6 text-sm">
-          O Console do Desenvolvedor é restrito a administradores e desenvolvedores autorizados. Professores não possuem permissão de acesso.
+        <h2 className="text-xl font-bold mb-2">Acesso Restrito ao Proprietário do Sistema</h2>
+        <p className="text-slate-400 max-w-md mb-2 text-sm">
+          O Console do Desenvolvedor é de acesso restrito e exclusivo do proprietário:
         </p>
-        <button
-          type="button"
-          onClick={onBackToApp}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm cursor-pointer transition-all"
-        >
-          Voltar ao Sistema
-        </button>
+
+        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl mb-6 max-w-md w-full text-left space-y-1">
+          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider block">
+            Proprietário Autorizado
+          </span>
+          <p className="text-sm font-bold text-white">{OWNER_NAME}</p>
+          <p className="text-xs text-slate-300 font-mono">{OWNER_EMAIL}</p>
+          <div className="mt-2.5 text-[11px] text-indigo-300 bg-indigo-950/40 border border-indigo-800/40 rounded-xl p-2.5 flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+            <span>Exige autenticação oficial via <strong>Conta Google</strong> ({OWNER_EMAIL}).</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 items-center justify-center">
+          <button
+            type="button"
+            onClick={() => setIsOwnerAuthModalOpen(true)}
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold text-xs cursor-pointer transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/30"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Conectar com o Google</span>
+          </button>
+          <button
+            type="button"
+            onClick={onBackToApp}
+            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer transition-all"
+          >
+            Voltar ao Sistema
+          </button>
+        </div>
+
+        {isOwnerAuthModalOpen && (
+          <DeveloperAuthModal
+            isOpen={isOwnerAuthModalOpen}
+            onClose={() => setIsOwnerAuthModalOpen(false)}
+            onSuccess={() => setIsOwnerAuthModalOpen(false)}
+          />
+        )}
       </div>
     );
   }
@@ -501,7 +547,7 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                   DEV CONSOLE
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
-                  ÁREA RESTRITA DO DESENVOLVEDOR
+                  ÁREA RESTRITA DO PROPRIETÁRIO
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
@@ -511,8 +557,15 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls & Owner 2FA Badge */}
         <div className="flex items-center space-x-2.5">
+          {/* Owner 2FA Indicator Badge */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/30 rounded-xl text-[11px] text-emerald-300">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="truncate">Proprietário: <strong className="text-white">{OWNER_EMAIL}</strong></span>
+            <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded font-mono text-[9px] uppercase font-bold">2FA Ativo</span>
+          </div>
+
           <button
             type="button"
             onClick={handleExportGlobalBackup}

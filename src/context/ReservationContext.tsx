@@ -56,8 +56,8 @@ interface ReservationContextType {
   currentSchoolId: string;
   currentSchool: School;
   switchSchool: (schoolId: string) => void;
-  addSchool: (schoolData: Omit<School, 'id' | 'createdAt'>, createDefaultRooms?: boolean) => School;
-  onboardNewClient: (clientData: ClientOnboardingData) => ClientOnboardingResult;
+  addSchool: (schoolData: Omit<School, 'id' | 'createdAt'>, createDefaultRooms?: boolean) => Promise<School>;
+  onboardNewClient: (clientData: ClientOnboardingData) => Promise<ClientOnboardingResult>;
   updateSchool: (id: string, schoolData: Partial<School>) => void;
   deleteSchool: (id: string) => boolean;
   assignSchoolAdmin: (schoolId: string, email: string, name?: string) => void;
@@ -364,10 +364,10 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   };
 
-  const addSchool = (
+  const addSchool = async (
     schoolData: Omit<School, 'id' | 'createdAt'>,
     createDefaultRooms: boolean = true
-  ): School => {
+  ): Promise<School> => {
     const newSchoolId = `school_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
     const newSchool: School = {
       ...schoolData,
@@ -377,12 +377,9 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       adminEmails: schoolData.adminEmails || [],
     };
 
-    setSchools((prev) => [...prev, newSchool]);
-    saveSchoolToCloud(newSchool).catch(() => {});
-
-    // Create standard default rooms for this new school if requested
+    let defaultStandardRooms: Room[] = [];
     if (createDefaultRooms) {
-      const defaultStandardRooms: Room[] = [
+      defaultStandardRooms = [
         {
           id: `room_${newSchoolId}_info`,
           schoolId: newSchoolId,
@@ -429,15 +426,28 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
           rules: ['Guardar materiais nos respectivos organizadores ao final'],
         },
       ];
+    }
 
+    setSchools((prev) => [...prev, newSchool]);
+    if (defaultStandardRooms.length > 0) {
       setAllRooms((prev) => [...prev, ...defaultStandardRooms]);
-      defaultStandardRooms.forEach((r) => saveRoomToCloud(r).catch(() => {}));
+    }
+
+    // Persist to Cloud Firestore
+    try {
+      await saveSchoolToCloud(newSchool, { rooms: defaultStandardRooms });
+      if (defaultStandardRooms.length > 0) {
+        await Promise.all(defaultStandardRooms.map((r) => saveRoomToCloud(r)));
+      }
+      console.log(`[Firestore] Nova escola "${newSchool.name}" persistida no banco com sucesso.`);
+    } catch (err) {
+      console.error('[Firestore] Erro ao salvar nova escola no banco de dados:', err);
     }
 
     return newSchool;
   };
 
-  const onboardNewClient = (clientData: ClientOnboardingData): ClientOnboardingResult => {
+  const onboardNewClient = async (clientData: ClientOnboardingData): Promise<ClientOnboardingResult> => {
     try {
       if (!clientData.name.trim()) {
         return { success: false, error: 'O nome da instituição / cliente é obrigatório.' };
@@ -628,8 +638,9 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
 
       // 5. Create Welcome Announcement if enabled
+      let welcomeAnnouncement: Announcement | undefined;
       if (clientData.createWelcomeAnnouncement !== false) {
-        const welcomeAnnouncement: Announcement = {
+        welcomeAnnouncement = {
           id: `ann_${Date.now()}`,
           schoolId: newSchoolId,
           title: `Boas-vindas ao Sistema de Agendamento - ${newSchool.shortName}`,
@@ -638,7 +649,28 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
           author: clientData.adminName.trim(),
           important: true,
         };
-        setAllAnnouncements((prev) => [welcomeAnnouncement, ...prev]);
+        setAllAnnouncements((prev) => [welcomeAnnouncement!, ...prev]);
+      }
+
+      // 6. PERSIST TO CLOUD FIRESTORE
+      try {
+        await saveSchoolToCloud(newSchool, {
+          rooms: roomsToCreate,
+          users: adminUser ? [adminUser] : [],
+        });
+
+        if (roomsToCreate.length > 0) {
+          await Promise.all(roomsToCreate.map((room) => saveRoomToCloud(room)));
+        }
+
+        if (welcomeAnnouncement) {
+          await saveAnnouncementToCloud(welcomeAnnouncement);
+        }
+
+        console.log(`[Firestore] Escola "${newSchool.name}" e seus dados vinculados salvos no banco de dados com sucesso!`);
+      } catch (cloudErr) {
+        console.error('[Firestore] Erro ao persistir nova escola no Firestore:', cloudErr);
+        // Continue to return success so local state works, but log error
       }
 
       return {
@@ -703,17 +735,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!trimmedEmail) return;
 
     // 1. Add email to school's admin list
-    setSchools((prev) =>
-      prev.map((s) => {
+    setSchools((prev) => {
+      const updatedList = prev.map((s) => {
         if (s.id === schoolId) {
           const currentAdmins = s.adminEmails || [];
           if (!currentAdmins.some((e) => e.toLowerCase() === trimmedEmail)) {
-            return { ...s, adminEmails: [...currentAdmins, trimmedEmail] };
+            const updated = { ...s, adminEmails: [...currentAdmins, trimmedEmail] };
+            saveSchoolToCloud(updated).catch(console.error);
+            return updated;
           }
         }
         return s;
-      })
-    );
+      });
+      return updatedList;
+    });
 
     // 2. Ensure user exists in AuthContext as Admin for this school
     const targetSchool = schools.find((s) => s.id === schoolId);
@@ -735,19 +770,22 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const removeSchoolAdmin = (schoolId: string, email: string) => {
     const trimmedEmail = email.trim().toLowerCase();
-    setSchools((prev) =>
-      prev.map((s) => {
+    setSchools((prev) => {
+      const updatedList = prev.map((s) => {
         if (s.id === schoolId) {
-          return {
+          const updated = {
             ...s,
             adminEmails: (s.adminEmails || []).filter(
               (e) => e.toLowerCase() !== trimmedEmail
             ),
           };
+          saveSchoolToCloud(updated).catch(console.error);
+          return updated;
         }
         return s;
-      })
-    );
+      });
+      return updatedList;
+    });
   };
 
   const getSchoolTeachers = (schoolId?: string): User[] => {

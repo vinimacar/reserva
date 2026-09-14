@@ -25,6 +25,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { TutorialModal } from './components/TutorialModal';
 import { Reservation } from './types';
 import { School, Terminal } from 'lucide-react';
+import { isOwnerEmail, isSession2FAVerified } from './services/totp';
 
 function ReserveAppContent() {
   const { currentUser, isAdmin, isDeveloperMode } = useAuth();
@@ -39,6 +40,15 @@ function ReserveAppContent() {
   const [showDeveloperPortal, setShowDeveloperPortal] = useState(false);
   const [isDevAuthModalOpen, setIsDevAuthModalOpen] = useState(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false);
+
+  // Handlers for Opening Developer Portal with Owner & 2FA check
+  const handleOpenDeveloperPortal = () => {
+    if (isOwnerEmail(currentUser?.email) && isSession2FAVerified()) {
+      setShowDeveloperPortal(true);
+    } else {
+      setIsDevAuthModalOpen(true);
+    }
+  };
 
   // Modals state
   const [isReservationModalOpen, setIsReservationModalOpen] = useState(false);
@@ -89,20 +99,33 @@ function ReserveAppContent() {
   const isFirstTimeSetup = !settings.isConfigured && !localStorage.getItem('reserve_school_configured');
 
   // If Developer Portal is explicitly open
-  // STRICT: Only administrators or developer mode can access the Developer Portal. Teachers are never allowed.
-  if (showDeveloperPortal && (isAdmin || isDeveloperMode || !currentUser)) {
-    return (
-      <DeveloperPortal
-        onBackToApp={() => {
-          setShowDeveloperPortal(false);
-        }}
-        onSelectClientToView={(schoolId) => {
-          switchSchool(schoolId);
-          setCurrentView('SCHEDULE');
-          setShowDeveloperPortal(false);
-        }}
-      />
-    );
+  // STRICT: Only the owner (vinicius.machado.carvalho@educacao.mg.gov.br) with 2FA verified is allowed to access
+  if (showDeveloperPortal) {
+    if (isOwnerEmail(currentUser?.email) && isSession2FAVerified()) {
+      return (
+        <DeveloperPortal
+          onBackToApp={() => {
+            setShowDeveloperPortal(false);
+          }}
+          onSelectClientToView={(schoolId) => {
+            switchSchool(schoolId);
+            setCurrentView('SCHEDULE');
+            setShowDeveloperPortal(false);
+          }}
+        />
+      );
+    } else {
+      return (
+        <DeveloperAuthModal
+          isOpen={true}
+          onClose={() => setShowDeveloperPortal(false)}
+          onSuccess={() => {
+            setIsDevAuthModalOpen(false);
+            setShowDeveloperPortal(true);
+          }}
+        />
+      );
+    }
   }
 
   // If user is not authenticated, show the Login Screen with Developer Access option
@@ -110,7 +133,7 @@ function ReserveAppContent() {
     return (
       <>
         <LoginScreen
-          onOpenDeveloperPortal={() => setShowDeveloperPortal(true)}
+          onOpenDeveloperPortal={handleOpenDeveloperPortal}
           onOpenTutorial={() => setIsTutorialModalOpen(true)}
         />
         <DeveloperAuthModal
@@ -147,12 +170,12 @@ function ReserveAppContent() {
         onOpenSchoolSettings={isAdmin ? () => setIsSchoolSetupModalOpen(true) : undefined}
         onOpenRegisterTeacher={isAdmin ? () => setIsUserRegistrationModalOpen(true) : undefined}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-        onOpenDeveloperPortal={isAdmin || isDeveloperMode ? () => setShowDeveloperPortal(true) : undefined}
+        onOpenDeveloperPortal={handleOpenDeveloperPortal}
         onOpenTutorial={() => setIsTutorialModalOpen(true)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2.5 sm:px-6 lg:px-8 py-3 sm:py-5 pb-24 md:pb-6">
         {/* Dynamic Views */}
         {currentView === 'SCHEDULE' && (
           <WeeklyScheduleGrid
@@ -183,7 +206,7 @@ function ReserveAppContent() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto">
+      <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto pb-24 md:pb-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <School className="w-4 h-4 text-blue-400" />
@@ -196,15 +219,15 @@ function ReserveAppContent() {
             <span>Autenticação Google Workspace</span>
             <span className="text-slate-600">•</span>
             <span>Secretaria de Estado de Educação</span>
-            {isAdmin && (
+            {(isAdmin || isOwnerEmail(currentUser?.email) || isDeveloperMode) && (
               <>
                 <span className="text-slate-600">•</span>
                 <button
                   type="button"
                   id="footer-developer-portal-btn"
-                  onClick={() => setShowDeveloperPortal(true)}
+                  onClick={handleOpenDeveloperPortal}
                   className="text-indigo-400 hover:text-indigo-300 font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                  title="Acesso restrito a administradores"
+                  title="Acesso exclusivo ao proprietário do sistema"
                 >
                   <Terminal className="w-3 h-3" />
                   <span>Console Dev</span>

@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
 import { useTheme } from '../context/ThemeContext';
 import { TeacherAvatar } from './TeacherAvatar';
+import { isOwnerEmail } from '../services/totp';
 
 interface HeaderProps {
   currentView: 'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS';
@@ -50,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTutorial,
 }) => {
   const { currentUser, isAdmin, isDeveloperMode, logout } = useAuth();
+  const isOwner = isOwnerEmail(currentUser?.email);
   const { announcements, settings, schools, currentSchoolId, switchSchool } = useReservations();
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -101,17 +103,31 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* School Switcher Dropdown */}
               {showSchoolSwitcher && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in">
-                  <div className="p-2 border-b border-slate-800/80 mb-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Rede de Ensino ({schools.length} Escolas)
-                    </p>
-                    <p className="text-xs font-semibold text-slate-300">
-                      Alternar Unidade Escolar:
-                    </p>
-                  </div>
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs sm:hidden"
+                    onClick={() => setShowSchoolSwitcher(false)}
+                  />
+                  <div className="fixed sm:absolute left-3 sm:left-0 top-16 sm:top-full mt-2 w-[calc(100vw-24px)] sm:w-80 max-w-sm bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in">
+                    <div className="p-2 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Rede de Ensino ({schools.length} Escolas)
+                        </p>
+                        <p className="text-xs font-semibold text-slate-300">
+                          Alternar Unidade Escolar:
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowSchoolSwitcher(false)}
+                        className="sm:hidden p-1 text-slate-400 hover:text-white text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    </div>
 
-                  <div className="max-h-56 overflow-y-auto space-y-1">
+                    <div className="max-h-60 overflow-y-auto space-y-1">
                     {schools.map((s) => {
                       const isCur = s.id === currentSchoolId;
                       return (
@@ -158,7 +174,8 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   )}
                 </div>
-              )}
+              </>
+            )}
             </div>
           </div>
 
@@ -257,14 +274,14 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Quick Developer Portal Button */}
-            {(isAdmin || isDeveloperMode) && onOpenDeveloperPortal && (
+            {/* Quick Developer Portal Button - Restricted strictly to isOwner (vinicius.machado.carvalho@educacao.mg.gov.br) */}
+            {isOwner && onOpenDeveloperPortal && (
               <button
                 id="header-quick-dev-portal-btn"
                 type="button"
                 onClick={onOpenDeveloperPortal}
                 className="hidden sm:flex items-center space-x-1.5 px-2.5 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 hover:text-white text-xs font-bold transition-all border border-indigo-500/40 shadow-xs cursor-pointer"
-                title="Abrir Console do Desenvolvedor"
+                title="Abrir Console do Desenvolvedor (Exclusivo Vinicius Carvalho)"
               >
                 <Terminal className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Console Dev</span>
@@ -318,10 +335,15 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
 
                 {showProfileMenu && (
-                  <div
-                    id="profile-dropdown"
-                    className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-                  >
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs sm:hidden"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+                    <div
+                      id="profile-dropdown"
+                      className="fixed sm:absolute right-3 sm:right-0 top-16 sm:top-full mt-2 w-[calc(100vw-24px)] sm:w-80 max-w-sm bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                    >
                     {/* User Info Card */}
                     <div className="p-3 bg-slate-800/80 rounded-xl mb-2 border border-slate-700/50">
                       <div className="flex items-center space-x-3">
@@ -486,7 +508,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
-                      {(isAdmin || isDeveloperMode) && onOpenDeveloperPortal && (
+                      {isOwner && onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
                           onClick={() => {
@@ -514,7 +536,8 @@ export const Header: React.FC<HeaderProps> = ({
                       <LogOut className="w-4 h-4" />
                       <span>Sair da Conta (Desconectar)</span>
                     </button>
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             ) : (
@@ -529,49 +552,107 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
         </div>
+      </div>
 
-        {/* Mobile Navigation bar */}
-        <div className="flex md:hidden items-center justify-around py-2 border-t border-slate-800 text-xs">
+      {/* Fixed Bottom Mobile Navigation Bar for Smartphones */}
+      <nav
+        id="mobile-bottom-nav"
+        aria-label="Navegação móvel"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 safe-bottom shadow-2xl"
+      >
+        <div className="flex items-center justify-around px-2 h-16 max-w-md mx-auto">
+          {/* Grade de Horários */}
           <button
+            id="mobile-nav-schedule-btn"
+            type="button"
             onClick={() => onViewChange('SCHEDULE')}
-            className={`flex items-center space-x-1 py-1 px-2.5 rounded-lg cursor-pointer ${
-              currentView === 'SCHEDULE' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
+            className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all cursor-pointer min-h-[48px] ${
+              currentView === 'SCHEDULE'
+                ? 'text-blue-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Grade</span>
+            <Calendar className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'SCHEDULE' ? 'scale-110 text-blue-400' : ''}`} />
+            <span className="text-[10px] tracking-tight">Grade</span>
           </button>
+
+          {/* Minhas Reservas */}
           <button
+            id="mobile-nav-my-reservations-btn"
+            type="button"
             onClick={() => onViewChange('MY_RESERVATIONS')}
-            className={`flex items-center space-x-1 py-1 px-2.5 rounded-lg cursor-pointer ${
-              currentView === 'MY_RESERVATIONS' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
+            className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all cursor-pointer min-h-[48px] ${
+              currentView === 'MY_RESERVATIONS'
+                ? 'text-blue-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Minhas</span>
+            <Layers className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'MY_RESERVATIONS' ? 'scale-110 text-blue-400' : ''}`} />
+            <span className="text-[10px] tracking-tight">Minhas</span>
           </button>
-          <button
-            onClick={() => onViewChange('ANNOUNCEMENTS')}
-            className={`flex items-center space-x-1 py-1 px-2.5 rounded-lg cursor-pointer ${
-              currentView === 'ANNOUNCEMENTS' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span>Avisos</span>
-          </button>
-          {isAdmin && (
+
+          {/* Center Floating Action Button: Nova Reserva */}
+          <div className="flex items-center justify-center px-2">
             <button
+              id="mobile-nav-new-reservation-btn"
+              type="button"
+              onClick={onOpenNewReservation}
+              className="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/40 border-2 border-slate-900 active:scale-90 transition-transform cursor-pointer"
+              title="Criar Nova Reserva"
+              aria-label="Criar Nova Reserva"
+            >
+              <PlusCircle className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Avisos */}
+          <button
+            id="mobile-nav-announcements-btn"
+            type="button"
+            onClick={() => onViewChange('ANNOUNCEMENTS')}
+            className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all relative cursor-pointer min-h-[48px] ${
+              currentView === 'ANNOUNCEMENTS'
+                ? 'text-blue-400 font-bold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Bell className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'ANNOUNCEMENTS' ? 'scale-110 text-blue-400' : ''}`} />
+            <span className="text-[10px] tracking-tight">Avisos</span>
+            {importantAnnouncementsCount > 0 && (
+              <span className="absolute top-1.5 right-4 w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            )}
+          </button>
+
+          {/* Admin ou Perfil */}
+          {isAdmin ? (
+            <button
+              id="mobile-nav-admin-btn"
+              type="button"
               onClick={() => onViewChange('ADMIN')}
-              className={`flex items-center space-x-1 py-1 px-2.5 rounded-lg cursor-pointer ${
-                currentView === 'ADMIN' ? 'bg-amber-600 text-white font-bold' : 'text-amber-400'
+              className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all cursor-pointer min-h-[48px] ${
+                currentView === 'ADMIN'
+                  ? 'text-amber-400 font-bold'
+                  : 'text-amber-300/80 hover:text-amber-200'
               }`}
             >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin</span>
+              <Shield className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'ADMIN' ? 'scale-110 text-amber-400' : ''}`} />
+              <span className="text-[10px] tracking-tight">Admin</span>
+            </button>
+          ) : (
+            <button
+              id="mobile-nav-profile-btn"
+              type="button"
+              onClick={() => setShowProfileMenu(true)}
+              className="flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all text-slate-400 hover:text-slate-200 cursor-pointer min-h-[48px]"
+            >
+              <div className="w-5 h-5 rounded-full overflow-hidden mb-0.5 border border-slate-600 flex items-center justify-center">
+                <TeacherAvatar avatar={currentUser?.avatar} name={currentUser?.name || ''} size="xs" />
+              </div>
+              <span className="text-[10px] tracking-tight">Perfil</span>
             </button>
           )}
         </div>
-      </div>
+      </nav>
     </header>
   );
 };

@@ -265,15 +265,15 @@ export const AdminPanel: React.FC<{
       )}
 
       {/* Top Admin Header Banner */}
-      <div className="bg-slate-900 dark:bg-slate-900 text-white rounded-3xl p-6 shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <Shield className="w-6 h-6" />
+      <div className="bg-slate-900 dark:bg-slate-900 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3 sm:space-x-3.5">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-lg font-black tracking-tight text-white">Painel da Coordenação & Administração</h2>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase font-mono">
+              <h2 className="text-base sm:text-lg font-black tracking-tight text-white">Painel da Coordenação & Administração</h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase font-mono shrink-0">
                 ADMIN ACCESS
               </span>
             </div>
@@ -284,7 +284,7 @@ export const AdminPanel: React.FC<{
         </div>
 
         {/* Top Header Actions */}
-        <div className="flex items-center space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {reservations.length > 0 && (
             <button
               onClick={() => {
@@ -299,16 +299,16 @@ export const AdminPanel: React.FC<{
                   },
                 });
               }}
-              className="flex items-center space-x-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/80 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/80 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
             >
               <Trash2 className="w-4 h-4 text-red-400" />
-              <span>Limpar Reservas de Teste</span>
+              <span>Limpar Testes</span>
             </button>
           )}
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             <Download className="w-4 h-4 text-emerald-400" />
             <span>Exportar CSV</span>
@@ -317,7 +317,7 @@ export const AdminPanel: React.FC<{
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center overflow-x-auto bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
+      <div className="flex items-center overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
         <button
           onClick={() => setActiveTab('SCHOOLS')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
