@@ -859,6 +859,21 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return { success: false, error: 'Este espaço está desativado.' };
     }
 
+    // Strict Shift Validation: Verify if school allows this shift
+    const targetSchool = schools.find((s) => s.id === (data.schoolId || currentSchoolId)) || currentSchool;
+    const allowedShifts: ShiftType[] = (targetSchool?.shifts && targetSchool.shifts.length > 0)
+      ? targetSchool.shifts
+      : ['MANHA', 'TARDE'];
+
+    if (!allowedShifts.includes(data.shift)) {
+      const shiftName = data.shift === 'MANHA' ? 'Manhã' : data.shift === 'TARDE' ? 'Tarde' : data.shift === 'NOITE' ? 'Noite' : 'Integral';
+      const allowedNames = allowedShifts.map((s) => s === 'MANHA' ? 'Manhã' : s === 'TARDE' ? 'Tarde' : s === 'NOITE' ? 'Noite' : 'Integral').join(', ');
+      return {
+        success: false,
+        error: `Operação Bloqueada: A escola "${targetSchool.name}" não permite agendamentos no turno ${shiftName}. Turnos autorizados: ${allowedNames}.`,
+      };
+    }
+
     // 1. Memory check
     const conflict = checkConflict(data.roomId, data.date, data.periodIds);
     if (conflict.hasConflict) {
@@ -952,6 +967,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       if (room.status === 'INACTIVE') {
         conflicts.push({ date: data.date, message: 'Este espaço está desativado.' });
+        continue;
+      }
+
+      // Check if shift is permitted for this school
+      const allowedShifts: ShiftType[] = (currentSchool?.shifts && currentSchool.shifts.length > 0)
+        ? currentSchool.shifts
+        : ['MANHA', 'TARDE'];
+
+      if (!allowedShifts.includes(data.shift)) {
+        const shiftName = data.shift === 'MANHA' ? 'Manhã' : data.shift === 'TARDE' ? 'Tarde' : data.shift === 'NOITE' ? 'Noite' : 'Integral';
+        conflicts.push({
+          date: data.date,
+          message: `O turno ${shiftName} não é ofertado pela escola ${currentSchool.name}. Agendamento bloqueado.`,
+        });
         continue;
       }
 

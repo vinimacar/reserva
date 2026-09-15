@@ -21,6 +21,8 @@ import {
   Download,
   Loader2,
   CheckCircle2,
+  ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +72,14 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   } = useReservations();
   const { currentUser, users, addUser, switchUser, isAdmin } = useAuth();
 
+  // Authorized shifts configured for this school
+  const schoolShifts: ShiftType[] = useMemo(() => {
+    if (currentSchool?.shifts && currentSchool.shifts.length > 0) {
+      return currentSchool.shifts;
+    }
+    return ['MANHA', 'TARDE'];
+  }, [currentSchool?.shifts]);
+
   // Teacher / User selection state
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(
     currentUser?.id || users[0]?.id || ''
@@ -82,7 +92,12 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   // Form State
   const [roomId, setRoomId] = useState<string>(initialRoomId || selectedRoomId || rooms[0]?.id || '');
   const [date, setDate] = useState<string>(initialDate || formatLocalDateToISO());
-  const [shift, setShift] = useState<ShiftType>('MANHA');
+  const [shift, setShift] = useState<ShiftType>(() => {
+    if (currentSchool?.shifts && currentSchool.shifts.length > 0) {
+      return currentSchool.shifts[0];
+    }
+    return 'MANHA';
+  });
   const [selectedPeriodIds, setSelectedPeriodIds] = useState<string[]>([]);
   const [turma, setTurma] = useState<string>('9º Ano A');
   const [customTurma, setCustomTurma] = useState<string>('');
@@ -158,17 +173,22 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
         setSelectedTeacherId(users[0].id);
       }
 
+      let targetShift = schoolShifts[0] || 'MANHA';
+
       if (initialPeriodId) {
         setSelectedPeriodIds([initialPeriodId]);
         const p = periods.find((item) => item.id === initialPeriodId);
-        if (p) setShift(p.shift);
+        if (p && schoolShifts.includes(p.shift)) {
+          targetShift = p.shift;
+        }
       } else {
-        // Default to first period of current shift
-        const shiftPeriods = periods.filter((p) => p.shift === 'MANHA');
+        // Default to first period of school's first shift
+        const shiftPeriods = periods.filter((p) => p.shift === targetShift);
         if (shiftPeriods.length > 0) {
           setSelectedPeriodIds([shiftPeriods[0].id]);
         }
       }
+      setShift(targetShift);
       
       setErrorMessage(null);
       setSuccessMessage(null);
@@ -176,7 +196,19 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       setIsSubmitting(false);
       setCreatedReservation(null);
     }
-  }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods, currentUser, users]);
+  }, [isOpen, initialRoomId, initialDate, initialPeriodId, periods, currentUser, users, schoolShifts]);
+
+  // Keep shift strictly valid whenever schoolShifts changes
+  useEffect(() => {
+    if (!schoolShifts.includes(shift)) {
+      const fallbackShift = schoolShifts[0] || 'MANHA';
+      setShift(fallbackShift);
+      const fallbackPeriods = periods.filter((p) => p.shift === fallbackShift);
+      if (fallbackPeriods.length > 0) {
+        setSelectedPeriodIds([fallbackPeriods[0].id]);
+      }
+    }
+  }, [schoolShifts, shift, periods]);
 
   // Target dates computation based on mode
   const targetDates: string[] = useMemo(() => {
@@ -251,7 +283,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   if (!isOpen) return null;
 
   const currentRoom = rooms.find((r) => r.id === roomId) || rooms[0];
-  const shiftPeriods = periods.filter((p) => p.shift === shift);
+  const shiftPeriods = periods.filter((p) => p.shift === shift && schoolShifts.includes(p.shift));
   const currentSelectedTeacher = users.find((u) => u.id === selectedTeacherId) || currentUser || users[0];
 
   // Quick Inline New Teacher Creation
@@ -344,6 +376,12 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
     if (!subjectTopic.trim()) {
       setErrorMessage('Descreva o objetivo ou planejamento pedagógico da aula.');
+      return;
+    }
+
+    if (!schoolShifts.includes(shift)) {
+      const allowedNames = schoolShifts.map((s) => s === 'MANHA' ? 'Manhã' : s === 'TARDE' ? 'Tarde' : s === 'NOITE' ? 'Noite' : 'Integral').join(', ');
+      setErrorMessage(`O turno selecionado não é autorizado para a escola ${currentSchool?.name || ''}. Turnos válidos: ${allowedNames}.`);
       return;
     }
 
@@ -889,60 +927,97 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             setSkipConflictDates={setSkipConflictDates}
           />
 
-          {/* 3. Turno de Funcionamento */}
+          {/* 3. Turno de Funcionamento - Restrito rigorosamente aos turnos cadastrados da escola */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide mb-1.5">
-              3. Turno Escolar:
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {(['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]).map((s) => {
-                const label =
-                  s === 'MANHA'
-                    ? 'Manhã'
-                    : s === 'TARDE'
-                    ? 'Tarde'
-                    : s === 'NOITE'
-                    ? 'Noite'
-                    : 'Integral';
-                const timeLabel =
-                  s === 'MANHA'
-                    ? '07:00'
-                    : s === 'TARDE'
-                    ? '13:00'
-                    : s === 'NOITE'
-                    ? '19:00'
-                    : '07:30';
-                const isSelected = shift === s;
-                return (
-                  <button
-                    type="button"
-                    key={s}
-                    onClick={() => {
-                      setShift(s);
-                      // reset selected periods to first period of that shift
-                      const newPeriods = periods.filter((p) => p.shift === s);
-                      if (newPeriods.length > 0) {
-                        setSelectedPeriodIds([newPeriods[0].id]);
-                      }
-                    }}
-                    className={`py-2 px-1.5 rounded-xl text-center border transition-all cursor-pointer flex flex-col items-center justify-center ${
-                      isSelected
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <span className="font-bold text-xs leading-none">{label}</span>
-                    <span
-                      className={`text-[9px] mt-0.5 font-mono ${
-                        isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                3. Turno Escolar:
+              </label>
+              <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate max-w-[200px] sm:max-w-none">
+                  Turnos de {currentSchool?.shortName || currentSchool?.name || 'sua escola'}
+                </span>
+              </div>
+            </div>
+
+            {schoolShifts.length === 1 ? (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-500 text-white flex items-center justify-center font-black text-base shadow-xs">
+                    {schoolShifts[0][0]}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">
+                        Turno Único: {
+                          schoolShifts[0] === 'MANHA' ? 'Manhã (07:00)' :
+                          schoolShifts[0] === 'TARDE' ? 'Tarde (13:00)' :
+                          schoolShifts[0] === 'NOITE' ? 'Noite (19:00)' : 'Integral (07:30)'
+                        }
+                      </p>
+                      <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Esta escola opera apenas neste turno. Outros turnos estão bloqueados para agendamento.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold uppercase shrink-0">
+                  Definido
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {schoolShifts.map((s) => {
+                  const label =
+                    s === 'MANHA'
+                      ? 'Manhã'
+                      : s === 'TARDE'
+                      ? 'Tarde'
+                      : s === 'NOITE'
+                      ? 'Noite'
+                      : 'Integral';
+                  const timeLabel =
+                    s === 'MANHA'
+                      ? '07:00'
+                      : s === 'TARDE'
+                      ? '13:00'
+                      : s === 'NOITE'
+                      ? '19:00'
+                      : '07:30';
+                  const isSelected = shift === s;
+                  return (
+                    <button
+                      type="button"
+                      key={s}
+                      onClick={() => {
+                        setShift(s);
+                        // reset selected periods to first period of that shift
+                        const newPeriods = periods.filter((p) => p.shift === s);
+                        if (newPeriods.length > 0) {
+                          setSelectedPeriodIds([newPeriods[0].id]);
+                        }
+                      }}
+                      className={`py-2 px-1.5 rounded-xl text-center border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
                       }`}
                     >
-                      {timeLabel}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span className="font-bold text-xs leading-none">{label}</span>
+                      <span
+                        className={`text-[9px] mt-0.5 font-mono ${
+                          isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        {timeLabel}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* 3. Aulas / Períodos (Seleção Múltipla) */}

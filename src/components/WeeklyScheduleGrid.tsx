@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -54,6 +54,8 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
     searchQuery,
     setSearchQuery,
     announcements,
+    currentSchool,
+    settings,
   } = useReservations();
   const { currentUser, isAdmin } = useAuth();
 
@@ -111,15 +113,47 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   const weekDays = getWeekDates(weekOffset);
   const currentRoom = rooms.find((r) => r.id === selectedRoomId) || rooms[0];
 
-  // Filter periods by selected shift
+  // Authorized shifts for the currently active school
+  const schoolShifts: ShiftType[] = useMemo(() => {
+    if (currentSchool?.shifts && currentSchool.shifts.length > 0) {
+      return currentSchool.shifts;
+    }
+    if (settings?.shifts && settings.shifts.length > 0) {
+      return settings.shifts;
+    }
+    return ['MANHA', 'TARDE'];
+  }, [currentSchool?.shifts, settings?.shifts]);
+
+  // If selectedShift is not 'ALL' and is not permitted in this school, reset to 'ALL'
+  useEffect(() => {
+    if (selectedShift !== 'ALL' && !schoolShifts.includes(selectedShift)) {
+      setSelectedShift('ALL');
+    }
+  }, [schoolShifts, selectedShift, setSelectedShift]);
+
+  // Filter periods strictly by the school's configured shifts
   const filteredPeriods = periods.filter((p) => {
+    if (!schoolShifts.includes(p.shift)) return false;
     if (selectedShift === 'ALL') return true;
     return p.shift === selectedShift;
   });
 
   // Shifts present in filteredPeriods
-  const activeShifts: ShiftType[] =
-    selectedShift === 'ALL' ? ['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] : [selectedShift];
+  const activeShifts: ShiftType[] = useMemo(() => {
+    if (selectedShift === 'ALL') {
+      return schoolShifts;
+    }
+    return schoolShifts.includes(selectedShift) ? [selectedShift] : [schoolShifts[0]];
+  }, [selectedShift, schoolShifts]);
+
+  // Guard slot clicking against unauthorized shifts
+  const handleSlotClick = (roomId: string, date: string, period: TimePeriod) => {
+    if (!schoolShifts.includes(period.shift)) {
+      alert(`O turno desta aula (${period.shift}) não é ofertado pela escola ${currentSchool?.name || ''}. Horários restritos aos turnos configurados.`);
+      return;
+    }
+    onSelectSlot(roomId, date, period.id);
+  };
 
   const getRoomIcon = (iconName: string) => {
     switch (iconName) {
@@ -386,58 +420,50 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
 
         {/* Shift Filter & Search */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Shift Filter Tabs */}
+          {/* Shift Filter Tabs - Dynamically restricted to School Configured Shifts */}
           <div className="flex overflow-x-auto no-scrollbar items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-            <button
-              onClick={() => setSelectedShift('ALL')}
-              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                selectedShift === 'ALL'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Todos os Turnos
-            </button>
-            <button
-              onClick={() => setSelectedShift('MANHA')}
-              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                selectedShift === 'MANHA'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Manhã
-            </button>
-            <button
-              onClick={() => setSelectedShift('TARDE')}
-              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                selectedShift === 'TARDE'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Tarde
-            </button>
-            <button
-              onClick={() => setSelectedShift('NOITE')}
-              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                selectedShift === 'NOITE'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Noite
-            </button>
-            <button
-              onClick={() => setSelectedShift('INTEGRAL')}
-              className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all ${
-                selectedShift === 'INTEGRAL'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Integral
-            </button>
+            {schoolShifts.length > 1 && (
+              <button
+                onClick={() => setSelectedShift('ALL')}
+                className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
+                  selectedShift === 'ALL'
+                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Todos ({schoolShifts.length})
+              </button>
+            )}
+
+            {schoolShifts.map((shift) => {
+              const isActive = selectedShift === shift || (schoolShifts.length === 1 && selectedShift === 'ALL');
+              const shiftConfig = {
+                MANHA: { label: 'Manhã', activeClass: 'bg-amber-500 text-white shadow-xs', badge: 'M' },
+                TARDE: { label: 'Tarde', activeClass: 'bg-blue-600 text-white shadow-xs', badge: 'T' },
+                NOITE: { label: 'Noite', activeClass: 'bg-purple-600 text-white shadow-xs', badge: 'N' },
+                INTEGRAL: { label: 'Integral', activeClass: 'bg-emerald-600 text-white shadow-xs', badge: 'I' },
+              }[shift] || { label: shift, activeClass: 'bg-slate-900 text-white', badge: shift[0] };
+
+              return (
+                <button
+                  key={shift}
+                  onClick={() => setSelectedShift(shift)}
+                  className={`shrink-0 px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isActive
+                      ? shiftConfig.activeClass
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={`Exibir horários do turno ${shiftConfig.label}`}
+                >
+                  <span>{shiftConfig.label}</span>
+                  {schoolShifts.length === 1 && (
+                    <span className="text-[10px] px-1 py-0.2 rounded bg-white/20 font-bold uppercase">
+                      Turno da Escola
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Quick Search */}
@@ -712,7 +738,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => onSelectSlot(selectedRoomId, curDay.date, period.id)}
+                                  onClick={() => handleSlotClick(selectedRoomId, curDay.date, period)}
                                   className="w-full text-left p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all cursor-pointer min-h-[50px] flex items-center justify-between"
                                 >
                                   <div>
@@ -907,7 +933,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                                 ) : (
                                   /* Empty Slot -> Quick Book */
                                   <button
-                                    onClick={() => onSelectSlot(selectedRoomId, day.date, period.id)}
+                                    onClick={() => handleSlotClick(selectedRoomId, day.date, period)}
                                     className="w-full h-full min-h-[70px] rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all group cursor-pointer p-1"
                                     title={`Reservar ${period.name} na ${day.dayName}`}
                                   >

@@ -29,6 +29,7 @@ import { useReservations } from '../context/ReservationContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { DeveloperAuthModal } from './DeveloperAuthModal';
 import { User, School } from '../types';
+import { ReserveLabsLogo } from './ReserveLabsLogo';
 import { signInWithGooglePopup } from '../services/firebaseAuthService';
 
 interface LoginScreenProps {
@@ -228,20 +229,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onOpenDeveloperPortal,
       {/* Top Bar / Institutional Header */}
       <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between relative z-20">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-md shadow-blue-500/20">
-            <SchoolIcon className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-base font-black tracking-tight text-white font-mono">RESERVE LABS</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-400/30">
-                Rede de Escolas
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 truncate max-w-xs sm:max-w-md">
-              Sistema Integrado de Agendamento de Laboratórios & Espaços Pedagógicos
-            </p>
-          </div>
+          <ReserveLabsLogo variant="horizontal" size="md" theme="dark" />
+          <span className="hidden md:inline-block h-6 w-px bg-slate-800" />
+          <p className="text-[11px] text-slate-400 truncate max-w-xs sm:max-w-md hidden md:block">
+            Sistema Integrado de Agendamento de Laboratórios & Espaços Pedagógicos
+          </p>
         </div>
 
         <div className="flex items-center space-x-3">

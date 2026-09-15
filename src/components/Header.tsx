@@ -24,6 +24,7 @@ import { useReservations } from '../context/ReservationContext';
 import { useTheme } from '../context/ThemeContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { isOwnerEmail } from '../services/totp';
+import { ReserveLabsLogo } from './ReserveLabsLogo';
 
 interface HeaderProps {
   currentView: 'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS';
@@ -68,15 +69,15 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-logo-btn"
               onClick={() => onViewChange('SCHEDULE')}
-              className="flex items-center space-x-2 text-left focus:outline-none group cursor-pointer"
+              className="flex items-center space-x-2.5 text-left focus:outline-none group cursor-pointer"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                <School className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700/80 p-1 flex items-center justify-center shadow-lg shadow-blue-500/10 group-hover:scale-105 transition-transform">
+                <ReserveLabsLogo variant="icon" size="sm" />
               </div>
               <div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-xl font-black tracking-tight text-white font-mono">RESERVE</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold border border-blue-400/30">
+                  <span className="text-lg font-black tracking-tight text-white font-mono">RESERVE</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-white font-extrabold shadow-2xs">
                     LABS
                   </span>
                 </div>

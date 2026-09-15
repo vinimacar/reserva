@@ -401,11 +401,19 @@ export const SchoolSetupModal: React.FC<SchoolSetupModalProps> = ({
           </div>
 
           {/* 2. Turnos Atendidos */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800 pb-1">
-              <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              2. Turnos com Aulas e Laboratórios Ativos
-            </h4>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1">
+              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 uppercase tracking-wide">
+                <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                2. Turnos com Aulas e Laboratórios Ativos
+              </h4>
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                Bloqueia outros turnos para agendamento
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Apenas os turnos marcados como <strong>Ativo</strong> permitirão criar reservas e consultar a grade. Turnos desativados ficarão bloqueados para agendamento.
+            </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
