@@ -27,11 +27,13 @@ import {
   UserCheck,
   Smartphone,
   Layers,
+  Printer,
 } from 'lucide-react';
 import { Room, TimePeriod, Reservation, ShiftType } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { EditRoomDetailsModal } from './EditRoomDetailsModal';
+import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { formatLocalDateToISO } from '../lib/dateUtils';
 
 interface WeeklyScheduleGridProps {
@@ -63,6 +65,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [showRoomInfo, setShowRoomInfo] = useState<boolean>(false);
   const [isEditRoomModalOpen, setIsEditRoomModalOpen] = useState<boolean>(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   // Mobile day view state: selectedDayIndex (0 = Seg, 1 = Ter, 2 = Qua, 3 = Qui, 4 = Sex)
   const getInitialDayIndex = () => {
@@ -416,6 +419,17 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
             <CalendarIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
             <span className="truncate">{formattedWeekRange}</span>
           </div>
+
+          {/* Print Weekly Schedule Button */}
+          <button
+            type="button"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/80 border border-blue-200 dark:border-blue-800/80 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+            title="Imprimir mapa de reservas da semana e turnos (Grid ou Pauta com Visto)"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Imprimir Grade</span>
+          </button>
         </div>
 
         {/* Shift Filter & Search */}
@@ -1007,6 +1021,14 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
         isOpen={isEditRoomModalOpen}
         room={currentRoom}
         onClose={() => setIsEditRoomModalOpen(false)}
+      />
+
+      {/* Weekly Schedule & Shifts Print Modal */}
+      <WeeklySchedulePrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        initialWeekOffset={weekOffset}
+        initialShift={selectedShift}
       />
     </div>
   );

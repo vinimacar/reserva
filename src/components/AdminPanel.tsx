@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   Sun,
   Moon,
+  GraduationCap,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +41,8 @@ import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
 import { AdminSchoolsTab } from './AdminSchoolsTab';
+import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
+import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 
 export const AdminPanel: React.FC<{
@@ -77,8 +80,11 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
+    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'CLASSES_SCHEDULES' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
   >('SCHOOLS');
+
+  // Print modal state
+  const [isWeeklyPrintModalOpen, setIsWeeklyPrintModalOpen] = useState<boolean>(false);
 
   // Filter state for bookings
   const [filterRoomId, setFilterRoomId] = useState<string>('ALL');
@@ -307,6 +313,16 @@ export const AdminPanel: React.FC<{
           )}
 
           <button
+            type="button"
+            onClick={() => setIsWeeklyPrintModalOpen(true)}
+            className="flex items-center space-x-1.5 sm:space-x-2 bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+            title="Imprimir mapa semanal e pautas com campo de visto do professor"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Imprimir Agenda Semanal</span>
+          </button>
+
+          <button
             onClick={handleExportCSV}
             className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
@@ -340,6 +356,18 @@ export const AdminPanel: React.FC<{
         >
           <Layers className="w-4 h-4" />
           <span>Gestão de Reservas ({reservations.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('CLASSES_SCHEDULES')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'CLASSES_SCHEDULES'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 text-amber-400" />
+          <span>Turmas & Horários</span>
         </button>
 
         <button
@@ -445,16 +473,28 @@ export const AdminPanel: React.FC<{
               </div>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Buscar professor, turma..."
-                value={searchBooking}
-                onChange={(e) => setSearchBooking(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Search Input & Print Button */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Buscar professor, turma..."
+                  value={searchBooking}
+                  onChange={(e) => setSearchBooking(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsWeeklyPrintModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/60 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                title="Imprimir mapa semanal e pautas com campo de visto do professor"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Imprimir por Semana</span>
+              </button>
             </div>
           </div>
 
@@ -572,6 +612,11 @@ export const AdminPanel: React.FC<{
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB: CLASSES & SCHEDULES (TURMAS & HORÁRIOS) */}
+      {activeTab === 'CLASSES_SCHEDULES' && (
+        <AdminClassesAndSchedulesTab onShowToast={showToast} />
       )}
 
       {/* TAB 2: ROOMS MANAGEMENT */}
@@ -1867,6 +1912,12 @@ export const AdminPanel: React.FC<{
           }}
         />
       )}
+
+      {/* Weekly Schedule & Shifts Print Modal */}
+      <WeeklySchedulePrintModal
+        isOpen={isWeeklyPrintModalOpen}
+        onClose={() => setIsWeeklyPrintModalOpen(false)}
+      />
     </div>
   );
 };

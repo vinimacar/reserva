@@ -22,6 +22,7 @@ import {
   SAMPLE_DEMO_RESERVATIONS,
   SAMPLE_DEMO_ANNOUNCEMENTS,
   DEFAULT_SCHOOLS,
+  SCHOOL_CLASSES,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
 import { formatLocalDateToISO } from '../lib/dateUtils';
@@ -132,6 +133,18 @@ interface ReservationContextType {
     totalAdmins: number;
   };
 
+  // Turmas & Horários Management (Mantendo os existentes)
+  classes: string[];
+  addClass: (className: string) => void;
+  removeClass: (className: string) => void;
+  updateClass: (oldName: string, newName: string) => void;
+  resetClasses: () => void;
+
+  addPeriod: (periodData: Omit<TimePeriod, 'id'>) => TimePeriod;
+  updatePeriod: (period: TimePeriod) => void;
+  deletePeriod: (id: string) => void;
+  resetPeriods: () => void;
+
   // Production / Data Management
   clearSystemForProduction: () => void;
   loadDemoSampleData: () => void;
@@ -145,6 +158,8 @@ const STORAGE_KEY_ACTIVE_SCHOOL = 'reserve_school_active_id';
 const STORAGE_KEY_RES = 'reserve_school_reservations';
 const STORAGE_KEY_ROOMS = 'reserve_school_rooms';
 const STORAGE_KEY_ANN = 'reserve_school_announcements';
+const STORAGE_KEY_PERIODS = 'reserve_time_periods_v2';
+const STORAGE_KEY_CLASSES = 'reserve_school_classes_v2';
 
 export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isAdmin, users, addUser, updateUserRole } = useAuth();
@@ -232,7 +247,50 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return DEFAULT_ANNOUNCEMENTS;
   });
 
-  const [periods] = useState<TimePeriod[]>(TIME_PERIODS);
+  // Periods (Horários) State - initialized with TIME_PERIODS and merged with saved custom periods
+  const [periods, setPeriods] = useState<TimePeriod[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_PERIODS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Maintain all standard default periods by checking IDs
+          const parsedIds = new Set(parsed.map((p: TimePeriod) => p.id));
+          const missingDefaults = TIME_PERIODS.filter((p) => !parsedIds.has(p.id));
+          return [...parsed, ...missingDefaults];
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return TIME_PERIODS;
+  });
+
+  // Classes (Turmas) State - initialized with SCHOOL_CLASSES and merged with saved custom classes
+  const [classes, setClasses] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CLASSES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Maintain all standard classes while incorporating any custom additions
+          return Array.from(new Set([...SCHOOL_CLASSES, ...parsed]));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return SCHOOL_CLASSES;
+  });
+
+  // Sync periods and classes to LocalStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PERIODS, JSON.stringify(periods));
+  }, [periods]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(classes));
+  }, [classes]);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -1367,6 +1425,59 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     DEFAULT_ANNOUNCEMENTS.forEach((a) => saveAnnouncementToCloud(a).catch(() => {}));
   };
 
+  // Turmas (Classes) Actions
+  const addClass = (className: string) => {
+    const trimmed = className.trim();
+    if (!trimmed) return;
+    setClasses((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      return [...prev, trimmed];
+    });
+  };
+
+  const removeClass = (className: string) => {
+    setClasses((prev) => prev.filter((c) => c !== className));
+  };
+
+  const updateClass = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setClasses((prev) => prev.map((c) => (c === oldName ? trimmed : c)));
+  };
+
+  const resetClasses = () => {
+    setClasses(SCHOOL_CLASSES);
+    localStorage.removeItem(STORAGE_KEY_CLASSES);
+  };
+
+  // Horários (Periods) Actions
+  const addPeriod = (periodData: Omit<TimePeriod, 'id'>): TimePeriod => {
+    const newPeriod: TimePeriod = {
+      id: `p_${periodData.shift.toLowerCase()[0]}_${Date.now()}`,
+      ...periodData,
+    };
+    setPeriods((prev) => {
+      const updated = [...prev, newPeriod];
+      return updated.sort((a, b) => a.number - b.number || a.startTime.localeCompare(b.startTime));
+    });
+    return newPeriod;
+  };
+
+  const updatePeriod = (updatedPeriod: TimePeriod) => {
+    setPeriods((prev) =>
+      prev.map((p) => (p.id === updatedPeriod.id ? updatedPeriod : p))
+    );
+  };
+
+  const deletePeriod = (id: string) => {
+    setPeriods((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const resetPeriods = () => {
+    setPeriods(TIME_PERIODS);
+    localStorage.removeItem(STORAGE_KEY_PERIODS);
+  };
+
   return (
     <ReservationContext.Provider
       value={{
@@ -1386,6 +1497,15 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         rooms,
         allRooms,
         periods,
+        classes,
+        addClass,
+        removeClass,
+        updateClass,
+        resetClasses,
+        addPeriod,
+        updatePeriod,
+        deletePeriod,
+        resetPeriods,
         announcements,
         settings,
         selectedRoomId,

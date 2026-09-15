@@ -62,6 +62,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const {
     rooms,
     periods,
+    classes,
+    addClass,
     addReservation,
     addBatchReservations,
     checkConflict,
@@ -146,6 +148,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const saveCustomClass = (newClass: string) => {
     const trimmed = newClass.trim();
     if (!trimmed) return;
+    addClass(trimmed);
     if (!schoolCustomClasses.includes(trimmed) && !SCHOOL_CLASSES.includes(trimmed)) {
       const updated = [trimmed, ...schoolCustomClasses];
       setSchoolCustomClasses(updated);
@@ -157,6 +160,18 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       }
     }
   };
+
+  // Merge context classes with school-specific custom classes
+  const customClassesList = useMemo(() => {
+    const set = new Set<string>();
+    classes.forEach((c) => {
+      if (!SCHOOL_CLASSES.includes(c)) set.add(c);
+    });
+    schoolCustomClasses.forEach((c) => {
+      if (!SCHOOL_CLASSES.includes(c)) set.add(c);
+    });
+    return Array.from(set);
+  }, [classes, schoolCustomClasses]);
 
   // Sync initial props when opened
   useEffect(() => {
@@ -1104,9 +1119,9 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
                     required
                   >
-                    {schoolCustomClasses.length > 0 && (
-                      <optgroup label="⭐ Turmas Cadastradas da Escola">
-                        {schoolCustomClasses.map((c) => (
+                    {customClassesList.length > 0 && (
+                      <optgroup label={`⭐ Turmas Cadastradas da Escola (${customClassesList.length})`}>
+                        {customClassesList.map((c) => (
                           <option key={`custom-${c}`} value={c}>
                             {c}
                           </option>
