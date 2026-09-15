@@ -82,15 +82,26 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
           {/* Official Letterhead */}
           <div className="border-b-2 border-slate-900 pb-4 flex items-start justify-between">
             <div className="space-y-1">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-700 text-white font-black flex items-center justify-center text-sm">
-                  R
-                </div>
+              <div className="flex items-center space-x-2.5">
+                {settings.logoUrl ? (
+                  <div className="w-10 h-10 rounded-lg bg-white border border-slate-300 p-1 flex items-center justify-center shrink-0">
+                    <img
+                      src={settings.logoUrl}
+                      alt={settings.schoolName}
+                      className="max-h-full max-w-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-lg bg-blue-700 text-white font-black flex items-center justify-center text-sm">
+                    R
+                  </div>
+                )}
                 <div>
                   <h2 className="text-base font-black tracking-tight text-slate-900">
-                    SISTEMA RESERVE - GESTÃO DE LABORATÓRIOS
+                    RESERVELABS • GESTÃO DE LABORATÓRIOS
                   </h2>
-                  <p className="text-xs text-slate-600 font-semibold">{settings.schoolName}</p>
+                  <p className="text-xs text-slate-700 font-bold">{settings.schoolName}</p>
                 </div>
               </div>
               <p className="text-[11px] text-slate-500">

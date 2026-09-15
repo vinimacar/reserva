@@ -1,9 +1,9 @@
 import React from 'react';
 
-interface ReserveLabsLogoProps {
+export interface ReserveLabsLogoProps {
   variant?: 'full' | 'horizontal' | 'icon';
-  theme?: 'dark' | 'light';
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  theme?: 'dark' | 'light' | 'auto';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
@@ -13,161 +13,161 @@ export const ReserveLabsLogo: React.FC<ReserveLabsLogoProps> = ({
   size = 'md',
   className = '',
 }) => {
-  // Dimensions
-  const iconSizeClasses = {
-    sm: 'w-7 h-7',
-    md: 'w-9 h-9',
-    lg: 'w-12 h-12',
-    xl: 'w-20 h-20',
-  }[size];
+  // Unique gradient ID suffix to avoid DOM collisions
+  const idSuffix = React.useId().replace(/:/g, '_');
 
-  const titleSizeClasses = {
-    sm: 'text-sm',
-    md: 'text-lg',
-    lg: 'text-2xl',
-    xl: 'text-4xl',
-  }[size];
-
-  const subtitleSizeClasses = {
-    sm: 'text-[9px] tracking-[0.2em]',
-    md: 'text-[11px] tracking-[0.25em]',
-    lg: 'text-sm tracking-[0.3em]',
-    xl: 'text-lg tracking-[0.35em]',
-  }[size];
-
-  // SVG Emblem
-  const Emblem = () => (
+  // Emblem Only Component (Square viewbox for icon variant)
+  const Emblem = ({ iconClass = '' }: { iconClass?: string }) => (
     <svg
-      viewBox="0 0 320 280"
-      className={`${iconSizeClasses} shrink-0 drop-shadow-sm`}
+      viewBox="0 0 240 220"
+      className={`${iconClass} shrink-0 drop-shadow-xs`}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      aria-label="ReserveLabs Icon"
     >
       <defs>
-        <linearGradient id="flaskLiquidGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#FBBF24" />
-          <stop offset="100%" stopColor="#F59E0B" />
+        <linearGradient id={`calGrad_${idSuffix}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0B41AC" />
+          <stop offset="100%" stopColor="#0062F5" />
         </linearGradient>
-        <linearGradient id="goldSwoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FBBF24" />
-          <stop offset="100%" stopColor="#D97706" />
+        <linearGradient id={`circleGrad_${idSuffix}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#072C7A" />
+          <stop offset="100%" stopColor="#0047BA" />
         </linearGradient>
       </defs>
 
-      {/* Golden Orbital Swoop Underneath */}
-      <path
-        d="M 50 170 C 40 210, 110 245, 185 245 C 240 245, 290 225, 305 200 C 275 228, 195 238, 110 215 C 75 205, 55 188, 50 170 Z"
-        fill="url(#goldSwoopGrad)"
-      />
+      <g transform="translate(10, 10)">
+        {/* Top Rings/Hooks */}
+        <rect x="44" y="2" width="13" height="26" rx="6.5" fill="#0A3A9E" />
+        <rect x="120" y="2" width="13" height="26" rx="6.5" fill="#0A3A9E" />
 
-      {/* Calendar Base */}
-      <g transform="translate(60, 20)">
-        {/* Top Rings */}
-        <rect x="36" y="0" width="14" height="28" rx="7" fill="#0D3B66" />
-        <rect x="110" y="0" width="14" height="28" rx="7" fill="#0D3B66" />
+        {/* Calendar Shell */}
+        <rect x="12" y="14" width="154" height="148" rx="26" fill={`url(#calGrad_${idSuffix})`} />
 
-        {/* Calendar Blue Shell */}
-        <rect x="5" y="14" width="150" height="142" rx="26" fill="#0D3B66" />
+        {/* Inner White Sheet */}
+        <rect x="25" y="46" width="128" height="104" rx="16" fill="#FFFFFF" />
 
-        {/* White Inner Sheet */}
-        <rect x="15" y="48" width="130" height="98" rx="15" fill="#FFFFFF" />
-
-        {/* Grid Slots */}
+        {/* Calendar Grid (4 cols x 3 rows) */}
         {/* Row 1 */}
-        <rect x="28" y="60" width="18" height="18" rx="4" fill="#E2E8F0" />
-        <rect x="54" y="60" width="18" height="18" rx="4" fill="#E2E8F0" />
-        <rect x="80" y="60" width="18" height="18" rx="4" fill="#E2E8F0" />
-        <rect x="106" y="60" width="18" height="18" rx="4" fill="#E2E8F0" />
+        <rect x="36" y="57" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="63" y="57" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="90" y="57" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="117" y="57" width="20" height="16" rx="4" fill="#0D44B4" />
 
-        {/* Row 2 */}
-        <rect x="28" y="86" width="18" height="18" rx="4" fill="#E2E8F0" />
-        {/* Yellow Slot with Checkmark */}
-        <rect x="54" y="86" width="18" height="18" rx="4" fill="#F59E0B" />
-        <path
-          d="M 59 95 L 62 98 L 68 91"
-          stroke="#FFFFFF"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <rect x="80" y="86" width="18" height="18" rx="4" fill="#CBD5E1" />
-        <rect x="106" y="86" width="18" height="18" rx="4" fill="#CBD5E1" />
+        {/* Row 2: Checkmark slot */}
+        <g transform="translate(36, 80)">
+          <path
+            d="M 3 11 L 8 16 L 17 4"
+            fill="none"
+            stroke="#0A2A75"
+            strokeWidth="3.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
+        <rect x="63" y="80" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="90" y="80" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="117" y="80" width="20" height="16" rx="4" fill="#0D44B4" />
 
         {/* Row 3 */}
-        <rect x="28" y="112" width="18" height="18" rx="4" fill="#CBD5E1" />
-        <rect x="54" y="112" width="18" height="18" rx="4" fill="#CBD5E1" />
-        <rect x="80" y="112" width="18" height="18" rx="4" fill="#CBD5E1" />
-        <rect x="106" y="112" width="18" height="18" rx="4" fill="#CBD5E1" />
-      </g>
+        <rect x="36" y="103" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="63" y="103" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="90" y="103" width="20" height="16" rx="4" fill="#0D44B4" />
+        <rect x="117" y="103" width="20" height="16" rx="4" fill="#0D44B4" />
 
-      {/* Laboratory Flask Overlapping Right */}
-      <g transform="translate(145, 50)">
-        <path
-          d="M 50 12 L 66 12 C 69 12 71 14 71 17 C 71 20 69 22 66 22 L 64 22 L 64 52 L 102 110 C 108 120 102 130 90 130 L 26 130 C 14 130 8 120 14 110 L 52 52 L 52 22 L 50 22 C 47 22 45 20 45 17 C 45 14 47 12 50 12 Z"
-          fill="#FFFFFF"
-          stroke="#0D3B66"
-          strokeWidth="11"
-          strokeLinejoin="round"
-        />
-
-        {/* Liquid Inside */}
-        <path
-          d="M 32 98 Q 58 92 84 98 C 93 112 93 121 86 121 L 30 121 C 23 121 23 112 32 98 Z"
-          fill="url(#flaskLiquidGrad)"
-        />
-
-        {/* Liquid Bubble */}
-        <circle cx="62" cy="74" r="3.5" fill="#F59E0B" />
-        <circle cx="55" cy="60" r="2.5" fill="#FBBF24" />
+        {/* Overlapping Flask Circle Badge */}
+        <g transform="translate(162, 134)">
+          <circle cx="0" cy="0" r="44" fill={`url(#circleGrad_${idSuffix})`} stroke="#FFFFFF" strokeWidth="6.5" />
+          <g transform="translate(-19, -21) scale(0.78)">
+            <path d="M 16 6 L 32 6" stroke="#FFFFFF" strokeWidth="4.2" strokeLinecap="round" />
+            <path
+              d="M 19 7 L 19 18 L 6 43 C 4.5 46 6.5 49 10 49 L 38 49 C 41.5 49 43.5 46 42 43 L 29 18 L 29 7"
+              fill="none"
+              stroke="#FFFFFF"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path d="M 12 37 L 36 37" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round" />
+            <circle cx="21" cy="42" r="2" fill="#FFFFFF" />
+            <circle cx="28" cy="44" r="1.5" fill="#FFFFFF" />
+            <circle cx="24" cy="29" r="1.8" fill="#FFFFFF" />
+          </g>
+        </g>
       </g>
     </svg>
   );
 
+  // Size configurations
+  const dimensions = {
+    xs: { icon: 'w-6 h-6', title: 'text-xs', labs: 'text-xs', subtitle: 'text-[7px]', bar: 'h-6' },
+    sm: { icon: 'w-8 h-8', title: 'text-sm', labs: 'text-sm', subtitle: 'text-[8.5px]', bar: 'h-8' },
+    md: { icon: 'w-10 h-10', title: 'text-lg', labs: 'text-lg', subtitle: 'text-[10px]', bar: 'h-10' },
+    lg: { icon: 'w-14 h-14', title: 'text-2xl', labs: 'text-2xl', subtitle: 'text-xs', bar: 'h-14' },
+    xl: { icon: 'w-20 h-20', title: 'text-4xl', labs: 'text-4xl', subtitle: 'text-base', bar: 'h-20' },
+  }[size];
+
+  // Theme text colors
+  const reserveColor =
+    theme === 'dark'
+      ? 'text-white'
+      : theme === 'light'
+      ? 'text-[#091B42]'
+      : 'text-slate-900 dark:text-white';
+
+  const subtitleColor =
+    theme === 'dark'
+      ? 'text-slate-300'
+      : theme === 'light'
+      ? 'text-[#091B42]'
+      : 'text-slate-600 dark:text-slate-300';
+
   if (variant === 'icon') {
-    return <Emblem />;
+    return <Emblem iconClass={`${dimensions.icon} ${className}`} />;
   }
 
   if (variant === 'full') {
     return (
       <div className={`flex flex-col items-center text-center ${className}`}>
-        <Emblem />
-        <div className="mt-1">
-          <span
-            className={`font-black tracking-tight block ${titleSizeClasses} ${
-              theme === 'dark' ? 'text-white' : 'text-[#0D3B66]'
-            }`}
-          >
-            RESERVE
-          </span>
-          <div className="flex items-center justify-center gap-2 mt-0.5">
-            <span className="w-5 h-[2px] bg-amber-500 rounded-full" />
-            <span className={`font-black text-amber-500 uppercase ${subtitleSizeClasses}`}>
-              LABS
-            </span>
-            <span className="w-5 h-[2px] bg-amber-500 rounded-full" />
+        <Emblem iconClass={dimensions.icon} />
+        <div className="mt-2">
+          <div className="flex items-center justify-center gap-1 font-black leading-none">
+            <span className={`${dimensions.title} ${reserveColor} tracking-tight`}>RESERVE</span>
+            <span className={`${dimensions.labs} text-[#0066FF] tracking-tight`}>LABS</span>
           </div>
+          <p className={`mt-1 font-extrabold uppercase tracking-[0.2em] ${dimensions.subtitle} ${subtitleColor}`}>
+            Sistema de Reserva de Laboratórios
+          </p>
         </div>
       </div>
     );
   }
 
-  // Default: Horizontal
+  // Default: Horizontal layout matching the exact uploaded logo
   return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
-      <Emblem />
-      <div className="flex flex-col justify-center">
-        <div className="flex items-center gap-1.5 leading-none">
-          <span
-            className={`font-black tracking-tight leading-none ${titleSizeClasses} ${
-              theme === 'dark' ? 'text-white' : 'text-[#0D3B66]'
-            }`}
-          >
+    <div className={`flex items-center gap-2 sm:gap-3 ${className}`}>
+      {/* 1. Emblem (Calendar + Overlapping Flask) */}
+      <Emblem iconClass={dimensions.icon} />
+
+      {/* 2. Vertical Golden Accent Separator */}
+      <span className={`w-[3.5px] ${dimensions.bar} bg-[#F59E0B] rounded-full shrink-0 shadow-2xs`} />
+
+      {/* 3. Typography */}
+      <div className="flex flex-col justify-center leading-tight">
+        {/* Title: RESERVE LABS */}
+        <div className="flex items-center gap-1 font-black leading-none tracking-tight">
+          <span className={`${dimensions.title} ${reserveColor}`}>
             RESERVE
           </span>
-          <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-extrabold text-[10px] tracking-wider leading-none shadow-2xs">
+          <span className={`${dimensions.labs} text-[#0066FF] dark:text-[#388BFD]`}>
             LABS
           </span>
         </div>
+
+        {/* Subtitle: SISTEMA DE RESERVA DE LABORATÓRIOS */}
+        <p className={`font-bold uppercase tracking-[0.16em] sm:tracking-[0.2em] mt-0.5 whitespace-nowrap ${dimensions.subtitle} ${subtitleColor}`}>
+          Sistema de Reserva de Laboratórios
+        </p>
       </div>
     </div>
   );

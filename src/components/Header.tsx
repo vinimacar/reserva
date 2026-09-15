@@ -95,7 +95,13 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs"
                 title="Clique para alternar de escola ou ver unidades da rede"
               >
-                <School className="w-3.5 h-3.5 text-blue-400" />
+                {settings.logoUrl ? (
+                  <div className="w-4 h-4 rounded bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
+                    <img src={settings.logoUrl} alt="" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                ) : (
+                  <School className="w-3.5 h-3.5 text-blue-400" />
+                )}
                 <span className="truncate max-w-[110px] md:max-w-[150px] font-semibold">
                   {settings.city ? `${settings.city} - ${settings.state || 'MG'}` : 'Rede de Escolas'}
                 </span>
@@ -139,12 +145,24 @@ export const Header: React.FC<HeaderProps> = ({
                             switchSchool(s.id);
                             setShowSchoolSwitcher(false);
                           }}
-                          className={`w-full p-2 rounded-xl text-left flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                          className={`w-full p-2 rounded-xl text-left flex items-center space-x-2.5 text-xs transition-colors cursor-pointer ${
                             isCur
                               ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40'
                               : 'hover:bg-slate-900 text-slate-300 hover:text-white border border-transparent'
                           }`}
                         >
+                          <div className="w-8 h-8 rounded-lg bg-white p-0.5 shrink-0 flex items-center justify-center border border-slate-700 overflow-hidden">
+                            {s.logoUrl ? (
+                              <img
+                                src={s.logoUrl}
+                                alt={s.name}
+                                className="w-full h-full object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <School className="w-4 h-4 text-slate-700" />
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-bold truncate text-white">{s.name}</p>
                             <p className="text-[10px] text-slate-400">

@@ -1,32 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 260" width="100%" height="100%">
   <defs>
     <!-- Calendar Blue Gradient -->
-    <linearGradient id="calGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="calGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#073B9C" />
       <stop offset="100%" stop-color="#0062F5" />
     </linearGradient>
 
     <!-- Flask Circle Gradient -->
-    <linearGradient id="circleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="circleGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#072C7A" />
       <stop offset="100%" stop-color="#0047BA" />
     </linearGradient>
 
     <!-- Electric Blue Labs Gradient -->
-    <linearGradient id="labsGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="labsGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#005BFF" />
       <stop offset="100%" stop-color="#007CFE" />
     </linearGradient>
   </defs>
 
   <!-- EMBLEM GROUP (Calendar + Overlapping Flask Circle) -->
-  <g id="logo-emblem" transform="translate(25, 20)">
+  <g id="logo-emblem-2" transform="translate(25, 20)">
     <!-- Top Rings/Hooks of Calendar -->
     <rect x="52" y="4" width="14" height="28" rx="7" fill="#0A3A9E" />
     <rect x="134" y="4" width="14" height="28" rx="7" fill="#0A3A9E" />
 
     <!-- Calendar Outer Rounded Body -->
-    <rect x="16" y="16" width="170" height="162" rx="30" fill="url(#calGrad)" />
+    <rect x="16" y="16" width="170" height="162" rx="30" fill="url(#calGrad2)" />
 
     <!-- Calendar Inner White Sheet -->
     <rect x="30" y="52" width="142" height="114" rx="18" fill="#FFFFFF" />
@@ -38,9 +38,8 @@
     <rect x="102" y="64" width="22" height="18" rx="4.5" fill="#0D44B4" />
     <rect x="132" y="64" width="22" height="18" rx="4.5" fill="#0D44B4" />
 
-    <!-- Row 2: Slot 1 has large checkmark -->
+    <!-- Row 2: Slot 1 has checkmark -->
     <g transform="translate(42, 90)">
-      <!-- Checkmark -->
       <path d="M 4 12 L 9 17 L 19 5" fill="none" stroke="#0A2A75" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
     </g>
     <rect x="72" y="90" width="22" height="18" rx="4.5" fill="#0D44B4" />
@@ -56,18 +55,14 @@
     <!-- Overlapping Circular Medallion (bottom-right) -->
     <g transform="translate(182, 146)">
       <!-- Outer Circle with White Ring Border -->
-      <circle cx="0" cy="0" r="48" fill="url(#circleGrad)" stroke="#FFFFFF" stroke-width="7" />
+      <circle cx="0" cy="0" r="48" fill="url(#circleGrad2)" stroke="#FFFFFF" stroke-width="7" />
       
       <!-- Erlenmeyer Flask Icon Inside Medallion -->
       <g transform="translate(-20, -23) scale(0.85)">
-        <!-- Top lip rim -->
         <path d="M 17 6 L 31 6" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" />
-        <!-- Neck & Body -->
         <path d="M 20 7 L 20 18 L 6 43 C 4.5 46 6.5 49 10 49 L 38 49 C 41.5 49 43.5 46 42 43 L 28 18 L 28 7" 
               fill="none" stroke="#FFFFFF" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
-        <!-- Liquid Level Line -->
         <path d="M 12 37 L 36 37" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
-        <!-- Bubbles -->
         <circle cx="21" cy="42" r="2" fill="#FFFFFF" />
         <circle cx="27" cy="44" r="1.5" fill="#FFFFFF" />
         <circle cx="24" cy="30" r="1.8" fill="#FFFFFF" />
@@ -83,7 +78,7 @@
     <!-- Line 1: RESERVE LABS -->
     <text x="0" y="126" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="900" font-size="82" letter-spacing="-1.5">
       <tspan fill="#091B42">RESERVE</tspan>
-      <tspan dx="12" fill="url(#labsGrad)">LABS</tspan>
+      <tspan dx="12" fill="url(#labsGrad2)">LABS</tspan>
     </text>
 
     <!-- Line 2: SISTEMA DE RESERVA DE LABORATÓRIOS -->

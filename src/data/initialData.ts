@@ -1,5 +1,6 @@
 import { Room, TimePeriod, User, Reservation, Announcement, SchoolSettings, School } from '../types';
 import { formatLocalDateToISO } from '../lib/dateUtils';
+import { SAMPLE_SCHOOL_LOGOS } from './sampleSchoolLogos';
 
 export const DEFAULT_SCHOOLS: School[] = [
   {
@@ -15,6 +16,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     contactEmail: 'escola.miltoncampos@educacao.mg.gov.br',
     phone: '(31) 3222-1000',
     directorName: 'Prof. Vinicius Carvalho',
+    logoUrl: SAMPLE_SCHOOL_LOGOS[0].dataUrl,
     active: true,
     createdAt: '2026-01-10T08:00:00.000Z',
     adminEmails: ['vinicius.machado.carvalho@educacao.mg.gov.br'],
@@ -35,6 +37,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     contactEmail: 'escola.afonsopena@educacao.mg.gov.br',
     phone: '(31) 3273-4500',
     directorName: 'Profa. Helena Drummond',
+    logoUrl: SAMPLE_SCHOOL_LOGOS[0].dataUrl,
     active: true,
     createdAt: '2026-01-15T09:00:00.000Z',
     adminEmails: ['helena.drummond@educacao.mg.gov.br', 'coordenacao.afonsopena@educacao.mg.gov.br'],
@@ -55,6 +58,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     contactEmail: 'cecilia.meireles@educacao.contagem.mg.gov.br',
     phone: '(31) 3390-5500',
     directorName: 'Profa. Juliana Magalhães',
+    logoUrl: SAMPLE_SCHOOL_LOGOS[1].dataUrl,
     active: true,
     createdAt: '2026-01-20T10:00:00.000Z',
     adminEmails: ['juliana.magalhaes@educacao.contagem.mg.gov.br'],
@@ -75,6 +79,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     contactEmail: 'ti.laboratorios@ifmg.edu.br',
     phone: '(31) 3615-8000',
     directorName: 'Prof. Marcos Valério',
+    logoUrl: SAMPLE_SCHOOL_LOGOS[2].dataUrl,
     active: true,
     createdAt: '2026-02-01T11:00:00.000Z',
     adminEmails: ['marcos.valerio@ifmg.edu.br'],

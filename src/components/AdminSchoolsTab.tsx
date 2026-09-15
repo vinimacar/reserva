@@ -23,11 +23,14 @@ import {
   UserCheck,
   Check,
   UserX,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { School, ShiftType, User } from '../types';
 import { TeacherAvatar } from './TeacherAvatar';
+import { SAMPLE_SCHOOL_LOGOS } from '../data/sampleSchoolLogos';
 
 export const AdminSchoolsTab: React.FC<{
   onShowToast: (msg: string) => void;
@@ -73,6 +76,7 @@ export const AdminSchoolsTab: React.FC<{
     directorName: string;
     contactEmail: string;
     phone: string;
+    logoUrl: string;
     shifts: ShiftType[];
     initialAdminEmail: string;
     initialAdminName: string;
@@ -91,6 +95,7 @@ export const AdminSchoolsTab: React.FC<{
     directorName: '',
     contactEmail: '',
     phone: '',
+    logoUrl: '',
     shifts: ['MANHA', 'TARDE'],
     initialAdminEmail: '',
     initialAdminName: '',
@@ -129,6 +134,7 @@ export const AdminSchoolsTab: React.FC<{
       directorName: '',
       contactEmail: '',
       phone: '',
+      logoUrl: '',
       shifts: ['MANHA', 'TARDE'],
       initialAdminEmail: '',
       initialAdminName: '',
@@ -153,6 +159,7 @@ export const AdminSchoolsTab: React.FC<{
       directorName: school.directorName || '',
       contactEmail: school.contactEmail || '',
       phone: school.phone || '',
+      logoUrl: school.logoUrl || '',
       shifts: school.shifts || ['MANHA', 'TARDE'],
       initialAdminEmail: '',
       initialAdminName: '',
@@ -162,6 +169,23 @@ export const AdminSchoolsTab: React.FC<{
       allowWeekendBooking: school.allowWeekendBooking || false,
     });
     setIsSchoolModalOpen(true);
+  };
+
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2.5 * 1024 * 1024) {
+      alert('A imagem é muito grande. Escolha uma imagem de até 2.5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const result = uploadEvent.target?.result as string;
+      if (result) {
+        setFormData((prev) => ({ ...prev, logoUrl: result }));
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveSchoolSubmit = async (e: React.FormEvent) => {
@@ -184,6 +208,7 @@ export const AdminSchoolsTab: React.FC<{
         directorName: formData.directorName.trim(),
         contactEmail: formData.contactEmail.trim(),
         phone: formData.phone.trim(),
+        logoUrl: formData.logoUrl.trim(),
         shifts: formData.shifts,
         requireAdminApproval: formData.requireAdminApproval,
         maxAdvanceDays: formData.maxAdvanceDays,
@@ -203,6 +228,7 @@ export const AdminSchoolsTab: React.FC<{
           directorName: formData.directorName.trim(),
           contactEmail: formData.contactEmail.trim(),
           phone: formData.phone.trim(),
+          logoUrl: formData.logoUrl.trim(),
           shifts: formData.shifts,
           active: true,
           adminEmails: formData.initialAdminEmail.trim() ? [formData.initialAdminEmail.trim().toLowerCase()] : [],
@@ -444,13 +470,24 @@ export const AdminSchoolsTab: React.FC<{
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex items-center space-x-3">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
-                        isCurrentActive
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden ${
+                        school.logoUrl
+                          ? 'bg-white p-1 border border-slate-200 dark:border-slate-700 shadow-xs'
+                          : isCurrentActive
                           ? 'bg-blue-600 text-white'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      <SchoolIcon className="w-5 h-5" />
+                      {school.logoUrl ? (
+                        <img
+                          src={school.logoUrl}
+                          alt={school.name}
+                          className="w-full h-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <SchoolIcon className="w-6 h-6" />
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
@@ -613,6 +650,16 @@ export const AdminSchoolsTab: React.FC<{
                 </div>
 
                 <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(school)}
+                    className="px-2.5 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-xs font-semibold flex items-center gap-1 border border-slate-200 dark:border-slate-800"
+                    title="Configurar ou alterar o brasão / logo desta escola"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Logo</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleOpenEditModal(school)}
@@ -843,6 +890,150 @@ export const AdminSchoolsTab: React.FC<{
                       );
                     })}
                   </div>
+                </div>
+
+                {/* School Logo / Crest Section */}
+                <div className="sm:col-span-2 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-blue-500" />
+                      <span>Logo / Brasão Institucional da Escola:</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500">
+                      Exibido no sistema, comprovantes e no seletor de escolas
+                    </span>
+                  </div>
+
+                  {formData.logoUrl ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                      {/* Live Previews: Light and Dark background comparison */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-center">
+                          <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 p-1.5 flex items-center justify-center shadow-xs">
+                            <img
+                              src={formData.logoUrl}
+                              alt="Pré-visualização do logo"
+                              className="max-h-full max-w-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-500 uppercase mt-1 block">Fundo Claro</span>
+                        </div>
+                        <div className="text-center">
+                          <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 p-1.5 flex items-center justify-center shadow-xs">
+                            <img
+                              src={formData.logoUrl}
+                              alt="Pré-visualização do logo"
+                              className="max-h-full max-w-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase mt-1 block">Fundo Escuro</span>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0 space-y-1.5 text-left w-full sm:w-auto">
+                        <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Logo configurado para esta escola</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Este brasão aparecerá no cabeçalho das reservas, recibos emitidos e cards da unidade.
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <label
+                            htmlFor="school-logo-input"
+                            className="px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 rounded-lg cursor-pointer border border-blue-200 dark:border-blue-800 transition-colors inline-flex items-center gap-1"
+                          >
+                            <Upload className="w-3 h-3" />
+                            <span>Substituir</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, logoUrl: '' }))}
+                            className="px-2.5 py-1 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Remover Logo</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* File Upload Drop Area */}
+                      <label
+                        htmlFor="school-logo-input"
+                        className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-white/50 dark:bg-slate-900/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all text-center group"
+                      >
+                        <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Clique aqui para selecionar uma imagem ou brasão do seu computador
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Formatos aceitos: PNG, JPG, SVG ou WebP (tamanho máx: 2.5MB)
+                        </p>
+                      </label>
+
+                      {/* Or direct URL input */}
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Ou informe a URL direta de uma imagem:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="url"
+                            value={formData.logoUrl}
+                            onChange={(e) => setFormData({ ...formData, logoUrl: e.target.value })}
+                            placeholder="https://exemplo.gov.br/brasao-escola.png"
+                            className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white text-xs placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Or pick a standard institutional crest */}
+                      <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                          Ou selecione um modelo institucional pré-definido:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {SAMPLE_SCHOOL_LOGOS.map((sample) => (
+                            <button
+                              key={sample.id}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, logoUrl: sample.dataUrl })}
+                              className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 text-left transition-all flex items-center gap-2 cursor-pointer group"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 p-1 shrink-0 flex items-center justify-center border border-slate-100 dark:border-slate-700">
+                                <img
+                                  src={sample.dataUrl}
+                                  alt={sample.name}
+                                  className="w-full h-full object-contain"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-500">
+                                  {sample.name}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hidden file input */}
+                  <input
+                    id="school-logo-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    onChange={handleLogoFileUpload}
+                    className="hidden"
+                  />
                 </div>
               </div>
 

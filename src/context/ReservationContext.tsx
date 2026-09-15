@@ -321,6 +321,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     contactEmail: currentSchool?.contactEmail || '',
     phone: currentSchool?.phone || '',
     directorName: currentSchool?.directorName || '',
+    logoUrl: currentSchool?.logoUrl || '',
     isConfigured: true,
     configuredAt: currentSchool?.createdAt || new Date().toISOString(),
   };
@@ -1227,6 +1228,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
             contactEmail: newSettings.contactEmail || s.contactEmail,
             phone: newSettings.phone || s.phone,
             directorName: newSettings.directorName || s.directorName,
+            logoUrl: newSettings.logoUrl !== undefined ? newSettings.logoUrl : s.logoUrl,
             requireAdminApproval: newSettings.requireAdminApproval !== undefined ? newSettings.requireAdminApproval : s.requireAdminApproval,
             maxAdvanceDays: newSettings.maxAdvanceDays || s.maxAdvanceDays,
             allowWeekendBooking: newSettings.allowWeekendBooking !== undefined ? newSettings.allowWeekendBooking : s.allowWeekendBooking,

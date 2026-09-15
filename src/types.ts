@@ -14,6 +14,7 @@ export interface School {
   contactEmail: string;
   phone?: string;
   directorName?: string;
+  logoUrl?: string; // URL or base64 image of the school's crest/logo
   active: boolean;
   createdAt: string;
   adminEmails: string[]; // List of emails of authorized administrators / responsáveis for this school
@@ -117,6 +118,7 @@ export interface SchoolSettings {
   contactEmail: string;
   phone?: string;
   directorName?: string;
+  logoUrl?: string;
   isConfigured: boolean;
   configuredAt?: string;
 }
@@ -143,6 +145,7 @@ export interface ClientOnboardingData {
   contactEmail: string;
   phone?: string;
   directorName?: string;
+  logoUrl?: string;
   
   // Operational rules
   shifts: ShiftType[];
