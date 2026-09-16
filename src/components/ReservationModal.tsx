@@ -63,6 +63,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     rooms,
     periods,
     classes,
+    getClassesForSchool,
     addClass,
     addReservation,
     addBatchReservations,
@@ -129,49 +130,36 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [createdBatchReservations, setCreatedBatchReservations] = useState<Reservation[]>([]);
   const [batchSkippedConflicts, setBatchSkippedConflicts] = useState<Array<{ date: string; message: string }>>([]);
 
-  // Load saved custom classes for this school from localStorage
-  useEffect(() => {
-    try {
-      const storageKey = `reserve_custom_classes_${currentSchoolId || 'default'}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setSchoolCustomClasses(parsed);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, [currentSchoolId]);
+  // Target school for the selected room and reservation
+  const currentRoom = useMemo(() => rooms.find((r) => r.id === roomId) || rooms[0], [rooms, roomId]);
+  const targetSchoolId = currentRoom?.schoolId || currentSchoolId;
+  const targetSchool = useMemo(
+    () => schools.find((s) => s.id === targetSchoolId) || currentSchool,
+    [schools, targetSchoolId, currentSchool]
+  );
+
+  // Registered classes strictly from the school's cadastro
+  const schoolClasses = useMemo(() => {
+    return getClassesForSchool(targetSchoolId);
+  }, [getClassesForSchool, targetSchoolId]);
 
   const saveCustomClass = (newClass: string) => {
     const trimmed = newClass.trim();
     if (!trimmed) return;
-    addClass(trimmed);
-    if (!schoolCustomClasses.includes(trimmed) && !SCHOOL_CLASSES.includes(trimmed)) {
-      const updated = [trimmed, ...schoolCustomClasses];
-      setSchoolCustomClasses(updated);
-      try {
-        const storageKey = `reserve_custom_classes_${currentSchoolId || 'default'}`;
-        localStorage.setItem(storageKey, JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-    }
+    addClass(trimmed, targetSchoolId);
+    setTurma(trimmed);
+    setIsAddingNewTurma(false);
+    setCustomTurma('');
   };
 
-  // Merge context classes with school-specific custom classes
-  const customClassesList = useMemo(() => {
-    const set = new Set<string>();
-    classes.forEach((c) => {
-      if (!SCHOOL_CLASSES.includes(c)) set.add(c);
-    });
-    schoolCustomClasses.forEach((c) => {
-      if (!SCHOOL_CLASSES.includes(c)) set.add(c);
-    });
-    return Array.from(set);
-  }, [classes, schoolCustomClasses]);
+  // Keep turma strictly synchronized with the school's registered classes
+  useEffect(() => {
+    if (schoolClasses.length > 0) {
+      if (!turma || !schoolClasses.includes(turma)) {
+        setTurma(schoolClasses[0]);
+      }
+    }
+  }, [schoolClasses, turma]);
 
   // Sync initial props when opened
   useEffect(() => {
@@ -297,7 +285,6 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentRoom = rooms.find((r) => r.id === roomId) || rooms[0];
   const shiftPeriods = periods.filter((p) => p.shift === shift && schoolShifts.includes(p.shift));
   const currentSelectedTeacher = users.find((u) => u.id === selectedTeacherId) || currentUser || users[0];
 
@@ -1111,55 +1098,30 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                     value={turma}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setTurma(val);
                       if (val === 'OUTRA') {
                         setIsAddingNewTurma(true);
+                      } else {
+                        setTurma(val);
                       }
                     }}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800"
                     required
                   >
-                    {customClassesList.length > 0 && (
-                      <optgroup label={`⭐ Turmas Cadastradas da Escola (${customClassesList.length})`}>
-                        {customClassesList.map((c) => (
-                          <option key={`custom-${c}`} value={c}>
+                    {schoolClasses.length === 0 ? (
+                      <option value="">Nenhuma turma cadastrada nesta escola</option>
+                    ) : (
+                      <optgroup
+                        label={`Turmas da Escola (${targetSchool?.shortName || targetSchool?.name || 'Escola'})`}
+                      >
+                        {schoolClasses.map((c) => (
+                          <option key={c} value={c}>
                             {c}
                           </option>
                         ))}
                       </optgroup>
                     )}
 
-                    <optgroup label="☀️ Ensino Fundamental (Anos Finais)">
-                      {SCHOOL_CLASSES.filter((c) => c.includes('Fundamental') || c.includes('º Ano ')).map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </optgroup>
-
-                    <optgroup label="🎓 Ensino Médio Regular & EMTI">
-                      {SCHOOL_CLASSES.filter((c) => c.includes('E.M.') || c.includes('EMTI')).map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </optgroup>
-
-                    <optgroup label="🌙 EJA, Técnicos & Eletivas">
-                      {SCHOOL_CLASSES.filter(
-                        (c) =>
-                          c.includes('EJA') ||
-                          c.includes('Técnico') ||
-                          c.includes('Itinerário') ||
-                          c.includes('Robótica')
-                      ).map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </optgroup>
-
-                    <option value="OUTRA">➕ Outra Turma / Digitar Personalizada...</option>
+                    <option value="OUTRA">➕ Outra Turma / Cadastrar Nova...</option>
                   </select>
                 </>
               ) : (

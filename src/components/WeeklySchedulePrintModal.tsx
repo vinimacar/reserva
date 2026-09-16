@@ -51,8 +51,6 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
   const [onlyApproved, setOnlyApproved] = useState<boolean>(true);
   const [printLayout, setPrintLayout] = useState<'GRID' | 'LIST'>('GRID'); // 'GRID' = Mapa Semanal, 'LIST' = Pauta com Assinatura
 
-  if (!isOpen) return null;
-
   // School branding details
   const schoolName = currentSchool?.name || settings?.schoolName || 'Escola da Rede';
   const schoolCity = currentSchool?.city || settings?.city || 'Belo Horizonte';
@@ -123,10 +121,17 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
     INTEGRAL: 'Tempo Integral',
   };
 
-  // Trigger print
+  // Trigger print safely without crashing iframe or throwing COOP errors
   const handlePrint = () => {
-    window.print();
+    try {
+      window.print();
+    } catch (err) {
+      console.warn('Erro ou bloqueio ao chamar window.print():', err);
+    }
   };
+
+  // Render nothing only after ALL hooks have been registered unconditionally
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">

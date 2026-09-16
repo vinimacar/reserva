@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Reservation,
   Room,
@@ -133,12 +133,13 @@ interface ReservationContextType {
     totalAdmins: number;
   };
 
-  // Turmas & Horários Management (Mantendo os existentes)
+  // Turmas & Horários Management (Mantendo os existentes e específicos por escola)
   classes: string[];
-  addClass: (className: string) => void;
-  removeClass: (className: string) => void;
-  updateClass: (oldName: string, newName: string) => void;
-  resetClasses: () => void;
+  getClassesForSchool: (schoolId: string) => string[];
+  addClass: (className: string, schoolId?: string) => void;
+  removeClass: (className: string, schoolId?: string) => void;
+  updateClass: (oldName: string, newName: string, schoolId?: string) => void;
+  resetClasses: (schoolId?: string) => void;
 
   addPeriod: (periodData: Omit<TimePeriod, 'id'>) => TimePeriod;
   updatePeriod: (period: TimePeriod) => void;
@@ -170,7 +171,30 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const saved = localStorage.getItem(STORAGE_KEY_SCHOOLS);
       if (saved) {
         const parsed: School[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((s) => {
+            if (!s.classes || s.classes.length === 0) {
+              const def = DEFAULT_SCHOOLS.find((d) => d.id === s.id);
+              return {
+                ...s,
+                classes: def?.classes || [
+                  '6º Ano A',
+                  '6º Ano B',
+                  '7º Ano A',
+                  '7º Ano B',
+                  '8º Ano A',
+                  '8º Ano B',
+                  '9º Ano A',
+                  '9º Ano B',
+                  '1º Ano E.M. 1',
+                  '2º Ano E.M. 1',
+                  '3º Ano E.M. 1',
+                ],
+              };
+            }
+            return s;
+          });
+        }
       }
     } catch {
       // ignore
@@ -194,6 +218,8 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     schools.find((s) => s.id === currentSchoolId) ||
     schools[0] ||
     DEFAULT_SCHOOLS[0];
+
+  const defaultSchoolId = DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
 
   // 3. Raw Data Stores (Multi-tenant persisted)
   const [allReservations, setAllReservations] = useState<Reservation[]>(() => {
@@ -266,31 +292,44 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return TIME_PERIODS;
   });
 
-  // Classes (Turmas) State - initialized with SCHOOL_CLASSES and merged with saved custom classes
-  const [classes, setClasses] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CLASSES);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Maintain all standard classes while incorporating any custom additions
-          return Array.from(new Set([...SCHOOL_CLASSES, ...parsed]));
-        }
+  // Helper to fetch classes specifically for any school
+  const getClassesForSchool = useCallback(
+    (schoolId?: string): string[] => {
+      const targetId = schoolId || currentSchoolId || defaultSchoolId;
+      const s = schools.find((sch) => sch.id === targetId);
+      if (s?.classes && s.classes.length > 0) {
+        return s.classes;
       }
-    } catch {
-      // ignore
-    }
-    return SCHOOL_CLASSES;
-  });
+      const def = DEFAULT_SCHOOLS.find((d) => d.id === targetId);
+      if (def?.classes && def.classes.length > 0) {
+        return def.classes;
+      }
+      return [
+        '6º Ano A',
+        '6º Ano B',
+        '7º Ano A',
+        '7º Ano B',
+        '8º Ano A',
+        '8º Ano B',
+        '9º Ano A',
+        '9º Ano B',
+        '1º Ano E.M. 1',
+        '2º Ano E.M. 1',
+        '3º Ano E.M. 1',
+      ];
+    },
+    [schools, currentSchoolId, defaultSchoolId]
+  );
 
-  // Sync periods and classes to LocalStorage
+  // Active School's registered classes
+  const classes = useMemo(() => {
+    return getClassesForSchool(currentSchoolId);
+  }, [getClassesForSchool, currentSchoolId]);
+
+  // Sync periods to LocalStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PERIODS, JSON.stringify(periods));
   }, [periods]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(classes));
-  }, [classes]);
 
   // Sync state to LocalStorage
   useEffect(() => {
@@ -350,8 +389,6 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   // Derived tenant-scoped slices
-  const defaultSchoolId = DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
-
   const rooms: Room[] = (allRooms || []).filter(
     (r) => r && (r.schoolId === currentSchoolId || (!r.schoolId && currentSchoolId === defaultSchoolId))
   );
@@ -1425,29 +1462,90 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     DEFAULT_ANNOUNCEMENTS.forEach((a) => saveAnnouncementToCloud(a).catch(() => {}));
   };
 
-  // Turmas (Classes) Actions
-  const addClass = (className: string) => {
+  // Turmas (Classes) Actions - Specific to each School
+  const addClass = (className: string, schoolId?: string) => {
     const trimmed = className.trim();
     if (!trimmed) return;
-    setClasses((prev) => {
-      if (prev.includes(trimmed)) return prev;
-      return [...prev, trimmed];
+    const targetId = schoolId || currentSchoolId || defaultSchoolId;
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== targetId) return s;
+        const currentList = s.classes || [];
+        if (currentList.includes(trimmed)) return s;
+        return { ...s, classes: [...currentList, trimmed] };
+      });
+      const target = updated.find((s) => s.id === targetId);
+      if (target) {
+        saveSchoolToCloud(target).catch(console.error);
+      }
+      return updated;
     });
   };
 
-  const removeClass = (className: string) => {
-    setClasses((prev) => prev.filter((c) => c !== className));
+  const removeClass = (className: string, schoolId?: string) => {
+    const targetId = schoolId || currentSchoolId || defaultSchoolId;
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== targetId) return s;
+        const currentList = s.classes || [];
+        return { ...s, classes: currentList.filter((c) => c !== className) };
+      });
+      const target = updated.find((s) => s.id === targetId);
+      if (target) {
+        saveSchoolToCloud(target).catch(console.error);
+      }
+      return updated;
+    });
   };
 
-  const updateClass = (oldName: string, newName: string) => {
+  const updateClass = (oldName: string, newName: string, schoolId?: string) => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    setClasses((prev) => prev.map((c) => (c === oldName ? trimmed : c)));
+    const targetId = schoolId || currentSchoolId || defaultSchoolId;
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== targetId) return s;
+        const currentList = s.classes || [];
+        return {
+          ...s,
+          classes: currentList.map((c) => (c === oldName ? trimmed : c)),
+        };
+      });
+      const target = updated.find((s) => s.id === targetId);
+      if (target) {
+        saveSchoolToCloud(target).catch(console.error);
+      }
+      return updated;
+    });
   };
 
-  const resetClasses = () => {
-    setClasses(SCHOOL_CLASSES);
-    localStorage.removeItem(STORAGE_KEY_CLASSES);
+  const resetClasses = (schoolId?: string) => {
+    const targetId = schoolId || currentSchoolId || defaultSchoolId;
+    const def = DEFAULT_SCHOOLS.find((d) => d.id === targetId);
+    const defaultClasses = def?.classes || [
+      '6º Ano A',
+      '6º Ano B',
+      '7º Ano A',
+      '7º Ano B',
+      '8º Ano A',
+      '8º Ano B',
+      '9º Ano A',
+      '9º Ano B',
+      '1º Ano E.M. 1',
+      '2º Ano E.M. 1',
+      '3º Ano E.M. 1',
+    ];
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id !== targetId) return s;
+        return { ...s, classes: defaultClasses };
+      });
+      const target = updated.find((s) => s.id === targetId);
+      if (target) {
+        saveSchoolToCloud(target).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   // Horários (Periods) Actions
@@ -1498,6 +1596,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         allRooms,
         periods,
         classes,
+        getClassesForSchool,
         addClass,
         removeClass,
         updateClass,

@@ -21,6 +21,7 @@ export interface School {
   requireAdminApproval?: boolean;
   maxAdvanceDays?: number;
   allowWeekendBooking?: boolean;
+  classes?: string[]; // Turmas cadastradas especificamente para esta escola
 }
 
 export interface User {
