@@ -509,9 +509,15 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
                             {dayReservations.map((res, idx) => (
                               <tr key={res.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                                 <td className="py-2 px-2 border-t border-r border-slate-200 font-semibold text-slate-800">
-                                  <span className="font-bold text-blue-900 block">{shiftLabels[res.shift].split(' ')[2] || res.shift}</span>
+                                  <span className="font-bold text-blue-900 block">
+                                    {shiftLabels[res.shift] || res.shift}
+                                  </span>
                                   <span className="text-[9px] text-slate-500 block">
-                                    {res.periodLabels?.join(', ') || 'Horário integral'}
+                                    {Array.isArray(res.periodLabels)
+                                      ? res.periodLabels.join(', ')
+                                      : typeof res.periodLabels === 'string' && res.periodLabels
+                                      ? res.periodLabels
+                                      : 'Horário integral'}
                                   </span>
                                 </td>
                                 <td className="py-2 px-2 border-t border-r border-slate-200 font-bold text-slate-900">
