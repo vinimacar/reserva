@@ -117,8 +117,24 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
   // Relevant shifts to display
   const activeShifts: ShiftType[] = useMemo(() => {
     if (selectedShiftFilter !== 'ALL') return [selectedShiftFilter];
-    return ['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'];
-  }, [selectedShiftFilter]);
+
+    const configuredShifts =
+      currentSchool?.shifts && currentSchool.shifts.length > 0
+        ? currentSchool.shifts
+        : settings?.shifts && settings.shifts.length > 0
+        ? settings.shifts
+        : (['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]);
+
+    const candidateOrder: ShiftType[] = ['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'];
+    const filtered = candidateOrder.filter((sh) => {
+      const hasPeriods = periods.some((p) => p.shift === sh);
+      const isConfigured = configuredShifts.includes(sh);
+      const hasRes = weekReservations.some((r) => r.shift === sh);
+      return hasPeriods && (isConfigured || hasRes);
+    });
+
+    return filtered.length > 0 ? filtered : configuredShifts;
+  }, [selectedShiftFilter, currentSchool?.shifts, settings?.shifts, periods, weekReservations]);
 
   // Shift label helper
   const shiftLabels: Record<ShiftType, string> = {
@@ -226,10 +242,10 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
                 onChange={(e) => setSelectedShiftFilter(e.target.value as ShiftType | 'ALL')}
                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold px-3 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="ALL">Todos os Turnos</option>
-                <option value="MANHA">Manhã</option>
-                <option value="TARDE">Tarde</option>
-                <option value="NOITE">Noite</option>
+                <option value="ALL">Todos os Turnos (Geral)</option>
+                <option value="MANHA">Turno da Manhã</option>
+                <option value="TARDE">Turno da Tarde</option>
+                <option value="NOITE">Turno da Noite</option>
                 <option value="INTEGRAL">Tempo Integral</option>
               </select>
             </div>

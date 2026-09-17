@@ -1028,7 +1028,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
         initialWeekOffset={weekOffset}
-        initialShift={selectedShift}
+        initialShift="ALL"
       />
     </div>
   );
