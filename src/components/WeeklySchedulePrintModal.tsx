@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Printer,
   X,
@@ -50,6 +50,13 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
   const [selectedRoomFilter, setSelectedRoomFilter] = useState<string>('ALL');
   const [onlyApproved, setOnlyApproved] = useState<boolean>(true);
   const [printLayout, setPrintLayout] = useState<'GRID' | 'LIST'>('GRID'); // 'GRID' = Mapa Semanal, 'LIST' = Pauta com Assinatura
+
+  useEffect(() => {
+    if (isOpen) {
+      setWeekOffset(initialWeekOffset);
+      setSelectedShiftFilter(initialShift);
+    }
+  }, [isOpen, initialWeekOffset, initialShift]);
 
   // School branding details
   const schoolName = currentSchool?.name || settings?.schoolName || 'Escola da Rede';

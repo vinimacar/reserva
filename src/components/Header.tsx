@@ -53,12 +53,13 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { currentUser, isAdmin, isDeveloperMode, logout } = useAuth();
   const isOwner = isOwnerEmail(currentUser?.email);
-  const { announcements, settings, schools, currentSchoolId, switchSchool } = useReservations();
+  const { announcements, settings, schools, currentSchool, currentSchoolId, switchSchool } = useReservations();
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
 
   const importantAnnouncementsCount = (announcements || []).filter((a) => a && a.important).length;
+  const activeSchoolLogo = currentSchool?.logoUrl || settings?.logoUrl;
 
   return (
     <header id="app-header" className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">
@@ -82,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium hidden sm:block truncate max-w-[180px] md:max-w-[240px]">
-                  {settings.shortName || settings.schoolName.split('-')[0]}
+                  {currentSchool?.name || settings.shortName || settings.schoolName.split('-')[0]}
                 </p>
               </div>
             </button>
@@ -95,15 +96,15 @@ export const Header: React.FC<HeaderProps> = ({
                 className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs"
                 title="Clique para alternar de escola ou ver unidades da rede"
               >
-                {settings.logoUrl ? (
+                {activeSchoolLogo ? (
                   <div className="w-4 h-4 rounded bg-white p-0.5 shrink-0 flex items-center justify-center overflow-hidden">
-                    <img src={settings.logoUrl} alt="" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    <img src={activeSchoolLogo} alt="" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                   </div>
                 ) : (
                   <School className="w-3.5 h-3.5 text-blue-400" />
                 )}
                 <span className="truncate max-w-[110px] md:max-w-[150px] font-semibold">
-                  {settings.city ? `${settings.city} - ${settings.state || 'MG'}` : 'Rede de Escolas'}
+                  {currentSchool?.city ? `${currentSchool.city} - ${currentSchool.state || 'MG'}` : (settings.city ? `${settings.city} - ${settings.state || 'MG'}` : 'Rede de Escolas')}
                 </span>
                 <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showSchoolSwitcher ? 'rotate-180 text-blue-400' : ''}`} />
               </button>
