@@ -53,13 +53,15 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { currentUser, isAdmin, isDeveloperMode, logout } = useAuth();
   const isOwner = isOwnerEmail(currentUser?.email);
-  const { announcements, settings, schools, currentSchool, currentSchoolId, switchSchool } = useReservations();
+  const { reservations, announcements, settings, schools, currentSchool, currentSchoolId, switchSchool } = useReservations();
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
 
   const importantAnnouncementsCount = (announcements || []).filter((a) => a && a.important).length;
   const activeSchoolLogo = currentSchool?.logoUrl || settings?.logoUrl;
+  const totalReservationsCount = (reservations || []).length;
+  const pendingReservationsCount = (reservations || []).filter((r) => r && r.status === 'PENDING').length;
 
   return (
     <header id="app-header" className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">
@@ -252,9 +254,19 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'text-amber-300 hover:text-white hover:bg-slate-700/60'
                 }`}
+                title={`Painel da Coordenação / Admin • ${totalReservationsCount} reserva(s)${pendingReservationsCount > 0 ? ` (${pendingReservationsCount} pendente(s))` : ''}`}
               >
                 <Shield className="w-4 h-4 text-amber-400" />
                 <span>Painel Admin</span>
+                {pendingReservationsCount > 0 ? (
+                  <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] animate-pulse">
+                    {pendingReservationsCount} pendente{pendingReservationsCount > 1 ? 's' : ''}
+                  </span>
+                ) : totalReservationsCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-amber-300 border border-slate-700 font-bold text-[10px]">
+                    {totalReservationsCount}
+                  </span>
+                ) : null}
               </button>
             )}
           </nav>
@@ -649,13 +661,24 @@ export const Header: React.FC<HeaderProps> = ({
               id="mobile-nav-admin-btn"
               type="button"
               onClick={() => onViewChange('ADMIN')}
-              className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all cursor-pointer min-h-[48px] ${
+              className={`flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all cursor-pointer min-h-[48px] relative ${
                 currentView === 'ADMIN'
                   ? 'text-amber-400 font-bold'
                   : 'text-amber-300/80 hover:text-amber-200'
               }`}
             >
-              <Shield className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'ADMIN' ? 'scale-110 text-amber-400' : ''}`} />
+              <div className="relative">
+                <Shield className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'ADMIN' ? 'scale-110 text-amber-400' : ''}`} />
+                {pendingReservationsCount > 0 ? (
+                  <span className="absolute -top-1.5 -right-2.5 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] animate-pulse">
+                    {pendingReservationsCount}
+                  </span>
+                ) : totalReservationsCount > 0 ? (
+                  <span className="absolute -top-1.5 -right-2.5 px-1.5 py-0.2 rounded-full bg-slate-800 text-amber-300 border border-slate-700 font-bold text-[9px]">
+                    {totalReservationsCount}
+                  </span>
+                ) : null}
+              </div>
               <span className="text-[10px] tracking-tight">Admin</span>
             </button>
           ) : (

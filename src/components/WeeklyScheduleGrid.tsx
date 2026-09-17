@@ -39,11 +39,13 @@ import { formatLocalDateToISO } from '../lib/dateUtils';
 interface WeeklyScheduleGridProps {
   onSelectSlot: (roomId: string, date: string, periodId: string) => void;
   onSelectReservation: (reservation: Reservation) => void;
+  onNavigateToAdmin?: () => void;
 }
 
 export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
   onSelectSlot,
   onSelectReservation,
+  onNavigateToAdmin,
 }) => {
   const {
     rooms,
@@ -60,6 +62,9 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
     settings,
   } = useReservations();
   const { currentUser, isAdmin } = useAuth();
+
+  const totalReservationsCount = (reservations || []).length;
+  const pendingReservationsCount = (reservations || []).filter((r) => r && r.status === 'PENDING').length;
 
   // Week offset state (0 = current week, 1 = next week, -1 = last week)
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -187,6 +192,57 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
 
   return (
     <div id="weekly-schedule-container" className="space-y-4">
+      {/* Coordinator / Admin Alert Indicator */}
+      {isAdmin && (
+        <div
+          id="coordinator-reservations-alert"
+          className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs transition-all shadow-xs ${
+            pendingReservationsCount > 0
+              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60 text-amber-950 dark:text-amber-200'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+          }`}
+        >
+          <div className="flex items-center space-x-2.5">
+            <div
+              className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
+                pendingReservationsCount > 0
+                  ? 'bg-amber-500 text-slate-950 font-black animate-pulse'
+                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-slate-900 dark:text-white">
+                Painel da Coordenação / Administrador:
+              </span>{' '}
+              <span>
+                Existem <strong>{totalReservationsCount}</strong> reserva{totalReservationsCount === 1 ? '' : 's'} registrada{totalReservationsCount === 1 ? '' : 's'} na rede.
+              </span>
+              {pendingReservationsCount > 0 && (
+                <span className="ml-1.5 px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] inline-flex items-center gap-1 animate-pulse">
+                  <span>⚠️ {pendingReservationsCount} aguardando aprovação</span>
+                </span>
+              )}
+            </div>
+          </div>
+          {onNavigateToAdmin && (
+            <button
+              id="coordinator-go-admin-btn"
+              type="button"
+              onClick={onNavigateToAdmin}
+              className={`px-3 py-1.5 rounded-xl font-bold transition-all text-xs shrink-0 self-start sm:self-auto cursor-pointer ${
+                pendingReservationsCount > 0
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs hover:scale-105'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
+              }`}
+            >
+              {pendingReservationsCount > 0 ? 'Avaliar Solicitações Pendentes →' : 'Gerenciar Todas no Admin →'}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 1. Room Selection Tabs */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-xs border border-slate-200 dark:border-slate-800 transition-colors">
         <div className="flex items-center justify-between mb-2 px-1">

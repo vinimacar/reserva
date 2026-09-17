@@ -181,6 +181,7 @@ function ReserveAppContent() {
           <WeeklyScheduleGrid
             onSelectSlot={handleOpenSlotBooking}
             onSelectReservation={handleSelectReservation}
+            onNavigateToAdmin={() => setCurrentView('ADMIN')}
           />
         )}
 

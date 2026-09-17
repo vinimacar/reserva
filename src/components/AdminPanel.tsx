@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Shield,
   Layers,
@@ -213,6 +213,26 @@ export const AdminPanel: React.FC<{
     document.body.removeChild(link);
   };
 
+  // Reservation metrics & alert counts for coordinator/admin
+  const todayStr = useMemo(() => formatLocalDateToISO(), []);
+  const totalReservationsCount = (reservations || []).length;
+  const pendingReservations = useMemo(
+    () => (reservations || []).filter((r) => r && r.status === 'PENDING'),
+    [reservations]
+  );
+  const confirmedReservations = useMemo(
+    () => (reservations || []).filter((r) => r && r.status === 'CONFIRMED'),
+    [reservations]
+  );
+  const todayReservations = useMemo(
+    () => (reservations || []).filter((r) => r && r.date === todayStr && r.status !== 'CANCELLED'),
+    [reservations, todayStr]
+  );
+  const upcomingReservations = useMemo(
+    () => (reservations || []).filter((r) => r && r.date >= todayStr && r.status === 'CONFIRMED'),
+    [reservations, todayStr]
+  );
+
   // Filtered Reservations for Admin table
   const filteredReservations = (reservations || []).filter((r) => {
     if (!r) return false;
@@ -332,6 +352,167 @@ export const AdminPanel: React.FC<{
         </div>
       </div>
 
+      {/* ALERT BANNER: PENDING RESERVATIONS REQUIRING COORDINATOR APPROVAL */}
+      {pendingReservations.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md shadow-amber-500/10">
+          <div className="flex items-start sm:items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-xs animate-pulse">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h4 className="font-black text-sm text-slate-900 dark:text-white">
+                  Atenção Coordenação: {pendingReservations.length} reserva{pendingReservations.length > 1 ? 's' : ''} aguardando sua aprovação!
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  Requer Ação
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Há solicitações docentes pendentes de validação para uso dos espaços. Clique no botão ao lado para avaliar.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('BOOKINGS');
+              setFilterStatus('PENDING');
+            }}
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shrink-0 shadow-sm cursor-pointer hover:scale-105"
+          >
+            Revisar e Aprovar ({pendingReservations.length}) →
+          </button>
+        </div>
+      )}
+
+      {/* RESERVATIONS OVERVIEW & ALERT METRIC CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Card 1: Total de Reservas */}
+        <div
+          onClick={() => {
+            setActiveTab('BOOKINGS');
+            setFilterStatus('ALL');
+            setSearchBooking('');
+          }}
+          className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-blue-400 dark:hover:border-blue-500 transition-all cursor-pointer group"
+          title="Clique para ver todas as reservas cadastradas"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Total de Reservas
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Layers className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{totalReservationsCount}</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">registradas</span>
+          </div>
+          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-1 block">
+            Ver todas as reservas →
+          </span>
+        </div>
+
+        {/* Card 2: Aguardando Aprovação */}
+        <div
+          onClick={() => {
+            setActiveTab('BOOKINGS');
+            setFilterStatus('PENDING');
+            setSearchBooking('');
+          }}
+          className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer group ${
+            pendingReservations.length > 0
+              ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 shadow-amber-500/10 shadow-md ring-2 ring-amber-400/30'
+              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs hover:border-amber-400'
+          }`}
+          title="Clique para filtrar apenas as reservas que aguardam aprovação"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+              Aguardando Aprovação
+            </span>
+            <div
+              className={`w-7 h-7 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform ${
+                pendingReservations.length > 0
+                  ? 'bg-amber-500 text-slate-950 animate-bounce'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span
+              className={`text-2xl font-black ${
+                pendingReservations.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'
+              }`}
+            >
+              {pendingReservations.length}
+            </span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">pendente(s)</span>
+          </div>
+          <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-1 block">
+            {pendingReservations.length > 0 ? '⚠️ Requer atenção imediata →' : 'Nenhuma pendente'}
+          </span>
+        </div>
+
+        {/* Card 3: Reservas Hoje */}
+        <div
+          onClick={() => {
+            setActiveTab('BOOKINGS');
+            setFilterStatus('ALL');
+            setSearchBooking(todayStr);
+          }}
+          className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-emerald-400 dark:hover:border-emerald-500 transition-all cursor-pointer group"
+          title="Clique para ver agendamentos de hoje"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Agendadas para Hoje
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{todayReservations.length}</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">aulas hoje ({formatDateBR(todayStr)})</span>
+          </div>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 block">
+            {todayReservations.length > 0 ? 'Ver reservas do dia →' : 'Sem agendamentos hoje'}
+          </span>
+        </div>
+
+        {/* Card 4: Próximas Confirmadas */}
+        <div
+          onClick={() => {
+            setActiveTab('BOOKINGS');
+            setFilterStatus('CONFIRMED');
+            setSearchBooking('');
+          }}
+          className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer group"
+          title="Clique para ver reservas confirmadas"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Próximas Confirmadas
+            </span>
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{upcomingReservations.length}</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">confirmadas</span>
+          </div>
+          <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 block">
+            Ver agenda confirmada →
+          </span>
+        </div>
+      </div>
+
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
         <button
@@ -355,7 +536,12 @@ export const AdminPanel: React.FC<{
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Gestão de Reservas ({reservations.length})</span>
+          <span>Gestão de Reservas ({totalReservationsCount})</span>
+          {pendingReservations.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black animate-pulse">
+              {pendingReservations.length} pendente{pendingReservations.length > 1 ? 's' : ''}
+            </span>
+          )}
         </button>
 
         <button
