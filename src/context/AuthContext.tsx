@@ -46,7 +46,7 @@ interface AuthContextType {
   exitDeveloperMode: () => void;
   changePassword: (userId: string, newPassword: string) => { success: boolean; error?: string };
   toggleRole: () => void;
-  updateUserRole: (userId: string, newRole: UserRole) => void;
+  updateUserRole: (userId: string, newRole: UserRole) => Promise<User | null> | void;
   addUser: (user: Partial<User>, autoLogin?: boolean) => User;
   updateUser: (userId: string, data: Partial<User>) => void;
   deleteUser: (userId: string) => void;
@@ -622,29 +622,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const toggleRole = () => {
     if (!currentUser) return;
     const newRole: UserRole = currentUser.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-    const updated = { ...currentUser, role: newRole };
+    const updated = normalizeUser({ ...currentUser, role: newRole });
     setCurrentUser(updated);
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    saveUserToCloud(updated).catch((e) => console.warn('Cloud role toggle warning:', e));
   };
 
-  const updateUserRole = (userId: string, newRole: UserRole) => {
+  const updateUserRole = async (userId: string, newRole: UserRole): Promise<User | null> => {
     const target = users.find((u) => u.id === userId);
-    if (target && isOwnerEmail(target.email)) {
+    if (!target) return null;
+    if (isOwnerEmail(target.email)) {
       console.warn('O proprietário do sistema possui cargo irrestrito de ADMIN e não pode ser alterado.');
-      return;
+      return target;
     }
+
+    const updated: User = normalizeUser({
+      ...target,
+      role: newRole,
+    });
+
     setUsers((prev) =>
       prev.map((u) => {
-        if (u.id === userId) {
-          const updated = { ...u, role: newRole };
-          if (currentUser && currentUser.id === userId) {
-            setCurrentUser(updated);
-          }
-          return updated;
+        if (u.id === userId || (u.email && u.email.toLowerCase() === target.email.toLowerCase())) {
+          return { ...updated, id: u.id };
         }
         return u;
       })
     );
+
+    if (
+      currentUser &&
+      (currentUser.id === userId ||
+        (currentUser.email && currentUser.email.toLowerCase() === target.email.toLowerCase()))
+    ) {
+      setCurrentUser(updated);
+      try {
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      await saveUserToCloud(updated);
+      console.log(`[Firestore] Permissão de ${updated.name} (${updated.email}) gravada no banco de dados como ${newRole}.`);
+    } catch (e) {
+      console.error('[Firestore] Erro ao gravar permissão de usuário no banco de dados:', e);
+      throw e;
+    }
+
+    return updated;
   };
 
   const addUser = (userData: Partial<User>, autoLogin: boolean = false): User => {
@@ -665,6 +692,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (autoLogin) {
         setCurrentUser(updatedUser);
       }
+      saveUserToCloud(updatedUser).catch((e) => console.warn('Cloud user save warning:', e));
       return updatedUser;
     }
 

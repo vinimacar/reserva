@@ -77,6 +77,8 @@ export const AdminPanel: React.FC<{
     clearSystemForProduction,
     loadDemoSampleData,
     resetToDefaultData,
+    assignSchoolAdmin,
+    removeSchoolAdmin,
   } = useReservations();
 
   const {
@@ -114,6 +116,7 @@ export const AdminPanel: React.FC<{
   const [isRoomModalOpen, setIsRoomModalOpen] = useState<boolean>(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
@@ -1706,18 +1709,53 @@ export const AdminPanel: React.FC<{
                                       </span>
                                     ) : (
                                       <button
-                                        onClick={() => {
-                                          const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-                                          updateUserRole(u.id, newRole);
-                                          showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
+                                        id={`admin-toggle-role-${u.id}`}
+                                        disabled={updatingRoleId === u.id}
+                                        onClick={async () => {
+                                          try {
+                                            setUpdatingRoleId(u.id);
+                                            const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
+                                            await updateUserRole(u.id, newRole);
+                                            if (newRole === 'ADMIN') {
+                                              assignSchoolAdmin(u.schoolId || currentSchoolId, u.email, u.name);
+                                            } else {
+                                              removeSchoolAdmin(u.schoolId || currentSchoolId, u.email);
+                                            }
+                                            showToast(
+                                              `Permissão de ${u.name} alterada para ${
+                                                newRole === 'ADMIN' ? 'Administrador' : 'Professor'
+                                              } e gravada com sucesso no banco de dados!`
+                                            );
+                                          } catch (err) {
+                                            console.error('Erro ao atualizar permissão no banco de dados:', err);
+                                            showToast('Erro ao gravar alteração no banco de dados. Tente novamente.');
+                                          } finally {
+                                            setUpdatingRoleId(null);
+                                          }
                                         }}
-                                        className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                                          u.role === 'ADMIN'
+                                        className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                                          updatingRoleId === u.id
+                                            ? 'opacity-60 cursor-wait'
+                                            : u.role === 'ADMIN'
                                             ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
                                             : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
                                         }`}
+                                        title={
+                                          u.role === 'ADMIN'
+                                            ? 'Revogar privilégios administrativos e salvar no banco de dados'
+                                            : 'Conceder acesso de Administrador e salvar no banco de dados'
+                                        }
                                       >
-                                        {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
+                                        {updatingRoleId === u.id ? (
+                                          <>
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Gravando...</span>
+                                          </>
+                                        ) : u.role === 'ADMIN' ? (
+                                          'Revogar Admin'
+                                        ) : (
+                                          'Tornar Admin'
+                                        )}
                                       </button>
                                     )}
 

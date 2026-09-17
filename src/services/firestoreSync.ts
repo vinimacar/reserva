@@ -166,7 +166,13 @@ export function subscribeToUsers(callback: (users: User[]) => void) {
     collection(db, COLLECTIONS.USERS),
     (snapshot) => {
       const list: User[] = [];
-      snapshot.forEach((d) => list.push(d.data() as User));
+      snapshot.forEach((d) => {
+        const data = d.data() as User;
+        list.push({
+          ...data,
+          id: d.id,
+        });
+      });
       callback(list);
     },
     (err) => {

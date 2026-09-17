@@ -54,7 +54,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   onSuccess,
 }) => {
   const { addUser, updateUser, isAdmin, currentUser } = useAuth();
-  const { currentSchoolId, currentSchool, schools } = useReservations();
+  const { currentSchoolId, currentSchool, schools, assignSchoolAdmin, removeSchoolAdmin } = useReservations();
   const isEditing = !!userToEdit;
 
   const [name, setName] = useState('');
@@ -158,8 +158,13 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
         schoolName: assignedSchool?.name || currentSchool?.name || 'Escola',
       };
       updateUser(userToEdit.id, updatedData);
+      if (role === 'ADMIN') {
+        assignSchoolAdmin(assignedSchool?.id || currentSchoolId, trimmedEmail, trimmedName);
+      } else if (userToEdit.role === 'ADMIN' && role === 'TEACHER') {
+        removeSchoolAdmin(userToEdit.schoolId || currentSchoolId, trimmedEmail);
+      }
       onSuccess?.(updatedData);
-      setSuccessMessage(`Dados de ${trimmedName} atualizados com sucesso!`);
+      setSuccessMessage(`Dados de ${trimmedName} atualizados e gravados no banco de dados!`);
     } else {
       const newUser = addUser(
         {
@@ -175,10 +180,13 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
         },
         false // Do not auto login on registration
       );
+      if (role === 'ADMIN') {
+        assignSchoolAdmin(assignedSchool?.id || currentSchoolId, trimmedEmail, trimmedName);
+      }
       if (newUser) {
         onSuccess?.(newUser);
       }
-      setSuccessMessage(`Professor(a) ${trimmedName} cadastrado(a) com sucesso!`);
+      setSuccessMessage(`Professor(a) ${trimmedName} cadastrado(a) e gravado(a) no banco de dados!`);
     }
 
     setTimeout(() => {
