@@ -24,6 +24,7 @@ interface UserRegistrationModalProps {
   onClose: () => void;
   userToEdit?: User | null;
   initialRole?: UserRole;
+  onSuccess?: (savedUser: User) => void;
 }
 
 const SCHOOL_DISCIPLINES = [
@@ -50,6 +51,7 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
   onClose,
   userToEdit,
   initialRole = 'TEACHER',
+  onSuccess,
 }) => {
   const { addUser, updateUser, isAdmin, currentUser } = useAuth();
   const { currentSchoolId, currentSchool, schools } = useReservations();
@@ -143,7 +145,8 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
     const assignedSchool = schools.find((s) => s.id === selectedSchoolId) || currentSchool;
 
     if (isEditing && userToEdit) {
-      updateUser(userToEdit.id, {
+      const updatedData: User = {
+        ...userToEdit,
         name: trimmedName,
         email: trimmedEmail,
         password: password.trim() || 'educacao123',
@@ -153,10 +156,12 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
         iconKey: chosenIcon,
         schoolId: assignedSchool?.id || currentSchoolId,
         schoolName: assignedSchool?.name || currentSchool?.name || 'Escola',
-      });
+      };
+      updateUser(userToEdit.id, updatedData);
+      onSuccess?.(updatedData);
       setSuccessMessage(`Dados de ${trimmedName} atualizados com sucesso!`);
     } else {
-      addUser(
+      const newUser = addUser(
         {
           name: trimmedName,
           email: trimmedEmail,
@@ -170,6 +175,9 @@ export const UserRegistrationModal: React.FC<UserRegistrationModalProps> = ({
         },
         false // Do not auto login on registration
       );
+      if (newUser) {
+        onSuccess?.(newUser);
+      }
       setSuccessMessage(`Professor(a) ${trimmedName} cadastrado(a) com sucesso!`);
     }
 

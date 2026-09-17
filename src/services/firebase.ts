@@ -15,6 +15,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   writeBatch,
   runTransaction,
 } from 'firebase/firestore';
@@ -116,6 +117,7 @@ export {
   query,
   where,
   orderBy,
+  limit,
   writeBatch,
   runTransaction,
 };

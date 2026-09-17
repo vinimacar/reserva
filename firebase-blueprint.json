@@ -163,6 +163,32 @@
         "updatedAt": { "type": "string", "description": "ISO timestamp" }
       },
       "required": ["lockId", "schoolId", "roomId", "date", "periodId", "reservationId", "active", "updatedAt"]
+    },
+    "error_logs": {
+      "title": "Error Logs",
+      "description": "Frontend runtime error logs captured automatically for remote debugging",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique error log ID" },
+        "message": { "type": "string", "description": "Error message" },
+        "category": { "type": "string", "description": "Category: CROSS_ORIGIN, TYPE_ERROR, PROMISE_REJECTION, RUNTIME_ERROR, REACT_ERROR, NETWORK_ERROR, CUSTOM" },
+        "severity": { "type": "string", "description": "Severity: CRITICAL, ERROR, WARNING, INFO" },
+        "stack": { "type": "string", "description": "JavaScript stack trace" },
+        "source": { "type": "string", "description": "File or source URL where error originated" },
+        "lineno": { "type": "number", "description": "Line number" },
+        "colno": { "type": "number", "description": "Column number" },
+        "componentStack": { "type": "string", "description": "React component stack trace" },
+        "url": { "type": "string", "description": "Window location URL when error occurred" },
+        "path": { "type": "string", "description": "URL pathname" },
+        "origin": { "type": "string", "description": "Window origin" },
+        "isIframe": { "type": "boolean", "description": "Whether error occurred inside an iframe" },
+        "userAgent": { "type": "string", "description": "Browser user agent" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" },
+        "userEmail": { "type": "string", "description": "Email of user if authenticated" },
+        "userId": { "type": "string", "description": "User ID if authenticated" },
+        "schoolId": { "type": "string", "description": "School ID context" }
+      },
+      "required": ["id", "message", "category", "severity", "url", "timestamp"]
     }
   },
   "enums": {
@@ -223,6 +249,10 @@
     "/slot_locks/{lockId}": {
       "schema": "slot_locks",
       "description": "Travas de concorrência atômicas por escola, sala, data e período"
+    },
+    "/error_logs/{logId}": {
+      "schema": "error_logs",
+      "description": "Logs de erros críticos capturados no frontend para depuração remota"
     }
   }
 }

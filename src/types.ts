@@ -181,3 +181,36 @@ export interface ClientOnboardingResult {
   roomsCreatedCount?: number;
   error?: string;
 }
+
+export type ErrorSeverity = 'CRITICAL' | 'ERROR' | 'WARNING' | 'INFO';
+
+export type ErrorCategory =
+  | 'CROSS_ORIGIN'
+  | 'TYPE_ERROR'
+  | 'PROMISE_REJECTION'
+  | 'RUNTIME_ERROR'
+  | 'REACT_ERROR'
+  | 'NETWORK_ERROR'
+  | 'CUSTOM';
+
+export interface FrontendErrorLog {
+  id: string;
+  message: string;
+  category: ErrorCategory;
+  severity: ErrorSeverity;
+  stack?: string;
+  source?: string;
+  lineno?: number;
+  colno?: number;
+  componentStack?: string;
+  url: string;
+  path: string;
+  origin: string;
+  isIframe: boolean;
+  userAgent: string;
+  timestamp: string;
+  userEmail?: string | null;
+  userId?: string | null;
+  schoolId?: string | null;
+  metadata?: Record<string, unknown>;
+}

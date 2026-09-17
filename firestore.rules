@@ -54,6 +54,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
+    // Error Logs: Remote debugging & critical error capture
+    match /error_logs/{logId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
     // Health check and connection test probe
     match /test/{docId} {
       allow read: if true;

@@ -33,6 +33,7 @@ import {
   Sun,
   Moon,
   GraduationCap,
+  Bug,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +43,7 @@ import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
 import { AdminSchoolsTab } from './AdminSchoolsTab';
 import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
+import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 
@@ -90,7 +92,7 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'CLASSES_SCHEDULES' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS'
+    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'CLASSES_SCHEDULES' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
   >('SCHOOLS');
 
   // Print modal state
@@ -674,6 +676,19 @@ export const AdminPanel: React.FC<{
         >
           <Settings className="w-4 h-4" />
           <span>Configurações</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ERROR_LOGS')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'ERROR_LOGS'
+              ? 'bg-red-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+          title="Logs de erros remotos capturados no frontend e Firestore"
+        >
+          <Bug className="w-4 h-4 text-red-400" />
+          <span>Logs de Erros (Depuração)</span>
         </button>
       </div>
 
@@ -2158,6 +2173,9 @@ export const AdminPanel: React.FC<{
           </div>
         </div>
       )}
+
+      {/* TAB 8: REMOTE DEBUGGING & ERROR LOGS */}
+      {activeTab === 'ERROR_LOGS' && <AdminErrorLogsTab />}
 
       {/* Dedicated Room Deletion Confirmation Modal */}
       {roomToDelete && (

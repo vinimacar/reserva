@@ -28,7 +28,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
   onClose,
 }) => {
   const { currentUser, addUser, loginWithGoogleEmail, logout, isAdmin } = useAuth();
-  const { settings, currentSchool } = useReservations();
+  const { settings, currentSchool, currentSchoolId } = useReservations();
 
   const [activeMode, setActiveMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
@@ -56,7 +56,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
         loginWithGoogleEmail(
           verifiedEmail,
           googleRes.user.displayName || undefined,
-          currentSchool?.id || settings.schoolId,
+          currentSchool?.id || currentSchoolId,
           currentSchool?.name || settings.schoolName
         );
 
@@ -125,7 +125,7 @@ export const GoogleLoginModal: React.FC<GoogleLoginModalProps> = ({
         email: trimmedEmail,
         subject: finalSubject,
         role: regRole,
-        schoolId: currentSchool?.id || settings.schoolId,
+        schoolId: currentSchool?.id || currentSchoolId,
         schoolName: currentSchool?.name || settings.schoolName || 'Escola Estadual',
       },
       false // Do not switch current user automatically

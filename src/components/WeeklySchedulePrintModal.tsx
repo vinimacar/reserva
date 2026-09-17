@@ -108,8 +108,8 @@ export const WeeklySchedulePrintModal: React.FC<WeeklySchedulePrintModalProps> =
       if (!weekIsoSet.has(r.date)) return false;
       if (selectedShiftFilter !== 'ALL' && r.shift !== selectedShiftFilter) return false;
       if (selectedRoomFilter !== 'ALL' && r.roomId !== selectedRoomFilter) return false;
-      if (onlyApproved && r.status === 'REJECTED') return false;
-      if (onlyApproved && r.status === 'CANCELLED') return false;
+      if (onlyApproved && r.status !== 'CONFIRMED' && r.status !== 'COMPLETED') return false;
+      if (r.status === 'CANCELLED') return false;
       return true;
     });
   }, [reservations, weekDays, selectedShiftFilter, selectedRoomFilter, onlyApproved]);

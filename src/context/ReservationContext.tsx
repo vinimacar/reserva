@@ -72,6 +72,7 @@ interface ReservationContextType {
   allRooms: Room[];
   periods: TimePeriod[];
   announcements: Announcement[];
+  allAnnouncements: Announcement[];
   settings: SchoolSettings;
 
   // Selected filters & UI state
@@ -1606,6 +1607,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         deletePeriod,
         resetPeriods,
         announcements,
+        allAnnouncements: announcements,
         settings,
         selectedRoomId,
         selectedDate,

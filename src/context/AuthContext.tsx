@@ -22,6 +22,7 @@ import {
   isSession2FAVerified,
   setSession2FAVerified,
 } from '../services/totp';
+import { setErrorLoggerUserContext } from '../services/errorLogger';
 
 export interface LoginResult {
   success: boolean;
@@ -80,9 +81,7 @@ function normalizeUser(u: User): User {
   const schoolName = u.schoolName || DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos';
 
   let approvalStatus = u.approvalStatus;
-  if (u.role === 'ADMIN' || isOwnerEmail(u.email)) {
-    approvalStatus = 'APPROVED';
-  } else if (!approvalStatus) {
+  if (!approvalStatus) {
     // Default pre-existing seed users or previously created teachers to APPROVED
     approvalStatus = 'APPROVED';
   }
@@ -106,7 +105,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(normalizeUser);
+          // Clean up any legacy entry where vinicius was erroneously marked as ADMIN in localStorage
+          const cleaned = parsed.map((u) => {
+            if (
+              u.email &&
+              u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
+              (u.id === 'user_vinicius' || u.role === 'ADMIN')
+            ) {
+              return {
+                ...normalizeUser(u),
+                role: 'TEACHER' as UserRole,
+                approvalStatus: (u.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+              };
+            }
+            return normalizeUser(u);
+          });
+          return cleaned;
         }
       }
     } catch {
@@ -131,6 +145,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved && saved !== 'null' && saved !== 'undefined') {
         const parsed: User = JSON.parse(saved);
         if (parsed && parsed.id && parsed.name) {
+          if (
+            parsed.email &&
+            parsed.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
+            (parsed.id === 'user_vinicius' || parsed.role === 'ADMIN')
+          ) {
+            return {
+              ...normalizeUser(parsed),
+              role: 'TEACHER' as UserRole,
+              approvalStatus: (parsed.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+            };
+          }
           return normalizeUser(parsed);
         }
       }
@@ -151,8 +176,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
+      setErrorLoggerUserContext({
+        email: currentUser.email,
+        id: currentUser.id,
+        schoolId: currentUser.schoolId,
+      });
     } else {
       localStorage.removeItem(STORAGE_KEY_USER);
+      setErrorLoggerUserContext({
+        email: null,
+        id: null,
+        schoolId: null,
+      });
     }
   }, [currentUser]);
 
@@ -164,7 +199,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
-        const normalizedList = cloudUsers.map(normalizeUser);
+        const normalizedList = cloudUsers.map((u) => {
+          if (
+            u.email &&
+            u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
+            (u.id === 'user_vinicius' || (u.role === 'ADMIN' && !u.approvedBy && !u.approvedAt))
+          ) {
+            return {
+              ...normalizeUser(u),
+              role: 'TEACHER' as UserRole,
+              approvalStatus: (u.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+            };
+          }
+          return normalizeUser(u);
+        });
         setUsers(normalizedList);
         // Ensure currentUser is kept in sync with the cloud state (e.g. when approved by coordinator)
         setCurrentUser((curr) => {
@@ -315,11 +363,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (existing) {
       const normalized = normalizeUser(existing);
       setCurrentUser(normalized);
-      if (isOwnerEmail(normalized.email)) {
-        setIsDeveloperMode(true);
-        setIs2FAVerified(true);
-        setSession2FAVerified(true);
-      }
       // Ensure user is in Firebase Auth
       registerInFirebaseAuth(normalized.email, normalized.password, normalized.name).catch((e) =>
         console.warn('Firebase Auth sync note:', e)
@@ -332,25 +375,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const targetSchoolId = schoolId || matchedSchool.id;
     const targetSchoolName = schoolName || matchedSchool.name;
 
-    // Determine default role: if email is in school's admin list or contains admin/coord, set as ADMIN
-    const isAdminEmail =
-      matchedSchool.adminEmails.some((e) => e.toLowerCase() === trimmedEmail) ||
-      trimmedEmail.includes('admin') ||
-      trimmedEmail.includes('vinicius') ||
-      trimmedEmail.includes('coordenacao') ||
-      trimmedEmail.includes('direcao') ||
-      isOwnerEmail(trimmedEmail);
-
     const rawName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     const formattedName = rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`;
     const gender = detectGenderFromName(formattedName);
     const subject = 'Docente Geral';
     const iconAvatar = getIconForSubject(subject);
 
-    // First access via Google: teachers require coordinator approval before accessing features.
-    // Only happens on first access because once approved, their status is permanently APPROVED.
-    const initialApprovalStatus: UserApprovalStatus = isAdminEmail ? 'APPROVED' : 'PENDING';
-
+    // REGRA DE PRIMEIRO ACESSO DO PROFESSOR:
+    // Ao acessar pela primeira vez como professor através do Google,
+    // o usuário DEVE ser criado SEMPRE com o cargo de PROFESSOR ('TEACHER')
+    // e com o status 'PENDING' (Aguardando liberação pelo coordenador/administrador).
+    // NUNCA deve entrar como Administrador ('ADMIN') no primeiro acesso!
     const newUser: User = {
       id: `user_${Date.now()}`,
       name: formattedName,
@@ -359,11 +394,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       iconKey: iconAvatar,
       password: 'educacao123',
       gender: gender,
-      role: isAdminEmail ? 'ADMIN' : 'TEACHER',
+      role: 'TEACHER', // SEMPRE PROFESSOR NO PRIMEIRO ACESSO
       subject: subject,
       schoolId: targetSchoolId,
       schoolName: targetSchoolName,
-      approvalStatus: initialApprovalStatus,
+      approvalStatus: 'PENDING', // AGUARDA LIBERAÇÃO DA COORDENAÇÃO
       firstLoginAt: new Date().toISOString(),
       authProvider: 'GOOGLE',
     };

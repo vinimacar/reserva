@@ -389,12 +389,17 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const selectedPeriodNumbers = shiftPeriods
+        .filter((p) => selectedPeriodIds.includes(p.id))
+        .map((p) => p.number);
+
       if (bookingType === 'SINGLE') {
         const result = await addReservation({
           roomId,
           date,
           shift,
           periodIds: selectedPeriodIds,
+          periodNumbers: selectedPeriodNumbers,
           turma: finalTurma,
           disciplina: finalDisciplina,
           subjectTopic,
@@ -429,6 +434,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
           date: d,
           shift,
           periodIds: selectedPeriodIds,
+          periodNumbers: selectedPeriodNumbers,
           turma: finalTurma,
           disciplina: finalDisciplina,
           subjectTopic,
@@ -440,16 +446,16 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
 
         const batchResult = await addBatchReservations(reservationsPayload);
 
-        if (batchResult.successCount === 0) {
+        if (batchResult.createdReservations.length === 0) {
           setErrorMessage(
-            batchResult.errors[0] || 'Não foi possível agendar nenhuma data devido a conflitos.'
+            batchResult.error || 'Não foi possível agendar nenhuma data devido a conflitos.'
           );
         } else {
           setCreatedBatchReservations(batchResult.createdReservations);
           setCreatedReservation(batchResult.createdReservations[0] || null);
           setBatchSkippedConflicts(batchResult.conflicts);
           setSuccessMessage(
-            `${batchResult.successCount} reservas confirmadas no período com sucesso!`
+            `${batchResult.createdReservations.length} reservas confirmadas no período com sucesso!`
           );
         }
       }
