@@ -1,5 +1,6 @@
 export type UserRole = 'ADMIN' | 'TEACHER';
 export type GenderType = 'MALE' | 'FEMALE';
+export type UserApprovalStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
 
 export interface School {
   id: string;
@@ -36,6 +37,11 @@ export interface User {
   schoolId?: string;
   schoolName: string;
   gender?: GenderType;
+  approvalStatus?: UserApprovalStatus;
+  approvedAt?: string;
+  approvedBy?: string;
+  firstLoginAt?: string;
+  authProvider?: 'GOOGLE' | 'PASSWORD' | 'SYSTEM';
 }
 
 export type SpaceType = 'INFORMATICA' | 'CIENCIAS' | 'QUIMICA_FISICA' | 'MAKER' | 'MULTIMIDIA';

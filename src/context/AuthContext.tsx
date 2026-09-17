@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '../types';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { User, UserRole, UserApprovalStatus } from '../types';
 import { DEFAULT_USERS, DEFAULT_SCHOOLS } from '../data/initialData';
 import { detectGenderFromName, getIconForSubject } from '../data/avatars';
 import {
@@ -53,6 +53,9 @@ interface AuthContextType {
   switchUser: (userId: string) => void;
   resetUsersToDefault: () => void;
   syncUsersToFirebaseAuth: (onProgress?: (current: number, total: number, email: string) => void) => Promise<AuthSyncResult>;
+  pendingApprovalUsers: User[];
+  approveUser: (userId: string, approvedBy?: string) => void;
+  rejectUser: (userId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -76,6 +79,14 @@ function normalizeUser(u: User): User {
   const schoolId = u.schoolId || DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
   const schoolName = u.schoolName || DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos';
 
+  let approvalStatus = u.approvalStatus;
+  if (u.role === 'ADMIN' || isOwnerEmail(u.email)) {
+    approvalStatus = 'APPROVED';
+  } else if (!approvalStatus) {
+    // Default pre-existing seed users or previously created teachers to APPROVED
+    approvalStatus = 'APPROVED';
+  }
+
   return {
     ...u,
     gender,
@@ -84,6 +95,7 @@ function normalizeUser(u: User): User {
     password,
     schoolId,
     schoolName,
+    approvalStatus,
   };
 }
 
@@ -152,7 +164,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
-        setUsers(cloudUsers.map(normalizeUser));
+        const normalizedList = cloudUsers.map(normalizeUser);
+        setUsers(normalizedList);
+        // Ensure currentUser is kept in sync with the cloud state (e.g. when approved by coordinator)
+        setCurrentUser((curr) => {
+          if (!curr) return null;
+          const fresh = normalizedList.find((u) => u.id === curr.id || u.email.toLowerCase() === curr.email.toLowerCase());
+          return fresh || curr;
+        });
       }
     });
     return () => unsubscribe();
@@ -319,7 +338,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       trimmedEmail.includes('admin') ||
       trimmedEmail.includes('vinicius') ||
       trimmedEmail.includes('coordenacao') ||
-      trimmedEmail.includes('direcao');
+      trimmedEmail.includes('direcao') ||
+      isOwnerEmail(trimmedEmail);
 
     const rawName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     const formattedName = rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`;
@@ -327,7 +347,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const subject = 'Docente Geral';
     const iconAvatar = getIconForSubject(subject);
 
-    const newUser: User = normalizeUser({
+    // First access via Google: teachers require coordinator approval before accessing features.
+    // Only happens on first access because once approved, their status is permanently APPROVED.
+    const initialApprovalStatus: UserApprovalStatus = isAdminEmail ? 'APPROVED' : 'PENDING';
+
+    const newUser: User = {
       id: `user_${Date.now()}`,
       name: formattedName,
       email: trimmedEmail,
@@ -339,7 +363,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subject: subject,
       schoolId: targetSchoolId,
       schoolName: targetSchoolName,
-    });
+      approvalStatus: initialApprovalStatus,
+      firstLoginAt: new Date().toISOString(),
+      authProvider: 'GOOGLE',
+    };
 
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
@@ -656,6 +683,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const approveUser = (userId: string, approvedBy?: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+
+    const approvedUser: User = {
+      ...target,
+      approvalStatus: 'APPROVED',
+      approvedAt: new Date().toISOString(),
+      approvedBy: approvedBy || currentUser?.name || 'Coordenação Pedagógica',
+    };
+
+    setUsers((prev) => prev.map((u) => (u.id === userId ? approvedUser : u)));
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser(approvedUser);
+    }
+    saveUserToCloud(approvedUser).catch((e) => console.warn('Cloud user save warning:', e));
+  };
+
+  const rejectUser = (userId: string) => {
+    deleteUser(userId);
+  };
+
+  const pendingApprovalUsers = useMemo(() => {
+    return users.filter((u) => u && u.approvalStatus === 'PENDING');
+  }, [users]);
+
   const syncUsersToFirebaseAuth = async (
     onProgress?: (current: number, total: number, email: string) => void
   ): Promise<AuthSyncResult> => {
@@ -688,6 +741,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchUser,
         resetUsersToDefault,
         syncUsersToFirebaseAuth,
+        pendingApprovalUsers,
+        approveUser,
+        rejectUser,
       }}
     >
       {children}

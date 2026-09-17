@@ -76,7 +76,17 @@ export const AdminPanel: React.FC<{
     resetToDefaultData,
   } = useReservations();
 
-  const { users, currentUser, updateUserRole, addUser, deleteUser, syncUsersToFirebaseAuth } = useAuth();
+  const {
+    users,
+    currentUser,
+    updateUserRole,
+    addUser,
+    deleteUser,
+    syncUsersToFirebaseAuth,
+    pendingApprovalUsers,
+    approveUser,
+    rejectUser,
+  } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
@@ -93,6 +103,7 @@ export const AdminPanel: React.FC<{
 
   // Filter state for teachers
   const [filterUserSchool, setFilterUserSchool] = useState<string>('ALL');
+  const [filterUserApproval, setFilterUserApproval] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL');
   const [searchUser, setSearchUser] = useState<string>('');
 
   // Room modal & delete state
@@ -352,6 +363,50 @@ export const AdminPanel: React.FC<{
         </div>
       </div>
 
+      {/* ALERT BANNER: NEW TEACHERS AWAITING GOOGLE FIRST-ACCESS APPROVAL */}
+      {pendingApprovalUsers.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-500/10">
+          <div className="flex items-start sm:items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-slate-950 flex items-center justify-center font-black shrink-0 shadow-md animate-pulse">
+              <UserCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 flex-wrap gap-1">
+                <h4 className="font-black text-sm text-slate-900 dark:text-white">
+                  Atenção Coordenação: {pendingApprovalUsers.length} professor{pendingApprovalUsers.length > 1 ? 'es' : ''} aguardando liberação de 1º acesso Google!
+                </h4>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  1º Acesso Pendente
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                {pendingApprovalUsers.length === 1 ? (
+                  <>
+                    O docente <strong>{pendingApprovalUsers[0].name}</strong> ({pendingApprovalUsers[0].email}) acessou o sistema pela 1ª vez através do Google e aguarda liberação da coordenação para agendar salas.
+                  </>
+                ) : (
+                  <>
+                    Docentes ({pendingApprovalUsers.map((u) => u.name).slice(0, 3).join(', ')}{pendingApprovalUsers.length > 3 ? '...' : ''}) realizaram o 1º acesso via Google e aguardam autorização da coordenação.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="admin-alert-review-teachers-btn"
+            onClick={() => {
+              setActiveTab('USERS');
+              setFilterUserApproval('PENDING');
+            }}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shrink-0 shadow-sm cursor-pointer hover:scale-105 flex items-center space-x-1.5 self-start sm:self-auto"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Liberar Docentes ({pendingApprovalUsers.length}) →</span>
+          </button>
+        </div>
+      )}
+
       {/* ALERT BANNER: PENDING RESERVATIONS REQUIRING COORDINATOR APPROVAL */}
       {pendingReservations.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md shadow-amber-500/10">
@@ -590,6 +645,11 @@ export const AdminPanel: React.FC<{
         >
           <Users className="w-4 h-4" />
           <span>Professores & Acessos ({users.length})</span>
+          {pendingApprovalUsers.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] animate-pulse shadow-xs">
+              {pendingApprovalUsers.length} pendente{pendingApprovalUsers.length > 1 ? 's' : ''}
+            </span>
+          )}
         </button>
 
         <button
@@ -1260,6 +1320,13 @@ export const AdminPanel: React.FC<{
       {activeTab === 'USERS' && (() => {
         const filteredUsers = (users || []).filter((u) => {
           if (!u) return false;
+          // Approval status filter
+          if (filterUserApproval === 'PENDING' && u.approvalStatus !== 'PENDING') {
+            return false;
+          }
+          if (filterUserApproval === 'APPROVED' && u.approvalStatus === 'PENDING') {
+            return false;
+          }
           // School filter
           if (filterUserSchool !== 'ALL' && (u.schoolId || 'school_milton_campos') !== filterUserSchool) {
             return false;
@@ -1381,15 +1448,60 @@ export const AdminPanel: React.FC<{
             {/* Filter Bar for Teachers */}
             <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs transition-colors">
               <div className="flex flex-wrap items-center gap-2.5">
+                {/* Approval Status Segmented Filter */}
+                <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setFilterUserApproval('ALL')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      filterUserApproval === 'ALL'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Todos ({(users || []).length})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterUserApproval('PENDING')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      filterUserApproval === 'PENDING'
+                        ? 'bg-amber-500 text-slate-950 shadow-xs'
+                        : (pendingApprovalUsers || []).length > 0
+                        ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <span>1º Acesso Pendente</span>
+                    {(pendingApprovalUsers || []).length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] animate-pulse">
+                        {(pendingApprovalUsers || []).length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterUserApproval('APPROVED')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      filterUserApproval === 'APPROVED'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Liberados ({(users || []).length - (pendingApprovalUsers || []).length})
+                  </button>
+                </div>
+
                 {(schools || []).length > 1 && (
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase">Filtrar por Escola:</label>
                     <select
                       value={filterUserSchool}
                       onChange={(e) => setFilterUserSchool(e.target.value)}
                       className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl px-3 py-1.5 font-semibold focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="ALL">Todas as Escolas ({(users || []).length} professores)</option>
+                      <option value="ALL">Todas as Escolas</option>
                       {(schools || []).map((s) => {
                         if (!s) return null;
                         const count = (users || []).filter((u) => u && (u.schoolId || 'school_milton_campos') === s.id).length;
@@ -1426,22 +1538,33 @@ export const AdminPanel: React.FC<{
                       <th className="p-3.5">Escola</th>
                       <th className="p-3.5">E-mail Institucional Google</th>
                       <th className="p-3.5">Disciplina</th>
-                      <th className="p-3.5">Nível de Acesso</th>
-                      <th className="p-3.5 text-right">Ações</th>
+                      <th className="p-3.5">Status & Acesso</th>
+                      <th className="p-3.5 text-right">Ações da Coordenação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {filteredUsers.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
-                          Nenhum professor encontrado com os filtros informados.
+                          {filterUserApproval === 'PENDING'
+                            ? 'Nenhum professor com primeiro acesso aguardando liberação no momento. Todos os acessos estão liberados!'
+                            : 'Nenhum professor encontrado com os filtros informados.'}
                         </td>
                       </tr>
                     ) : (
                       filteredUsers.map((u) => {
                         const userSchool = schools.find((s) => s.id === u.schoolId) || currentSchool;
+                        const isPending = u.approvalStatus === 'PENDING';
+
                         return (
-                          <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr
+                            key={u.id}
+                            className={`transition-colors ${
+                              isPending
+                                ? 'bg-amber-500/10 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                            }`}
+                          >
                             <td className="p-3.5">
                               <div className="flex items-center space-x-2.5">
                                 <TeacherAvatar
@@ -1450,13 +1573,25 @@ export const AdminPanel: React.FC<{
                                   subject={u.subject}
                                   role={u.role}
                                   size="sm"
-                                  showRoleBadge={true}
+                                  showRoleBadge={!isPending}
                                 />
                                 <div>
-                                  <span className="font-bold text-slate-900 dark:text-slate-100 block">{u.name}</span>
-                                  {currentUser?.id === u.id && (
-                                    <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Você (Conectado)</span>
-                                  )}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100 block">{u.name}</span>
+                                    {currentUser?.id === u.id && (
+                                      <span className="text-[9px] font-bold text-blue-600 dark:text-blue-400">Você</span>
+                                    )}
+                                  </div>
+                                  {isPending ? (
+                                    <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                                      <Clock className="w-3 h-3 text-amber-500 animate-spin" />
+                                      <span>1º Acesso Google Pendente</span>
+                                    </span>
+                                  ) : u.approvedBy ? (
+                                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                                      ✓ Acesso autorizado
+                                    </span>
+                                  ) : null}
                                 </div>
                               </div>
                             </td>
@@ -1468,70 +1603,116 @@ export const AdminPanel: React.FC<{
                             <td className="p-3.5 text-slate-600 dark:text-slate-400 font-mono text-[11px]">{u.email}</td>
                             <td className="p-3.5 text-slate-700 dark:text-slate-300">{u.subject || 'Geral'}</td>
                             <td className="p-3.5">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                  u.role === 'ADMIN'
-                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                                }`}
-                              >
-                                {u.role === 'ADMIN'
-                                  ? '👑 Administrador'
-                                  : u.gender === 'FEMALE'
-                                  ? '👩‍🏫 Professora'
-                                  : '👨‍🏫 Professor'}
-                              </span>
+                              {isPending ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                                  <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                  <span>Aguardando Liberação</span>
+                                </span>
+                              ) : (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                    u.role === 'ADMIN'
+                                      ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                                      : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                                  }`}
+                                >
+                                  {u.role === 'ADMIN'
+                                    ? '👑 Administrador'
+                                    : u.gender === 'FEMALE'
+                                    ? '👩‍🏫 Professora Liberada'
+                                    : '👨‍🏫 Professor Liberado'}
+                                </span>
+                              )}
                             </td>
                             <td className="p-3.5 text-right">
                               <div className="flex items-center justify-end space-x-1.5">
-                                {/* Edit Teacher Button */}
-                                <button
-                                  id={`admin-edit-teacher-${u.id}`}
-                                  onClick={() => {
-                                    setEditingUser(u);
-                                    setIsUserModalOpen(true);
-                                  }}
-                                  className="flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold text-xs transition-colors cursor-pointer"
-                                  title={`Editar dados de ${u.name}`}
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                  <span>Editar</span>
-                                </button>
+                                {isPending ? (
+                                  <>
+                                    <button
+                                      id={`admin-approve-user-${u.id}`}
+                                      onClick={() => {
+                                        approveUser(u.id);
+                                        showToast(`Acesso do Prof. ${u.name} liberado com sucesso! O professor já pode utilizar o sistema.`);
+                                      }}
+                                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/20 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                                      title={`Liberar 1º acesso de ${u.name}`}
+                                    >
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      <span>Liberar Acesso</span>
+                                    </button>
 
-                                <button
-                                  onClick={() => {
-                                    const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-                                    updateUserRole(u.id, newRole);
-                                    showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
-                                  }}
-                                  className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                                    u.role === 'ADMIN'
-                                      ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
-                                      : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
-                                  }`}
-                                >
-                                  {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
-                                </button>
+                                    <button
+                                      id={`admin-reject-user-${u.id}`}
+                                      onClick={() => {
+                                        setConfirmModal({
+                                          title: 'Recusar 1º Acesso do Docente',
+                                          message: `Deseja recusar a solicitação de primeiro acesso de "${u.name}" (${u.email})? A conta será removida.`,
+                                          confirmLabel: 'Recusar e Remover',
+                                          isDestructive: true,
+                                          onConfirm: () => {
+                                            rejectUser(u.id);
+                                            showToast(`Solicitação de ${u.name} recusada.`);
+                                          },
+                                        });
+                                      }}
+                                      className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                                      title="Recusar e remover"
+                                    >
+                                      <XCircle className="w-4 h-4 text-red-400" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    {/* Edit Teacher Button */}
+                                    <button
+                                      id={`admin-edit-teacher-${u.id}`}
+                                      onClick={() => {
+                                        setEditingUser(u);
+                                        setIsUserModalOpen(true);
+                                      }}
+                                      className="flex items-center space-x-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                                      title={`Editar dados de ${u.name}`}
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                      <span>Editar</span>
+                                    </button>
 
-                                {users.length > 1 && (
-                                  <button
-                                    onClick={() => {
-                                      setConfirmModal({
-                                        title: 'Remover Docente do Sistema',
-                                        message: `Tem certeza que deseja remover o usuário de "${u.name}" (${u.email})?`,
-                                        confirmLabel: 'Sim, Remover',
-                                        isDestructive: true,
-                                        onConfirm: () => {
-                                          deleteUser(u.id);
-                                          showToast(`Professor ${u.name} removido com sucesso.`);
-                                        },
-                                      });
-                                    }}
-                                    className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
-                                    title="Remover docente"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                    <button
+                                      onClick={() => {
+                                        const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
+                                        updateUserRole(u.id, newRole);
+                                        showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
+                                      }}
+                                      className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                                        u.role === 'ADMIN'
+                                          ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
+                                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
+                                      }`}
+                                    >
+                                      {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
+                                    </button>
+
+                                    {users.length > 1 && (
+                                      <button
+                                        onClick={() => {
+                                          setConfirmModal({
+                                            title: 'Remover Docente do Sistema',
+                                            message: `Tem certeza que deseja remover o usuário de "${u.name}" (${u.email})?`,
+                                            confirmLabel: 'Sim, Remover',
+                                            isDestructive: true,
+                                            onConfirm: () => {
+                                              deleteUser(u.id);
+                                              showToast(`Professor ${u.name} removido com sucesso.`);
+                                            },
+                                          });
+                                        }}
+                                        className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                                        title="Remover docente"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>

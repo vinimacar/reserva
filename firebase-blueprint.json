@@ -120,7 +120,11 @@
         "subject": { "type": "string", "description": "Teaching subject" },
         "schoolId": { "type": "string", "description": "School ID" },
         "schoolName": { "type": "string", "description": "School Name" },
-        "gender": { "type": "string", "description": "MALE or FEMALE" }
+        "gender": { "type": "string", "description": "MALE or FEMALE" },
+        "approvalStatus": { "type": "string", "description": "APPROVED, PENDING, or REJECTED" },
+        "approvedAt": { "type": "string", "description": "ISO date string when coordinator approved" },
+        "approvedBy": { "type": "string", "description": "Name of coordinator who approved access" },
+        "firstLoginAt": { "type": "string", "description": "ISO date of first Google access" }
       },
       "required": ["id", "name", "email", "avatar", "role", "schoolName"]
     },

@@ -22,6 +22,7 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { DeveloperAuthModal } from './components/DeveloperAuthModal';
 import { DeveloperPortal } from './components/DeveloperPortal';
 import { LoginScreen } from './components/LoginScreen';
+import { PendingApprovalScreen } from './components/PendingApprovalScreen';
 import { TutorialModal } from './components/TutorialModal';
 import { Reservation } from './types';
 import { School, Terminal } from 'lucide-react';
@@ -150,6 +151,11 @@ function ReserveAppContent() {
         />
       </>
     );
+  }
+
+  // If a teacher accessed for the first time via Google and is awaiting coordinator approval:
+  if (!isAdmin && currentUser.approvalStatus === 'PENDING') {
+    return <PendingApprovalScreen />;
   }
 
   return (

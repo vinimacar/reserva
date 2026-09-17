@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDeveloperPortal,
   onOpenTutorial,
 }) => {
-  const { currentUser, isAdmin, isDeveloperMode, logout } = useAuth();
+  const { currentUser, isAdmin, isDeveloperMode, logout, pendingApprovalUsers } = useAuth();
   const isOwner = isOwnerEmail(currentUser?.email);
   const { reservations, announcements, settings, schools, currentSchool, currentSchoolId, switchSchool } = useReservations();
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
@@ -62,6 +62,8 @@ export const Header: React.FC<HeaderProps> = ({
   const activeSchoolLogo = currentSchool?.logoUrl || settings?.logoUrl;
   const totalReservationsCount = (reservations || []).length;
   const pendingReservationsCount = (reservations || []).filter((r) => r && r.status === 'PENDING').length;
+  const pendingTeachersCount = (pendingApprovalUsers || []).length;
+  const totalPendingAlerts = pendingReservationsCount + pendingTeachersCount;
 
   return (
     <header id="app-header" className="sticky top-0 z-30 bg-slate-900 text-white shadow-md border-b border-slate-800">
@@ -254,13 +256,13 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'text-amber-300 hover:text-white hover:bg-slate-700/60'
                 }`}
-                title={`Painel da Coordenação / Admin • ${totalReservationsCount} reserva(s)${pendingReservationsCount > 0 ? ` (${pendingReservationsCount} pendente(s))` : ''}`}
+                title={`Painel da Coordenação / Admin • ${totalReservationsCount} reserva(s)${pendingReservationsCount > 0 ? ` (${pendingReservationsCount} reserva(s) pendente(s))` : ''}${pendingTeachersCount > 0 ? ` (${pendingTeachersCount} professor(es) aguardando liberação)` : ''}`}
               >
                 <Shield className="w-4 h-4 text-amber-400" />
                 <span>Painel Admin</span>
-                {pendingReservationsCount > 0 ? (
+                {totalPendingAlerts > 0 ? (
                   <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] animate-pulse">
-                    {pendingReservationsCount} pendente{pendingReservationsCount > 1 ? 's' : ''}
+                    {totalPendingAlerts} pendente{totalPendingAlerts > 1 ? 's' : ''}
                   </span>
                 ) : totalReservationsCount > 0 ? (
                   <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-amber-300 border border-slate-700 font-bold text-[10px]">
@@ -669,9 +671,9 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <div className="relative">
                 <Shield className={`w-5 h-5 mb-0.5 transition-transform ${currentView === 'ADMIN' ? 'scale-110 text-amber-400' : ''}`} />
-                {pendingReservationsCount > 0 ? (
+                {totalPendingAlerts > 0 ? (
                   <span className="absolute -top-1.5 -right-2.5 px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] animate-pulse">
-                    {pendingReservationsCount}
+                    {totalPendingAlerts}
                   </span>
                 ) : totalReservationsCount > 0 ? (
                   <span className="absolute -top-1.5 -right-2.5 px-1.5 py-0.2 rounded-full bg-slate-800 text-amber-300 border border-slate-700 font-bold text-[9px]">
