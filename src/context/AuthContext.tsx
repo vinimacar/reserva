@@ -67,6 +67,7 @@ const STORAGE_KEY_DEV_MODE = 'reserve_developer_mode_active';
 
 // Helper to normalize user avatar to educational icon (no photos/animals) and set password
 function normalizeUser(u: User): User {
+  const isOwner = isOwnerEmail(u.email);
   const gender = u.gender || detectGenderFromName(u.name);
   let avatar = u.avatar;
 
@@ -80,9 +81,14 @@ function normalizeUser(u: User): User {
   const schoolId = u.schoolId || DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos';
   const schoolName = u.schoolName || DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos';
 
-  let approvalStatus = u.approvalStatus;
-  if (!approvalStatus) {
-    // Default pre-existing seed users or previously created teachers to APPROVED
+  // REGRA DO PROPRIETÁRIO (ACESSO IRRESTRITO):
+  // O proprietário vinicius.machado.carvalho@educacao.mg.gov.br possui acesso irrestrito:
+  // SEMPRE cargo ADMIN e aprovação total APPROVED (nunca pendente nem rebaixado).
+  let role: UserRole = u.role;
+  let approvalStatus: UserApprovalStatus = u.approvalStatus || 'APPROVED';
+
+  if (isOwner) {
+    role = 'ADMIN';
     approvalStatus = 'APPROVED';
   }
 
@@ -92,6 +98,7 @@ function normalizeUser(u: User): User {
     avatar,
     iconKey,
     password,
+    role,
     schoolId,
     schoolName,
     approvalStatus,
@@ -105,22 +112,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Clean up any legacy entry where vinicius was erroneously marked as ADMIN in localStorage
-          const cleaned = parsed.map((u) => {
-            if (
-              u.email &&
-              u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
-              (u.id === 'user_vinicius' || u.role === 'ADMIN')
-            ) {
+          // Guarantee owner always has unrestricted ADMIN role and APPROVED status
+          const hasOwner = parsed.some((u) => isOwnerEmail(u.email));
+          const listWithNormalized = parsed.map((u) => {
+            if (isOwnerEmail(u.email)) {
               return {
                 ...normalizeUser(u),
-                role: 'TEACHER' as UserRole,
-                approvalStatus: (u.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+                role: 'ADMIN' as UserRole,
+                approvalStatus: 'APPROVED' as UserApprovalStatus,
               };
             }
             return normalizeUser(u);
           });
-          return cleaned;
+          if (!hasOwner) {
+            const ownerSeed = DEFAULT_USERS.find((u) => isOwnerEmail(u.email)) || DEFAULT_USERS[0];
+            listWithNormalized.unshift(normalizeUser(ownerSeed));
+          }
+          return listWithNormalized;
         }
       }
     } catch {
@@ -145,15 +153,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved && saved !== 'null' && saved !== 'undefined') {
         const parsed: User = JSON.parse(saved);
         if (parsed && parsed.id && parsed.name) {
-          if (
-            parsed.email &&
-            parsed.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
-            (parsed.id === 'user_vinicius' || parsed.role === 'ADMIN')
-          ) {
+          if (parsed.email && isOwnerEmail(parsed.email)) {
             return {
               ...normalizeUser(parsed),
-              role: 'TEACHER' as UserRole,
-              approvalStatus: (parsed.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+              role: 'ADMIN' as UserRole,
+              approvalStatus: 'APPROVED' as UserApprovalStatus,
             };
           }
           return normalizeUser(parsed);
@@ -200,23 +204,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
         const normalizedList = cloudUsers.map((u) => {
-          if (
-            u.email &&
-            u.email.toLowerCase() === OWNER_EMAIL.toLowerCase() &&
-            (u.id === 'user_vinicius' || (u.role === 'ADMIN' && !u.approvedBy && !u.approvedAt))
-          ) {
+          if (u.email && isOwnerEmail(u.email)) {
             return {
               ...normalizeUser(u),
-              role: 'TEACHER' as UserRole,
-              approvalStatus: (u.approvedAt ? 'APPROVED' : 'PENDING') as UserApprovalStatus,
+              role: 'ADMIN' as UserRole,
+              approvalStatus: 'APPROVED' as UserApprovalStatus,
             };
           }
           return normalizeUser(u);
         });
+
+        // Ensure owner is always in the users list
+        if (!normalizedList.some((u) => isOwnerEmail(u.email))) {
+          const ownerSeed = DEFAULT_USERS.find((u) => isOwnerEmail(u.email)) || DEFAULT_USERS[0];
+          normalizedList.unshift(normalizeUser(ownerSeed));
+        }
+
         setUsers(normalizedList);
-        // Ensure currentUser is kept in sync with the cloud state (e.g. when approved by coordinator)
+        // Ensure currentUser is kept in sync with the cloud state
         setCurrentUser((curr) => {
           if (!curr) return null;
+          if (isOwnerEmail(curr.email)) {
+            const freshOwner = normalizedList.find((u) => isOwnerEmail(u.email));
+            return freshOwner || {
+              ...curr,
+              role: 'ADMIN' as UserRole,
+              approvalStatus: 'APPROVED' as UserApprovalStatus,
+            };
+          }
           const fresh = normalizedList.find((u) => u.id === curr.id || u.email.toLowerCase() === curr.email.toLowerCase());
           return fresh || curr;
         });
@@ -269,8 +284,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Look for matching user in users list
     let found = users.find((u) => u.email.toLowerCase() === trimmedEmail);
 
-    // If not found by direct email, check if user is a designated admin in DEFAULT_SCHOOLS
+    // If not found by direct email, check if owner or designated admin in DEFAULT_SCHOOLS
     if (!found) {
+      if (isOwnerEmail(trimmedEmail)) {
+        const autoOwner: User = normalizeUser({
+          id: 'user_vinicius',
+          name: OWNER_NAME,
+          email: OWNER_EMAIL,
+          avatar: 'icon:tech',
+          iconKey: 'icon:tech',
+          password: password || 'educacao123',
+          role: 'ADMIN',
+          gender: 'MALE',
+          subject: 'Tecnologia & Robótica / Gestão Geral',
+          schoolId: preferredSchoolId || DEFAULT_SCHOOLS[0]?.id || 'school_milton_campos',
+          schoolName: DEFAULT_SCHOOLS[0]?.name || 'E.E. Governador Milton Campos',
+          approvalStatus: 'APPROVED',
+        });
+
+        setUsers((prev) => [autoOwner, ...prev.filter((u) => !isOwnerEmail(u.email))]);
+        setCurrentUser(autoOwner);
+        saveUserToCloud(autoOwner).catch(console.warn);
+        registerInFirebaseAuth(autoOwner.email, autoOwner.password, autoOwner.name).catch(console.warn);
+        return { success: true, user: autoOwner };
+      }
+
       const schoolWithAdmin = DEFAULT_SCHOOLS.find((s) =>
         s.adminEmails.some((e) => e.toLowerCase() === trimmedEmail)
       );
@@ -358,10 +396,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     schoolName?: string
   ): User => {
     const trimmedEmail = email.trim().toLowerCase();
+    const isOwner = isOwnerEmail(trimmedEmail);
     const existing = users.find((u) => u.email.toLowerCase() === trimmedEmail);
 
     if (existing) {
-      const normalized = normalizeUser(existing);
+      let normalized = normalizeUser(existing);
+      if (isOwner) {
+        normalized = {
+          ...normalized,
+          role: 'ADMIN',
+          approvalStatus: 'APPROVED',
+        };
+      }
       setCurrentUser(normalized);
       // Ensure user is in Firebase Auth
       registerInFirebaseAuth(normalized.email, normalized.password, normalized.name).catch((e) =>
@@ -375,30 +421,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const targetSchoolId = schoolId || matchedSchool.id;
     const targetSchoolName = schoolName || matchedSchool.name;
 
-    const rawName = name || trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    const formattedName = rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`;
-    const gender = detectGenderFromName(formattedName);
-    const subject = 'Docente Geral';
-    const iconAvatar = getIconForSubject(subject);
+    const rawName = name || (isOwner ? OWNER_NAME : trimmedEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, (l) => l.toUpperCase()));
+    const formattedName = isOwner ? OWNER_NAME : (rawName.startsWith('Prof') ? rawName : `Prof. ${rawName}`);
+    const gender = isOwner ? 'MALE' : detectGenderFromName(formattedName);
+    const subject = isOwner ? 'Tecnologia & Robótica / Gestão Geral' : 'Docente Geral';
+    const iconAvatar = isOwner ? 'icon:tech' : getIconForSubject(subject);
 
-    // REGRA DE PRIMEIRO ACESSO DO PROFESSOR:
-    // Ao acessar pela primeira vez como professor através do Google,
-    // o usuário DEVE ser criado SEMPRE com o cargo de PROFESSOR ('TEACHER')
-    // e com o status 'PENDING' (Aguardando liberação pelo coordenador/administrador).
-    // NUNCA deve entrar como Administrador ('ADMIN') no primeiro acesso!
+    // REGRA DE ACESSO:
+    // O PROPRIETÁRIO (vinicius.machado.carvalho@educacao.mg.gov.br) possui ACESSO IRRESTRITO:
+    // entra SEMPRE como Administrador ('ADMIN') e status APROVADO ('APPROVED').
+    // Demais professores que acessam pela primeira vez via Google entram como 'TEACHER'
+    // e com status 'PENDING' (aguardando liberação pela coordenação).
     const newUser: User = {
-      id: `user_${Date.now()}`,
+      id: isOwner ? 'user_vinicius' : `user_${Date.now()}`,
       name: formattedName,
       email: trimmedEmail,
       avatar: iconAvatar,
       iconKey: iconAvatar,
       password: 'educacao123',
       gender: gender,
-      role: 'TEACHER', // SEMPRE PROFESSOR NO PRIMEIRO ACESSO
+      role: isOwner ? 'ADMIN' : 'TEACHER',
       subject: subject,
       schoolId: targetSchoolId,
       schoolName: targetSchoolName,
-      approvalStatus: 'PENDING', // AGUARDA LIBERAÇÃO DA COORDENAÇÃO
+      approvalStatus: isOwner ? 'APPROVED' : 'PENDING',
       firstLoginAt: new Date().toISOString(),
       authProvider: 'GOOGLE',
     };
@@ -582,6 +628,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateUserRole = (userId: string, newRole: UserRole) => {
+    const target = users.find((u) => u.id === userId);
+    if (target && isOwnerEmail(target.email)) {
+      console.warn('O proprietário do sistema possui cargo irrestrito de ADMIN e não pode ser alterado.');
+      return;
+    }
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
@@ -671,6 +722,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteUser = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target && isOwnerEmail(target.email)) {
+      console.warn('O proprietário do sistema possui acesso irrestrito e não pode ser excluído.');
+      return;
+    }
     if (users.length <= 1) return;
 
     setUsers((prev) => {
@@ -737,11 +793,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const rejectUser = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (target && isOwnerEmail(target.email)) {
+      console.warn('O proprietário do sistema possui acesso irrestrito e não pode ser rejeitado.');
+      return;
+    }
     deleteUser(userId);
   };
 
   const pendingApprovalUsers = useMemo(() => {
-    return users.filter((u) => u && u.approvalStatus === 'PENDING');
+    return users.filter((u) => u && u.approvalStatus === 'PENDING' && !isOwnerEmail(u.email));
   }, [users]);
 
   const syncUsersToFirebaseAuth = async (
@@ -755,7 +816,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         currentUser,
         users,
-        isAdmin: currentUser?.role === 'ADMIN',
+        isAdmin: isOwnerEmail(currentUser?.email) || isDeveloperMode || currentUser?.role === 'ADMIN',
         isDeveloperMode,
         isOwner: isOwnerEmail(currentUser?.email),
         is2FAVerified,

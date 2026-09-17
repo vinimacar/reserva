@@ -46,6 +46,7 @@ import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
 import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
+import { isOwnerEmail } from '../services/totp';
 
 export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
@@ -1626,12 +1627,16 @@ export const AdminPanel: React.FC<{
                               ) : (
                                 <span
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                    u.role === 'ADMIN'
+                                    isOwnerEmail(u.email)
+                                      ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-700'
+                                      : u.role === 'ADMIN'
                                       ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
                                       : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
                                   }`}
                                 >
-                                  {u.role === 'ADMIN'
+                                  {isOwnerEmail(u.email)
+                                    ? '👑 Proprietário (Acesso Irrestrito)'
+                                    : u.role === 'ADMIN'
                                     ? '👑 Administrador'
                                     : u.gender === 'FEMALE'
                                     ? '👩‍🏫 Professora Liberada'
@@ -1692,22 +1697,31 @@ export const AdminPanel: React.FC<{
                                       <span>Editar</span>
                                     </button>
 
-                                    <button
-                                      onClick={() => {
-                                        const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
-                                        updateUserRole(u.id, newRole);
-                                        showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
-                                      }}
-                                      className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
-                                        u.role === 'ADMIN'
-                                          ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
-                                          : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
-                                      }`}
-                                    >
-                                      {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
-                                    </button>
+                                    {isOwnerEmail(u.email) ? (
+                                      <span
+                                        className="px-2.5 py-1.5 rounded-xl font-bold text-[11px] bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 cursor-default select-none"
+                                        title="Proprietário do sistema possui acesso irrestrito permanente."
+                                      >
+                                        <span>👑 Proprietário</span>
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          const newRole: UserRole = u.role === 'ADMIN' ? 'TEACHER' : 'ADMIN';
+                                          updateUserRole(u.id, newRole);
+                                          showToast(`Permissão do professor ${u.name} alterada para ${newRole === 'ADMIN' ? 'Administrador' : 'Professor'}.`);
+                                        }}
+                                        className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer ${
+                                          u.role === 'ADMIN'
+                                            ? 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-800'
+                                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-xs'
+                                        }`}
+                                      >
+                                        {u.role === 'ADMIN' ? 'Revogar Admin' : 'Tornar Admin'}
+                                      </button>
+                                    )}
 
-                                    {users.length > 1 && (
+                                    {!isOwnerEmail(u.email) && users.length > 1 && (
                                       <button
                                         onClick={() => {
                                           setConfirmModal({
