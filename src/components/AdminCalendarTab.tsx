@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Calendar as CalendarIcon,
   CalendarDays,
@@ -21,6 +21,14 @@ import {
   Clock,
   ShieldCheck,
   Sliders,
+  FileText,
+  Upload,
+  Download,
+  ExternalLink,
+  Eye,
+  FileCheck,
+  HardDrive,
+  CalendarClock,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import {
@@ -37,6 +45,15 @@ import {
   matchesSpecialDay,
 } from '../data/defaultAcademicCalendar';
 import { formatDateBR, formatLocalDateToISO } from '../lib/dateUtils';
+import {
+  saveCalendarPdf,
+  loadCalendarPdf,
+  deleteCalendarPdf,
+  downloadCalendarPdf,
+  openCalendarPdfInNewTab,
+  formatPdfFileSize,
+} from '../lib/pdfStorage';
+import { CalendarPdfViewerModal } from './CalendarPdfViewerModal';
 
 interface AdminCalendarTabProps {
   onShowToast?: (msg: string) => void;
@@ -72,10 +89,21 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
     return academicCalendar || createDefaultAcademicCalendar(2026, 'TRIMESTRE');
   });
 
-  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'TERMS' | 'HOLIDAYS' | 'SATURDAYS' | 'SETTINGS'>('OVERVIEW');
+  const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'TERMS' | 'HOLIDAYS' | 'SATURDAYS' | 'SETTINGS' | 'PDF'>('OVERVIEW');
   const [currentMonthView, setCurrentMonthView] = useState<number>(new Date().getMonth()); // 0 - 11
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
+
+  // PDF Document upload & viewer state
+  const [storedPdfUrl, setStoredPdfUrl] = useState<string | null>(calendarDraft.pdfUrl || null);
+  const [isUploadingPdf, setIsUploadingPdf] = useState<boolean>(false);
+  const [isDraggingPdf, setIsDraggingPdf] = useState<boolean>(false);
+  const [isPdfViewerOpen, setIsPdfViewerOpen] = useState<boolean>(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Year definition state
+  const [isYearModalOpen, setIsYearModalOpen] = useState<boolean>(false);
+  const [yearInputVal, setYearInputVal] = useState<number>(calendarDraft.year || 2026);
 
   // Modal for adding / editing a special day
   const [editingSpecialDay, setEditingSpecialDay] = useState<Partial<CalendarSpecialDay> | null>(null);
@@ -85,11 +113,147 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
   const [editingTerm, setEditingTerm] = useState<AcademicTerm | null>(null);
 
   // Keep draft in sync if active school changes externally
-  React.useEffect(() => {
+  useEffect(() => {
     if (academicCalendar) {
       setCalendarDraft(academicCalendar);
+      setYearInputVal(academicCalendar.year || 2026);
     }
   }, [academicCalendar, currentSchoolId]);
+
+  // Load PDF from IndexedDB / cache whenever school or pdf metadata changes
+  useEffect(() => {
+    let isMounted = true;
+    loadCalendarPdf(currentSchoolId, calendarDraft.pdfUrl).then((url) => {
+      if (isMounted && url) {
+        setStoredPdfUrl(url);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentSchoolId, calendarDraft.pdfFileName, calendarDraft.pdfUrl]);
+
+  // Handle PDF Upload via file input or drag-and-drop
+  const handlePdfUpload = async (file: File) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.pdf') && !file.type.includes('pdf')) {
+      if (onShowToast) onShowToast('Erro: O arquivo selecionado deve ser um documento PDF (.pdf).');
+      return;
+    }
+
+    try {
+      setIsUploadingPdf(true);
+      const res = await saveCalendarPdf(currentSchoolId, file);
+      setStoredPdfUrl(res.dataUrl);
+
+      const updatedDraft: AcademicCalendarConfig = {
+        ...calendarDraft,
+        pdfFileName: res.fileName,
+        pdfFileSize: res.fileSize,
+        pdfUploadedAt: res.uploadedAt,
+        // Armazena no config apenas se for menor que 400KB para respeitar limites do Firestore
+        pdfUrl: res.fileSize <= 400 * 1024 ? res.dataUrl : undefined,
+      };
+
+      setCalendarDraft(updatedDraft);
+      updateAcademicCalendar(updatedDraft, currentSchoolId);
+      if (onShowToast) {
+        onShowToast(`Calendário em PDF "${res.fileName}" salvo com sucesso!`);
+      }
+    } catch (err: any) {
+      console.error('Erro ao enviar PDF:', err);
+      if (onShowToast) {
+        onShowToast(err?.message || 'Falha ao processar o arquivo PDF.');
+      }
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
+
+  // Handle Remove PDF
+  const handleRemovePdf = async () => {
+    if (!window.confirm('Deseja realmente excluir o documento PDF do calendário letivo desta unidade escolar?')) {
+      return;
+    }
+
+    try {
+      await deleteCalendarPdf(currentSchoolId);
+      setStoredPdfUrl(null);
+
+      const updatedDraft: AcademicCalendarConfig = {
+        ...calendarDraft,
+        pdfFileName: undefined,
+        pdfFileSize: undefined,
+        pdfUploadedAt: undefined,
+        pdfUrl: undefined,
+      };
+
+      setCalendarDraft(updatedDraft);
+      updateAcademicCalendar(updatedDraft, currentSchoolId);
+      if (onShowToast) {
+        onShowToast('Documento PDF removido.');
+      }
+    } catch (err) {
+      console.error('Erro ao remover PDF:', err);
+    }
+  };
+
+  // Handle Define / Change School Year
+  const handleYearChange = (newYear: number, applyOfficialTemplate: boolean = true) => {
+    if (isNaN(newYear) || newYear < 2020 || newYear > 2040) {
+      if (onShowToast) onShowToast('Por favor, informe um ano válido entre 2020 e 2040.');
+      return;
+    }
+
+    if (applyOfficialTemplate) {
+      const template = createDefaultAcademicCalendar(newYear, calendarDraft.periodType || 'TRIMESTRE');
+      const updated: AcademicCalendarConfig = {
+        ...template,
+        warnOnHolidayBooking: calendarDraft.warnOnHolidayBooking,
+        blockBookingOnHolidays: calendarDraft.blockBookingOnHolidays,
+        totalSchoolDaysGoal: calendarDraft.totalSchoolDaysGoal || 200,
+        pdfUrl: calendarDraft.pdfUrl,
+        pdfFileName: calendarDraft.pdfFileName,
+        pdfFileSize: calendarDraft.pdfFileSize,
+        pdfUploadedAt: calendarDraft.pdfUploadedAt,
+      };
+      setCalendarDraft(updated);
+      updateAcademicCalendar(updated, currentSchoolId);
+      if (onShowToast) {
+        onShowToast(`Ano letivo alterado para ${newYear} com a matriz oficial de 200 dias aplicada!`);
+      }
+    } else {
+      // Renomeia apenas o ano mantendo eventos
+      const oldYearStr = String(calendarDraft.year || 2025);
+      const newYearStr = String(newYear);
+      const updated: AcademicCalendarConfig = {
+        ...calendarDraft,
+        year: newYear,
+        schoolYearStart: calendarDraft.schoolYearStart.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        schoolYearEnd: calendarDraft.schoolYearEnd.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        terms: calendarDraft.terms.map((t) => ({
+          ...t,
+          startDate: t.startDate.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          endDate: t.endDate.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          classCouncilStart: t.classCouncilStart?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          classCouncilEnd: t.classCouncilEnd?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          parentMeetingStart: t.parentMeetingStart?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          parentMeetingEnd: t.parentMeetingEnd?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        })),
+        specialDays: calendarDraft.specialDays.map((d) => ({
+          ...d,
+          date: d.date.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          endDate: d.endDate?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        })),
+      };
+      setCalendarDraft(updated);
+      updateAcademicCalendar(updated, currentSchoolId);
+      if (onShowToast) {
+        onShowToast(`Ano letivo alterado para ${newYear}.`);
+      }
+    }
+    setIsYearModalOpen(false);
+  };
 
   // Total school days calculated
   const totalSchoolDays = useMemo(() => {

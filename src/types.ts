@@ -60,7 +60,7 @@ export interface CalendarSpecialDay {
 }
 
 export interface AcademicCalendarConfig {
-  year: number; // e.g. 2025, 2026
+  year: number; // e.g. 2026, 2027
   periodType: AcademicPeriodType; // 'BIMESTRE' ou 'TRIMESTRE'
   schoolYearStart: string; // "YYYY-MM-DD"
   schoolYearEnd: string; // "YYYY-MM-DD"
@@ -69,6 +69,11 @@ export interface AcademicCalendarConfig {
   warnOnHolidayBooking?: boolean;
   blockBookingOnHolidays?: boolean;
   totalSchoolDaysGoal?: number; // Meta da LDB (200 dias)
+  // Upload do calendário letivo anual oficial em PDF
+  pdfUrl?: string; // Data URL base64 ou URL do arquivo PDF
+  pdfFileName?: string; // Nome do arquivo (ex: "Calendario_SEE_MG_2026.pdf")
+  pdfFileSize?: number; // Tamanho em bytes
+  pdfUploadedAt?: string; // Data e hora do envio (ISO string)
 }
 
 export interface User {
