@@ -204,6 +204,7 @@ function ReserveAppContent() {
             onSelectReservation={handleSelectReservation}
             onOpenReceipt={handleOpenReceipt}
             onOpenSchoolSettings={() => setIsSchoolSetupModalOpen(true)}
+            onOpenDeveloperPortal={handleOpenDeveloperPortal}
           />
         )}
 

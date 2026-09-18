@@ -34,6 +34,7 @@ import {
   Moon,
   GraduationCap,
   Bug,
+  Terminal,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -41,7 +42,6 @@ import { useTheme } from '../context/ThemeContext';
 import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
-import { AdminSchoolsTab } from './AdminSchoolsTab';
 import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
 import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
@@ -52,7 +52,8 @@ export const AdminPanel: React.FC<{
   onSelectReservation: (r: Reservation) => void;
   onOpenReceipt: (r: Reservation) => void;
   onOpenSchoolSettings?: () => void;
-}> = ({ onSelectReservation, onOpenReceipt, onOpenSchoolSettings }) => {
+  onOpenDeveloperPortal?: () => void;
+}> = ({ onSelectReservation, onOpenReceipt, onOpenSchoolSettings, onOpenDeveloperPortal }) => {
   const {
     schools,
     reservations,
@@ -95,8 +96,8 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'SCHOOLS' | 'BOOKINGS' | 'ROOMS' | 'CLASSES_SCHEDULES' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
-  >('SCHOOLS');
+    'BOOKINGS' | 'CLASSES_SCHEDULES' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
+  >('BOOKINGS');
 
   // Print modal state
   const [isWeeklyPrintModalOpen, setIsWeeklyPrintModalOpen] = useState<boolean>(false);
@@ -349,6 +350,19 @@ export const AdminPanel: React.FC<{
             </button>
           )}
 
+          {isOwnerEmail(currentUser?.email) && onOpenDeveloperPortal && (
+            <button
+              type="button"
+              id="admin-open-dev-portal-btn"
+              onClick={onOpenDeveloperPortal}
+              className="flex items-center space-x-1.5 sm:space-x-2 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/80 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+              title="Acesso exclusivo do proprietário para cadastrar e gerenciar escolas da rede"
+            >
+              <Terminal className="w-4 h-4 text-indigo-400" />
+              <span>Console Dev (Incluir Escolas)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsWeeklyPrintModalOpen(true)}
@@ -577,18 +591,6 @@ export const AdminPanel: React.FC<{
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
         <button
-          onClick={() => setActiveTab('SCHOOLS')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === 'SCHOOLS'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Building2 className="w-4 h-4 text-blue-400" />
-          <span>Rede de Escolas & Responsáveis ({schools.length})</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('BOOKINGS')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'BOOKINGS'
@@ -695,9 +697,6 @@ export const AdminPanel: React.FC<{
           <span>Logs de Erros (Depuração)</span>
         </button>
       </div>
-
-      {/* TAB 0: SCHOOLS & SYSTEM RESPONSABLES */}
-      {activeTab === 'SCHOOLS' && <AdminSchoolsTab onShowToast={showToast} />}
 
       {/* TAB 1: RESERVATIONS MANAGEMENT */}
       {activeTab === 'BOOKINGS' && (
@@ -1915,6 +1914,33 @@ export const AdminPanel: React.FC<{
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
               Personalize os dados da instituição escolar e as regras de agendamento de laboratórios.
             </p>
+          </div>
+
+          {/* Network Notice Card */}
+          <div className="bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/50 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-indigo-900 dark:text-indigo-200">
+                  Rede de Escolas & Inclusão de Unidades
+                </h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  A inclusão e implantação de novas escolas na rede é gerenciada exclusivamente pelo Proprietário no Console do Desenvolvedor com autenticação 2FA.
+                </p>
+              </div>
+            </div>
+            {isOwnerEmail(currentUser?.email) && onOpenDeveloperPortal && (
+              <button
+                type="button"
+                onClick={onOpenDeveloperPortal}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs flex items-center space-x-1.5 self-start sm:self-auto"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                <span>Console Dev</span>
+              </button>
+            )}
           </div>
 
           {/* School Identity Card */}

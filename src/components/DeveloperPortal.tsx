@@ -160,6 +160,11 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   const [newPasswordValue, setNewPasswordValue] = useState('');
   const [passwordResetSuccess, setPasswordResetSuccess] = useState(false);
 
+  // Edit School State (Developer/Owner exclusive)
+  const [schoolToEdit, setSchoolToEdit] = useState<School | null>(null);
+  const [editSchoolForm, setEditSchoolForm] = useState<Partial<School>>({});
+  const [editSchoolSuccess, setEditSchoolSuccess] = useState(false);
+
   // Client Deletion State
   const [schoolToDelete, setSchoolToDelete] = useState<School | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
@@ -1367,6 +1372,34 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                         <button
                           type="button"
                           onClick={() => {
+                            setSchoolToEdit(school);
+                            setEditSchoolSuccess(false);
+                            setEditSchoolForm({
+                              name: school.name,
+                              shortName: school.shortName || '',
+                              city: school.city,
+                              state: school.state || 'MG',
+                              inepCode: school.inepCode || school.code || '',
+                              networkType: school.networkType || 'Estadual',
+                              directorName: school.directorName || '',
+                              contactEmail: school.contactEmail || '',
+                              phone: school.phone || '',
+                              shifts: school.shifts || ['MANHA', 'TARDE'],
+                              requireAdminApproval: school.requireAdminApproval || false,
+                              maxAdvanceDays: school.maxAdvanceDays || 30,
+                              allowWeekendBooking: school.allowWeekendBooking || false,
+                            });
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                          title="Editar dados cadastrais desta instituição"
+                        >
+                          <Edit3 className="w-3 h-3 text-amber-400" />
+                          <span>Editar</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
                             setSchoolToDelete(school);
                             setDeleteConfirmationText('');
                           }}
@@ -1949,6 +1982,244 @@ Ambiente provisionado com sucesso pela Equipe de Desenvolvimento.`;
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit School Details (Owner Only) */}
+      {schoolToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto text-slate-100">
+            <div className="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Editar Instituição Escolar</h3>
+                  <p className="text-[11px] text-slate-400 truncate max-w-xs sm:max-w-md">{schoolToEdit.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSchoolToEdit(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!editSchoolForm.name?.trim()) return;
+                updateSchool(schoolToEdit.id, editSchoolForm);
+                setEditSchoolSuccess(true);
+                setTimeout(() => {
+                  setSchoolToEdit(null);
+                  setEditSchoolSuccess(false);
+                }, 1200);
+              }}
+              className="p-6 space-y-4 text-xs"
+            >
+              {editSchoolSuccess && (
+                <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Instituição atualizada com sucesso no banco de dados!</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Nome Oficial da Instituição: *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editSchoolForm.name || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Sigla / Nome Curto:
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.shortName || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, shortName: e.target.value })}
+                    placeholder="Ex: E.E. Milton Campos"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Código INEP:
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.inepCode || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, inepCode: e.target.value })}
+                    placeholder="8 dígitos"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Município:
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.city || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, city: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Estado (UF):
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.state || 'MG'}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, state: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Rede de Ensino:
+                  </label>
+                  <select
+                    value={editSchoolForm.networkType || 'Estadual'}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, networkType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="Estadual">Estadual (SEE/MG)</option>
+                    <option value="Municipal">Municipal</option>
+                    <option value="Federal">Federal / IF</option>
+                    <option value="Particular">Particular</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Diretor(a) Geral:
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.directorName || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, directorName: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    Telefone / Ramal:
+                  </label>
+                  <input
+                    type="text"
+                    value={editSchoolForm.phone || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, phone: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                    E-mail Institucional:
+                  </label>
+                  <input
+                    type="email"
+                    value={editSchoolForm.contactEmail || ''}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, contactEmail: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              {/* Turnos */}
+              <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl">
+                <label className="block text-[11px] font-bold text-slate-300 mb-2">
+                  Turnos de Atendimento Habilitados:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(['MANHA', 'TARDE', 'NOITE', 'INTEGRAL'] as ShiftType[]).map((sh) => (
+                    <label key={sh} className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(editSchoolForm.shifts || []).includes(sh)}
+                        onChange={() => {
+                          const currentShifts = editSchoolForm.shifts || [];
+                          const next = currentShifts.includes(sh)
+                            ? currentShifts.length > 1
+                              ? currentShifts.filter((s) => s !== sh)
+                              : currentShifts
+                            : [...currentShifts, sh];
+                          setEditSchoolForm({ ...editSchoolForm, shifts: next });
+                        }}
+                        className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-900"
+                      />
+                      <span className="capitalize">{sh.toLowerCase()}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Regras */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-950 border border-slate-800 rounded-2xl">
+                <label className="flex items-start space-x-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editSchoolForm.requireAdminApproval || false}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, requireAdminApproval: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-900 mt-0.5"
+                  />
+                  <div>
+                    <span className="font-bold text-white block">Exigir Aprovação</span>
+                    <span className="text-[10px] text-slate-500">Reservas de professores entram pendentes</span>
+                  </div>
+                </label>
+
+                <label className="flex items-start space-x-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editSchoolForm.allowWeekendBooking || false}
+                    onChange={(e) => setEditSchoolForm({ ...editSchoolForm, allowWeekendBooking: e.target.checked })}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 bg-slate-900 mt-0.5"
+                  />
+                  <div>
+                    <span className="font-bold text-white block">Fins de Semana</span>
+                    <span className="text-[10px] text-slate-500">Permite sábados para reposição</span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setSchoolToEdit(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl font-bold transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black transition-colors flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Salvar Alterações</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
