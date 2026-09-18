@@ -1,6 +1,7 @@
 import { Room, TimePeriod, User, Reservation, Announcement, SchoolSettings, School } from '../types';
 import { formatLocalDateToISO } from '../lib/dateUtils';
 import { SAMPLE_SCHOOL_LOGOS } from './sampleSchoolLogos';
+import { createDefaultAcademicCalendar } from './defaultAcademicCalendar';
 
 export const DEFAULT_SCHOOLS: School[] = [
   {
@@ -23,6 +24,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     requireAdminApproval: false,
     maxAdvanceDays: 30,
     allowWeekendBooking: false,
+    academicCalendar: createDefaultAcademicCalendar(2026, 'TRIMESTRE'),
     classes: [
       '6º Ano A',
       '6º Ano B',
@@ -65,6 +67,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     requireAdminApproval: true,
     maxAdvanceDays: 20,
     allowWeekendBooking: false,
+    academicCalendar: createDefaultAcademicCalendar(2026, 'TRIMESTRE'),
     classes: [
       '6º Ano 01',
       '6º Ano 02',
@@ -102,6 +105,7 @@ export const DEFAULT_SCHOOLS: School[] = [
     requireAdminApproval: false,
     maxAdvanceDays: 30,
     allowWeekendBooking: false,
+    academicCalendar: createDefaultAcademicCalendar(2026, 'TRIMESTRE'),
     classes: [
       '1º Ano Fundamental',
       '2º Ano Fundamental',

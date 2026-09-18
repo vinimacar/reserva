@@ -69,7 +69,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
 
   // Local draft state of the calendar so coordinator can edit and save
   const [calendarDraft, setCalendarDraft] = useState<AcademicCalendarConfig>(() => {
-    return academicCalendar || createDefaultAcademicCalendar(2025);
+    return academicCalendar || createDefaultAcademicCalendar(2026, 'TRIMESTRE');
   });
 
   const [activeSubTab, setActiveSubTab] = useState<'OVERVIEW' | 'TERMS' | 'HOLIDAYS' | 'SATURDAYS' | 'SETTINGS'>('OVERVIEW');
@@ -112,19 +112,22 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
   };
 
   // Handle Reset to Default Template
-  const handleResetToOfficialTemplate = (periodType: AcademicPeriodType = 'BIMESTRE') => {
-    const newCal = createDefaultAcademicCalendar(calendarDraft.year, periodType);
+  const handleResetToOfficialTemplate = (periodType: AcademicPeriodType = 'TRIMESTRE') => {
+    const yearToUse = calendarDraft.year || 2026;
+    const newCal = createDefaultAcademicCalendar(yearToUse, periodType);
     setCalendarDraft(newCal);
     updateAcademicCalendar(newCal, currentSchoolId);
     setIsResetConfirmOpen(false);
     if (onShowToast) {
-      onShowToast(`Calendário redefinido para o Padrão Oficial (${periodType === 'BIMESTRE' ? '4 Bimestres' : '3 Trimestres'})!`);
+      const typeLabel = periodType === 'TRIMESTRE' ? '3 Trimestres (SEE-MG Oficial)' : periodType === 'BIMESTRE' ? '4 Bimestres' : '2 Semestres';
+      onShowToast(`Calendário redefinido para o Padrão Oficial (${typeLabel})!`);
     }
   };
 
-  // Switch Period Type (Bimestre vs Trimestre)
+  // Switch Period Type (Bimestre vs Trimestre vs Semestre)
   const handlePeriodTypeChange = (newType: AcademicPeriodType) => {
-    const newCal = createDefaultAcademicCalendar(calendarDraft.year, newType);
+    const yearToUse = calendarDraft.year || 2026;
+    const newCal = createDefaultAcademicCalendar(yearToUse, newType);
     setCalendarDraft((prev) => ({
       ...prev,
       periodType: newType,
@@ -189,7 +192,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
 
   // Month Calendar Matrix Generation
   const calendarMonthData = useMemo(() => {
-    const year = calendarDraft.year || 2025;
+    const year = calendarDraft.year || 2026;
     const month = currentMonthView;
 
     const firstDay = new Date(year, month, 1);
@@ -221,6 +224,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
       const isRecess = specialDay?.type === 'RECESSO';
       const isSaturdaySchool = specialDay?.type === 'SABADO_LETIVO';
       const isPlanning = specialDay?.type === 'PLANEJAMENTO';
+      const isDiaEscolar = specialDay?.type === 'DIA_ESCOLAR';
 
       days.push({
         dayNumber: d,
@@ -233,6 +237,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
         isRecess,
         isSaturdaySchool,
         isPlanning,
+        isDiaEscolar,
       });
     }
 
@@ -248,21 +253,36 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
             <CalendarDays className="w-6 h-6" />
           </div>
           <div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center flex-wrap gap-2">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Calendário Letivo & Planejamento Escolar
               </h3>
               <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-300 dark:border-emerald-800">
                 Ano {calendarDraft.year}
               </span>
+              <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-wider border border-blue-300 dark:border-blue-800">
+                {calendarDraft.periodType === 'TRIMESTRE' ? 'Organização Trimestral (SEE-MG)' : calendarDraft.periodType === 'BIMESTRE' ? 'Organização Bimestral' : 'Organização Semestral'}
+              </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Configuração oficial de bimestres, feriados, recessos, sábados letivos e conformidade com os 200 dias letivos da LDB para {currentSchool?.name || 'sua escola'}.
+              Configuração de trimestres, conselhos de classe, reuniões de pais, feriados, recessos, sábados letivos e cumprimento rigoroso dos 200 dias letivos da LDB para {currentSchool?.name || 'sua escola'}.
             </p>
           </div>
         </div>
 
         <div className="flex items-center flex-wrap gap-2 self-start md:self-auto">
+          {calendarDraft.periodType !== 'TRIMESTRE' && (
+            <button
+              type="button"
+              onClick={() => handleResetToOfficialTemplate('TRIMESTRE')}
+              className="px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
+              title="Corrigir para a organização trimestral oficial da SEE-MG"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+              <span>Corrigir para Trimestral (SEE-MG)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsResetConfirmOpen(true)}
@@ -296,6 +316,30 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
           </button>
         </div>
       </div>
+
+      {/* Alert banner if currently bimestral or not trimestral */}
+      {calendarDraft.periodType !== 'TRIMESTRE' && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-900 dark:text-amber-200">
+                Atenção: A organização oficial da rede estadual de ensino (SEE-MG) é Trimestral
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                O calendário escolar atualmente está configurado como <strong>{calendarDraft.periodType}</strong>. Deseja aplicar a matriz trimestral com 3 trimestres, conselhos de classe e 200 dias letivos?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleResetToOfficialTemplate('TRIMESTRE')}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shrink-0 self-start sm:self-auto cursor-pointer shadow-xs transition-colors"
+          >
+            Aplicar 3 Trimestres (SEE-MG)
+          </button>
+        </div>
+      )}
 
       {/* LDB 200 Days Compliance & Overview Card */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -396,7 +440,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
           }`}
         >
           <GraduationCap className="w-3.5 h-3.5" />
-          <span>Bimestres & Períodos Letivos ({calendarDraft.terms.length})</span>
+          <span>{calendarDraft.periodType === 'TRIMESTRE' ? 'Trimestres' : calendarDraft.periodType === 'BIMESTRE' ? 'Bimestres' : 'Semestres'} & Períodos Letivos ({calendarDraft.terms.length})</span>
         </button>
 
         <button
@@ -409,7 +453,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
           }`}
         >
           <Palmtree className="w-3.5 h-3.5" />
-          <span>Feriados & Recessos ({calendarDraft.specialDays.filter((d) => d.type === 'FERIADO' || d.type === 'RECESSO' || d.type === 'PLANEJAMENTO').length})</span>
+          <span>Feriados, Recessos & Dias Escolares ({calendarDraft.specialDays.filter((d) => d.type === 'FERIADO' || d.type === 'RECESSO' || d.type === 'PLANEJAMENTO' || d.type === 'DIA_ESCOLAR').length})</span>
         </button>
 
         <button
@@ -531,6 +575,8 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                   dayBg = 'bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40';
                 } else if (d.isSaturdaySchool) {
                   dayBg = 'bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60';
+                } else if (d.isDiaEscolar) {
+                  dayBg = 'bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40';
                 } else if (d.isPlanning) {
                   dayBg = 'bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40';
                 }
@@ -583,6 +629,8 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                               ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200'
                               : d.isSaturdaySchool
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200'
+                              : d.isDiaEscolar
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
                               : 'bg-purple-100 text-purple-800 dark:bg-purple-900/60 dark:text-purple-200'
                           }`}
                           title={d.specialDay.title}
@@ -663,6 +711,34 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                     </button>
                   </div>
 
+                  {/* Class Council & Parent Meeting info */}
+                  {(term.classCouncilStart || term.parentMeetingStart) && (
+                    <div className="space-y-1.5 pt-2 text-xs border-t border-slate-100 dark:border-slate-800">
+                      {term.classCouncilStart && (
+                        <div className="flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-800/40 px-2.5 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <span className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                            <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                            Conselho de Classe:
+                          </span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {formatDateBR(term.classCouncilStart, false)} a {term.classCouncilEnd ? formatDateBR(term.classCouncilEnd, false) : ''}
+                          </span>
+                        </div>
+                      )}
+                      {term.parentMeetingStart && (
+                        <div className="flex items-center justify-between text-[11px] bg-slate-50 dark:bg-slate-800/40 px-2.5 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                          <span className="font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                            Reunião de Pais:
+                          </span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {formatDateBR(term.parentMeetingStart, false)} a {term.parentMeetingEnd ? formatDateBR(term.parentMeetingEnd, false) : ''}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl text-center">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Dias Letivos Reais</span>
@@ -728,6 +804,8 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                           ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300'
                           : day.type === 'RECESSO'
                           ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-300'
+                          : day.type === 'DIA_ESCOLAR'
+                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300'
                           : 'bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-300'
                       }`}
                     >
@@ -735,6 +813,8 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                         <Palmtree className="w-4 h-4" />
                       ) : day.type === 'RECESSO' ? (
                         <CalendarRange className="w-4 h-4" />
+                      ) : day.type === 'DIA_ESCOLAR' ? (
+                        <GraduationCap className="w-4 h-4" />
                       ) : (
                         <Clock className="w-4 h-4" />
                       )}
@@ -749,10 +829,12 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                               ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
                               : day.type === 'RECESSO'
                               ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300'
+                              : day.type === 'DIA_ESCOLAR'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
                               : 'bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300'
                           }`}
                         >
-                          {day.type}
+                          {day.type === 'DIA_ESCOLAR' ? 'Dia Escolar (DE)' : day.type}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -1011,6 +1093,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                 >
                   <option value="FERIADO">Feriado Escolar / Nacional / Estadual</option>
                   <option value="RECESSO">Recesso Escolar (Férias de Julho / Recesso)</option>
+                  <option value="DIA_ESCOLAR">Dia Escolar (DE) - Atividades Pedagógicas sem estudantes</option>
                   <option value="SABADO_LETIVO">Sábado Letivo (Reposição / Atividade)</option>
                   <option value="PLANEJAMENTO">Planejamento Docente / Módulo / Conselho</option>
                   <option value="EVENTO">Evento Escolar (Mostra Maker / Feira)</option>
@@ -1132,31 +1215,33 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
               </button>
             </div>
 
-            <form onSubmit={handleSaveTerm} className="p-5 space-y-3 text-xs">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Data de Início:
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={editingTerm.startDate}
-                  onChange={(e) => setEditingTerm({ ...editingTerm, startDate: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                />
-              </div>
+            <form onSubmit={handleSaveTerm} className="p-5 space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Data de Início: *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editingTerm.startDate}
+                    onChange={(e) => setEditingTerm({ ...editingTerm, startDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Data de Término:
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={editingTerm.endDate}
-                  onChange={(e) => setEditingTerm({ ...editingTerm, endDate: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                />
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Data de Término: *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editingTerm.endDate}
+                    onChange={(e) => setEditingTerm({ ...editingTerm, endDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1165,15 +1250,71 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                 </label>
                 <input
                   type="number"
-                  value={editingTerm.targetSchoolDays || 50}
+                  value={editingTerm.targetSchoolDays || 66}
                   onChange={(e) =>
                     setEditingTerm({
                       ...editingTerm,
-                      targetSchoolDays: parseInt(e.target.value, 10) || 50,
+                      targetSchoolDays: parseInt(e.target.value, 10) || 66,
                     })
                   }
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
+              </div>
+
+              {/* Class Council Dates */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center space-x-1.5 text-blue-600 dark:text-blue-400 font-bold text-[11px]">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Conselho de Classe do {editingTerm.name}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Início do Conselho:</label>
+                    <input
+                      type="date"
+                      value={editingTerm.classCouncilStart || ''}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, classCouncilStart: e.target.value || undefined })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Término do Conselho:</label>
+                    <input
+                      type="date"
+                      value={editingTerm.classCouncilEnd || ''}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, classCouncilEnd: e.target.value || undefined })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parent Meeting Dates */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center space-x-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px]">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Reunião com Pais / Responsáveis</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Início da Reunião:</label>
+                    <input
+                      type="date"
+                      value={editingTerm.parentMeetingStart || ''}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, parentMeetingStart: e.target.value || undefined })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-500 mb-1">Término da Reunião:</label>
+                    <input
+                      type="date"
+                      value={editingTerm.parentMeetingEnd || ''}
+                      onChange={(e) => setEditingTerm({ ...editingTerm, parentMeetingEnd: e.target.value || undefined })}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-2">
@@ -1188,7 +1329,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                   type="submit"
                   className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold"
                 >
-                  Salvar
+                  Salvar Período
                 </button>
               </div>
             </form>
@@ -1200,7 +1341,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
       {isResetConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
               <RotateCcw className="w-6 h-6" />
             </div>
 
@@ -1209,24 +1350,39 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
             </h4>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Isso atualizará este calendário com as datas normativas do MEC/Secretaria de Educação para o ano {calendarDraft.year}, incluindo 4 bimestres (200 dias letivos), feriados nacionais e recessos oficiais.
+              Isso atualizará este calendário com a matriz oficial para o ano <strong>{calendarDraft.year}</strong> (cumprimento exato de 200 dias letivos da LDB, feriados e recessos escolares).
             </p>
 
-            <div className="flex items-center justify-center space-x-2 pt-2">
+            <div className="space-y-2 pt-2">
               <button
                 type="button"
-                onClick={() => setIsResetConfirmOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
+                onClick={() => {
+                  handleResetToOfficialTemplate('TRIMESTRE');
+                  setIsResetConfirmOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
               >
-                Cancelar
+                <Sparkles className="w-4 h-4" />
+                <span>Padrão Oficial Trimestral SEE-MG (3 Trimestres - 200 Dias)</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => handleResetToOfficialTemplate('BIMESTRE')}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold cursor-pointer shadow-xs"
+                onClick={() => {
+                  handleResetToOfficialTemplate('BIMESTRE');
+                  setIsResetConfirmOpen(false);
+                }}
+                className="w-full py-2 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
               >
-                Confirmar e Restaurar
+                Regime Bimestral Alternativo (4 Bimestres)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsResetConfirmOpen(false)}
+                className="w-full py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-medium cursor-pointer"
+              >
+                Cancelar
               </button>
             </div>
           </div>

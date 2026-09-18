@@ -30,18 +30,23 @@ export type AcademicPeriodType = 'BIMESTRE' | 'TRIMESTRE' | 'SEMESTRE';
 
 export interface AcademicTerm {
   id: string;
-  name: string; // e.g. "1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"
+  name: string; // e.g. "1º Trimestre", "2º Trimestre", "3º Trimestre"
   startDate: string; // "YYYY-MM-DD"
   endDate: string; // "YYYY-MM-DD"
   targetSchoolDays?: number;
+  classCouncilStart?: string; // "YYYY-MM-DD" Conselho de Classe
+  classCouncilEnd?: string; // "YYYY-MM-DD"
+  parentMeetingStart?: string; // "YYYY-MM-DD" Reunião de Pais/Responsáveis
+  parentMeetingEnd?: string; // "YYYY-MM-DD"
 }
 
 export type CalendarDayType =
-  | 'FERIADO' // Feriado Nacional, Estadual ou Municipal
-  | 'RECESSO' // Recesso Escolar de meio ou fim de ano
+  | 'FERIADO' // Feriado Nacional, Estadual ou Municipal (FN)
+  | 'RECESSO' // Recesso Escolar de meio ou fim de ano (R)
+  | 'DIA_ESCOLAR' // Dia Escolar sem estudantes (DE - Acolhimento, Formação, Reunião de Pais)
   | 'PLANEJAMENTO' // Conselho de Classe, Módulo ou Planejamento Pedagógico
-  | 'SABADO_LETIVO' // Sábado Letivo com reposição ou atividade
-  | 'EVENTO'; // Mostra Cultural, Feira de Ciências, etc.
+  | 'SABADO_LETIVO' // Sábado Letivo com reposição ou atividade (SL)
+  | 'EVENTO'; // Mostra Cultural, Feira de Ciências, Censo Escolar (CE)
 
 export interface CalendarSpecialDay {
   id: string;

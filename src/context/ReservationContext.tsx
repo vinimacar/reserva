@@ -433,7 +433,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     logoUrl: currentSchool?.logoUrl || '',
     isConfigured: true,
     configuredAt: currentSchool?.createdAt || new Date().toISOString(),
-    academicCalendar: currentSchool?.academicCalendar || createDefaultAcademicCalendar(2025),
+    academicCalendar: currentSchool?.academicCalendar || createDefaultAcademicCalendar(2026, 'TRIMESTRE'),
   };
 
   // UI state for active school
@@ -1574,7 +1574,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (currentSchool?.academicCalendar) {
       return currentSchool.academicCalendar;
     }
-    return createDefaultAcademicCalendar(2025);
+    return createDefaultAcademicCalendar(2026, 'TRIMESTRE');
   }, [currentSchool?.academicCalendar]);
 
   const updateAcademicCalendar = (newCalendar: AcademicCalendarConfig, schoolId?: string) => {
@@ -1599,8 +1599,8 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const resetAcademicCalendarToDefault = (
     schoolId?: string,
-    year: number = 2025,
-    periodType: AcademicPeriodType = 'BIMESTRE'
+    year: number = 2026,
+    periodType: AcademicPeriodType = 'TRIMESTRE'
   ) => {
     const defaultCal = createDefaultAcademicCalendar(year, periodType);
     updateAcademicCalendar(defaultCal, schoolId);
