@@ -60,6 +60,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
     announcements,
     currentSchool,
     settings,
+    getCalendarDayInfo,
   } = useReservations();
   const { currentUser, isAdmin } = useAuth();
 
@@ -106,6 +107,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
       
       const dayNumber = d.getDate();
       const monthName = d.toLocaleDateString('pt-BR', { month: 'short' });
+      const calendarInfo = getCalendarDayInfo(isoDate);
 
       weekDays.push({
         date: isoDate,
@@ -113,6 +115,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
         shortName: shortDayNames[i],
         displayDate: `${dayNumber} ${monthName}`,
         isToday,
+        calendarInfo,
       });
     }
     return weekDays;
@@ -618,6 +621,18 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                       Hoje
                     </span>
                   )}
+                  {d.calendarInfo?.specialDay && (
+                    <span
+                      className={`text-[7px] font-black px-1 rounded-full max-w-[60px] truncate ${
+                        d.calendarInfo.specialDay.type === 'FERIADO' || d.calendarInfo.specialDay.type === 'RECESSO'
+                          ? isSelected ? 'bg-rose-400 text-slate-950' : 'bg-rose-500 text-white'
+                          : isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-500 text-white'
+                      }`}
+                      title={`${d.calendarInfo.badgeLabel}: ${d.calendarInfo.specialDay.description}`}
+                    >
+                      {d.calendarInfo.badgeLabel}
+                    </span>
+                  )}
                   {/* Indicator dots */}
                   <div className="flex items-center space-x-1 mt-0.5">
                     {hasMyBooking && (
@@ -882,6 +897,16 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                   >
                     {day.displayDate}
                   </p>
+                  {day.calendarInfo?.badgeLabel && (
+                    <div className="mt-1">
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md inline-block max-w-full truncate ${day.calendarInfo.badgeColorClass}`}
+                        title={`${day.calendarInfo.badgeLabel}${day.calendarInfo.specialDay ? `: ${day.calendarInfo.specialDay.description}` : ''}`}
+                      >
+                        {day.calendarInfo.badgeLabel}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

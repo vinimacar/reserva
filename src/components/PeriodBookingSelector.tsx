@@ -10,8 +10,10 @@ import {
   Clock,
   Sparkles,
   Info,
+  CalendarDays,
 } from 'lucide-react';
 import { formatDateBR, formatLocalDateToISO, getRelativeDays, addDaysToISO } from '../lib/dateUtils';
+import { useReservations } from '../context/ReservationContext';
 
 export type BookingType = 'SINGLE' | 'DATE_RANGE' | 'RECURRING';
 
@@ -73,8 +75,11 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
   skipConflictDates,
   setSkipConflictDates,
 }) => {
+  const { getCalendarDayInfo } = useReservations();
   const [showConflictsDetail, setShowConflictsDetail] = useState(false);
   const [showDatesList, setShowDatesList] = useState(false);
+
+  const singleDayInfo = getCalendarDayInfo(singleDate);
 
   const toggleDayOfWeek = (day: number) => {
     setRecurringDaysOfWeek(
@@ -195,6 +200,22 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
             >
               Em 2 dias
             </button>
+          </div>
+
+          {/* Academic Calendar Insight for selected date */}
+          <div className="p-2 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center space-x-2 min-w-0">
+              <CalendarDays className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <span className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
+                {singleDayInfo.term ? `${singleDayInfo.term.name}` : 'Ano Letivo'}
+                {singleDayInfo.specialDay ? ` • ${singleDayInfo.specialDay.description}` : ''}
+              </span>
+            </div>
+            {singleDayInfo.badgeLabel && (
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${singleDayInfo.badgeColorClass}`}>
+                {singleDayInfo.badgeLabel}
+              </span>
+            )}
           </div>
         </div>
       )}

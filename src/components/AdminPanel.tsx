@@ -16,6 +16,7 @@ import {
   Download,
   Printer,
   Calendar,
+  CalendarDays,
   Clock,
   MapPin,
   Wrench,
@@ -43,6 +44,7 @@ import { Room, SpaceType, Reservation, UserRole, User } from '../types';
 import { UserRegistrationModal } from './UserRegistrationModal';
 import { TeacherAvatar } from './TeacherAvatar';
 import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
+import { AdminCalendarTab } from './AdminCalendarTab';
 import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
@@ -96,7 +98,7 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'BOOKINGS' | 'CLASSES_SCHEDULES' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
+    'BOOKINGS' | 'CLASSES_SCHEDULES' | 'CALENDAR' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
   >('BOOKINGS');
 
   // Print modal state
@@ -620,6 +622,18 @@ export const AdminPanel: React.FC<{
         </button>
 
         <button
+          onClick={() => setActiveTab('CALENDAR')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'CALENDAR'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <CalendarDays className="w-4 h-4 text-emerald-400" />
+          <span>Calendário Letivo</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('ROOMS')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'ROOMS'
@@ -881,6 +895,11 @@ export const AdminPanel: React.FC<{
       {/* TAB: CLASSES & SCHEDULES (TURMAS & HORÁRIOS) */}
       {activeTab === 'CLASSES_SCHEDULES' && (
         <AdminClassesAndSchedulesTab onShowToast={showToast} />
+      )}
+
+      {/* TAB: ACADEMIC CALENDAR (CALENDÁRIO LETIVO) */}
+      {activeTab === 'CALENDAR' && (
+        <AdminCalendarTab onShowToast={showToast} />
       )}
 
       {/* TAB 2: ROOMS MANAGEMENT */}
@@ -1941,6 +1960,31 @@ export const AdminPanel: React.FC<{
                 <span>Console Dev</span>
               </button>
             )}
+          </div>
+
+          {/* Academic Calendar Settings Card */}
+          <div className="bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50 flex items-center justify-center shrink-0">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-xs text-emerald-950 dark:text-emerald-100">
+                  Calendário Letivo & Planejamento Escolar
+                </h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                  Configure os bimestres, datas de recesso escolar, feriados oficiais e sábados letivos com controle de conformidade de 200 dias letivos (LDB).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('CALENDAR')}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs flex items-center space-x-1.5 self-start sm:self-auto"
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Configurar Calendário</span>
+            </button>
           </div>
 
           {/* School Identity Card */}

@@ -23,6 +23,47 @@ export interface School {
   maxAdvanceDays?: number;
   allowWeekendBooking?: boolean;
   classes?: string[]; // Turmas cadastradas especificamente para esta escola
+  academicCalendar?: AcademicCalendarConfig;
+}
+
+export type AcademicPeriodType = 'BIMESTRE' | 'TRIMESTRE' | 'SEMESTRE';
+
+export interface AcademicTerm {
+  id: string;
+  name: string; // e.g. "1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  targetSchoolDays?: number;
+}
+
+export type CalendarDayType =
+  | 'FERIADO' // Feriado Nacional, Estadual ou Municipal
+  | 'RECESSO' // Recesso Escolar de meio ou fim de ano
+  | 'PLANEJAMENTO' // Conselho de Classe, Módulo ou Planejamento Pedagógico
+  | 'SABADO_LETIVO' // Sábado Letivo com reposição ou atividade
+  | 'EVENTO'; // Mostra Cultural, Feira de Ciências, etc.
+
+export interface CalendarSpecialDay {
+  id: string;
+  date: string; // "YYYY-MM-DD"
+  endDate?: string; // Opcional para intervalos de recesso (ex: 14/07 a 25/07)
+  title: string; // e.g. "Tiradentes", "Recesso de Julho", "Sábado Letivo - Horário de Segunda"
+  type: CalendarDayType;
+  description?: string;
+  equivalentWeekday?: number; // Para Sábado Letivo: 1 = Segunda, 2 = Terça, ..., 5 = Sexta
+  allowBooking?: boolean; // Se permite reservas ou se alerta/bloqueia
+}
+
+export interface AcademicCalendarConfig {
+  year: number; // e.g. 2025, 2026
+  periodType: AcademicPeriodType; // 'BIMESTRE' ou 'TRIMESTRE'
+  schoolYearStart: string; // "YYYY-MM-DD"
+  schoolYearEnd: string; // "YYYY-MM-DD"
+  terms: AcademicTerm[];
+  specialDays: CalendarSpecialDay[];
+  warnOnHolidayBooking?: boolean;
+  blockBookingOnHolidays?: boolean;
+  totalSchoolDaysGoal?: number; // Meta da LDB (200 dias)
 }
 
 export interface User {
@@ -128,6 +169,7 @@ export interface SchoolSettings {
   logoUrl?: string;
   isConfigured: boolean;
   configuredAt?: string;
+  academicCalendar?: AcademicCalendarConfig;
 }
 
 export interface RoomStats {
@@ -214,3 +256,6 @@ export interface FrontendErrorLog {
   schoolId?: string | null;
   metadata?: Record<string, unknown>;
 }
+
+export type { CalendarDayAnalysis } from './data/defaultAcademicCalendar';
+

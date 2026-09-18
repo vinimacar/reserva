@@ -12,7 +12,14 @@ import {
   User,
   ClientOnboardingData,
   ClientOnboardingResult,
+  AcademicCalendarConfig,
+  AcademicPeriodType,
 } from '../types';
+import {
+  createDefaultAcademicCalendar,
+  analyzeDateWithCalendar,
+  CalendarDayAnalysis,
+} from '../data/defaultAcademicCalendar';
 import {
   DEFAULT_ROOMS,
   TIME_PERIODS,
@@ -133,6 +140,12 @@ interface ReservationContextType {
     totalReservations: number;
     totalAdmins: number;
   };
+
+  // Academic Calendar
+  academicCalendar: AcademicCalendarConfig;
+  updateAcademicCalendar: (calendar: AcademicCalendarConfig, schoolId?: string) => void;
+  resetAcademicCalendarToDefault: (schoolId?: string, year?: number, periodType?: AcademicPeriodType) => void;
+  getCalendarDayInfo: (dateISO: string, schoolId?: string) => CalendarDayAnalysis;
 
   // Turmas & Horários Management (Mantendo os existentes e específicos por escola)
   classes: string[];
@@ -420,6 +433,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     logoUrl: currentSchool?.logoUrl || '',
     isConfigured: true,
     configuredAt: currentSchool?.createdAt || new Date().toISOString(),
+    academicCalendar: currentSchool?.academicCalendar || createDefaultAcademicCalendar(2025),
   };
 
   // UI state for active school
@@ -1309,8 +1323,8 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Settings
   const updateSettings = (newSettings: Partial<SchoolSettings>) => {
     // Synchronize to the active school
-    setSchools((prev) =>
-      prev.map((s) => {
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
         if (s.id === currentSchoolId) {
           return {
             ...s,
@@ -1328,11 +1342,17 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
             requireAdminApproval: newSettings.requireAdminApproval !== undefined ? newSettings.requireAdminApproval : s.requireAdminApproval,
             maxAdvanceDays: newSettings.maxAdvanceDays || s.maxAdvanceDays,
             allowWeekendBooking: newSettings.allowWeekendBooking !== undefined ? newSettings.allowWeekendBooking : s.allowWeekendBooking,
+            academicCalendar: newSettings.academicCalendar !== undefined ? newSettings.academicCalendar : s.academicCalendar,
           };
         }
         return s;
-      })
-    );
+      });
+      const targetSchool = updated.find((s) => s.id === currentSchoolId);
+      if (targetSchool) {
+        saveSchoolToCloud(targetSchool).catch(console.error);
+      }
+      return updated;
+    });
   };
 
   // Stats
@@ -1549,6 +1569,49 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   };
 
+  // Academic Calendar State & Methods
+  const academicCalendar: AcademicCalendarConfig = useMemo(() => {
+    if (currentSchool?.academicCalendar) {
+      return currentSchool.academicCalendar;
+    }
+    return createDefaultAcademicCalendar(2025);
+  }, [currentSchool?.academicCalendar]);
+
+  const updateAcademicCalendar = (newCalendar: AcademicCalendarConfig, schoolId?: string) => {
+    const targetId = schoolId || currentSchoolId;
+    setSchools((prev) => {
+      const updated = prev.map((s) => {
+        if (s.id === targetId) {
+          return {
+            ...s,
+            academicCalendar: newCalendar,
+          };
+        }
+        return s;
+      });
+      const targetSchool = updated.find((s) => s.id === targetId);
+      if (targetSchool) {
+        saveSchoolToCloud(targetSchool).catch(console.error);
+      }
+      return updated;
+    });
+  };
+
+  const resetAcademicCalendarToDefault = (
+    schoolId?: string,
+    year: number = 2025,
+    periodType: AcademicPeriodType = 'BIMESTRE'
+  ) => {
+    const defaultCal = createDefaultAcademicCalendar(year, periodType);
+    updateAcademicCalendar(defaultCal, schoolId);
+  };
+
+  const getCalendarDayInfo = (dateISO: string, schoolId?: string): CalendarDayAnalysis => {
+    const targetSchool = schoolId ? schools.find((s) => s.id === schoolId) : currentSchool;
+    const cal = targetSchool?.academicCalendar || academicCalendar;
+    return analyzeDateWithCalendar(dateISO, cal);
+  };
+
   // Horários (Periods) Actions
   const addPeriod = (periodData: Omit<TimePeriod, 'id'>): TimePeriod => {
     const newPeriod: TimePeriod = {
@@ -1609,6 +1672,10 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         announcements,
         allAnnouncements: announcements,
         settings,
+        academicCalendar,
+        updateAcademicCalendar,
+        resetAcademicCalendarToDefault,
+        getCalendarDayInfo,
         selectedRoomId,
         selectedDate,
         selectedShift,
