@@ -20,25 +20,32 @@ import { formatDateBR } from '../lib/dateUtils';
 interface CalendarPdfViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  pdfDataUrl: string;
+  pdfDataUrl?: string;
+  pdfUrl?: string;
   fileName: string;
   fileSize?: number;
   uploadedAt?: string;
   schoolName?: string;
   year?: number;
+  onReplace?: () => void;
+  onRemove?: () => void;
 }
 
 export const CalendarPdfViewerModal: React.FC<CalendarPdfViewerModalProps> = ({
   isOpen,
   onClose,
   pdfDataUrl,
+  pdfUrl,
   fileName,
   fileSize,
   uploadedAt,
   schoolName,
   year = 2026,
+  onReplace,
+  onRemove,
 }) => {
   const [iframeError, setIframeError] = useState(false);
+  const activePdfUrl = pdfUrl || pdfDataUrl || '';
 
   if (!isOpen) return null;
 
@@ -80,9 +87,31 @@ export const CalendarPdfViewerModal: React.FC<CalendarPdfViewerModalProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center space-x-2 shrink-0">
+            {onReplace && (
+              <button
+                type="button"
+                onClick={onReplace}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all hidden sm:flex items-center space-x-1.5 cursor-pointer"
+                title="Substituir PDF por outro arquivo"
+              >
+                <span>Substituir</span>
+              </button>
+            )}
+
+            {onRemove && (
+              <button
+                type="button"
+                onClick={onRemove}
+                className="px-3 py-1.5 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-bold transition-all hidden sm:flex items-center space-x-1.5 cursor-pointer"
+                title="Excluir PDF do calendário"
+              >
+                <span>Excluir</span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => openCalendarPdfInNewTab(pdfDataUrl)}
+              onClick={() => openCalendarPdfInNewTab(activePdfUrl)}
               className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
               title="Abrir em Nova Aba para Visualizador Nativo"
             >
@@ -92,7 +121,7 @@ export const CalendarPdfViewerModal: React.FC<CalendarPdfViewerModalProps> = ({
 
             <button
               type="button"
-              onClick={() => downloadCalendarPdf(pdfDataUrl, fileName)}
+              onClick={() => downloadCalendarPdf(activePdfUrl, fileName)}
               className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs"
               title="Baixar Arquivo PDF"
             >
@@ -113,9 +142,9 @@ export const CalendarPdfViewerModal: React.FC<CalendarPdfViewerModalProps> = ({
 
         {/* Content Area */}
         <div className="flex-1 bg-slate-100 dark:bg-slate-950 p-2 sm:p-4 overflow-hidden relative flex flex-col items-center justify-center">
-          {pdfDataUrl ? (
+          {activePdfUrl ? (
             <iframe
-              src={pdfDataUrl}
+              src={activePdfUrl}
               title="Visualizador do Calendário Escolar"
               className="w-full h-full rounded-2xl bg-white shadow-inner border border-slate-200 dark:border-slate-800"
               onError={() => setIframeError(true)}
@@ -128,7 +157,7 @@ export const CalendarPdfViewerModal: React.FC<CalendarPdfViewerModalProps> = ({
               </p>
               <button
                 type="button"
-                onClick={() => openCalendarPdfInNewTab(pdfDataUrl)}
+                onClick={() => openCalendarPdfInNewTab(activePdfUrl)}
                 className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl text-xs"
               >
                 Abrir em Nova Aba do Navegador

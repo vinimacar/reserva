@@ -144,6 +144,7 @@ interface ReservationContextType {
   // Academic Calendar
   academicCalendar: AcademicCalendarConfig;
   updateAcademicCalendar: (calendar: AcademicCalendarConfig, schoolId?: string) => void;
+  updateCalendarYear: (year: number, applyOfficialTemplate?: boolean, schoolId?: string) => void;
   resetAcademicCalendarToDefault: (schoolId?: string, year?: number, periodType?: AcademicPeriodType) => void;
   getCalendarDayInfo: (dateISO: string, schoolId?: string) => CalendarDayAnalysis;
 
@@ -187,26 +188,40 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const parsed: School[] = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((s) => {
-            if (!s.classes || s.classes.length === 0) {
+            let schoolObj = { ...s };
+            if (!schoolObj.classes || schoolObj.classes.length === 0) {
               const def = DEFAULT_SCHOOLS.find((d) => d.id === s.id);
-              return {
-                ...s,
-                classes: def?.classes || [
-                  '6º Ano A',
-                  '6º Ano B',
-                  '7º Ano A',
-                  '7º Ano B',
-                  '8º Ano A',
-                  '8º Ano B',
-                  '9º Ano A',
-                  '9º Ano B',
-                  '1º Ano E.M. 1',
-                  '2º Ano E.M. 1',
-                  '3º Ano E.M. 1',
-                ],
+              schoolObj.classes = def?.classes || [
+                '6º Ano A',
+                '6º Ano B',
+                '7º Ano A',
+                '7º Ano B',
+                '8º Ano A',
+                '8º Ano B',
+                '9º Ano A',
+                '9º Ano B',
+                '1º Ano E.M. 1',
+                '2º Ano E.M. 1',
+                '3º Ano E.M. 1',
+              ];
+            }
+
+            // Migração automática de calendário letivo 2025 para 2026 (matriz trimestral SEE-MG)
+            if (schoolObj.academicCalendar && schoolObj.academicCalendar.year === 2025) {
+              const official2026 = createDefaultAcademicCalendar(2026, schoolObj.academicCalendar.periodType || 'TRIMESTRE');
+              schoolObj.academicCalendar = {
+                ...official2026,
+                warnOnHolidayBooking: schoolObj.academicCalendar.warnOnHolidayBooking ?? true,
+                blockBookingOnHolidays: schoolObj.academicCalendar.blockBookingOnHolidays ?? false,
+                totalSchoolDaysGoal: schoolObj.academicCalendar.totalSchoolDaysGoal || 200,
+                pdfUrl: schoolObj.academicCalendar.pdfUrl,
+                pdfFileName: schoolObj.academicCalendar.pdfFileName,
+                pdfFileSize: schoolObj.academicCalendar.pdfFileSize,
+                pdfUploadedAt: schoolObj.academicCalendar.pdfUploadedAt,
               };
             }
-            return s;
+
+            return schoolObj;
           });
         }
       }
@@ -1572,10 +1587,41 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // Academic Calendar State & Methods
   const academicCalendar: AcademicCalendarConfig = useMemo(() => {
     if (currentSchool?.academicCalendar) {
+      if (currentSchool.academicCalendar.year === 2025) {
+        const official2026 = createDefaultAcademicCalendar(2026, currentSchool.academicCalendar.periodType || 'TRIMESTRE');
+        return {
+          ...official2026,
+          warnOnHolidayBooking: currentSchool.academicCalendar.warnOnHolidayBooking ?? true,
+          blockBookingOnHolidays: currentSchool.academicCalendar.blockBookingOnHolidays ?? false,
+          totalSchoolDaysGoal: currentSchool.academicCalendar.totalSchoolDaysGoal || 200,
+          pdfUrl: currentSchool.academicCalendar.pdfUrl,
+          pdfFileName: currentSchool.academicCalendar.pdfFileName,
+          pdfFileSize: currentSchool.academicCalendar.pdfFileSize,
+          pdfUploadedAt: currentSchool.academicCalendar.pdfUploadedAt,
+        };
+      }
       return currentSchool.academicCalendar;
     }
     return createDefaultAcademicCalendar(2026, 'TRIMESTRE');
   }, [currentSchool?.academicCalendar]);
+
+  // Persistir migração para 2026 caso a escola ativa ainda estivesse com ano 2025
+  useEffect(() => {
+    if (currentSchool?.academicCalendar && currentSchool.academicCalendar.year === 2025) {
+      const official2026 = createDefaultAcademicCalendar(2026, currentSchool.academicCalendar.periodType || 'TRIMESTRE');
+      const updatedConfig: AcademicCalendarConfig = {
+        ...official2026,
+        warnOnHolidayBooking: currentSchool.academicCalendar.warnOnHolidayBooking ?? true,
+        blockBookingOnHolidays: currentSchool.academicCalendar.blockBookingOnHolidays ?? false,
+        totalSchoolDaysGoal: currentSchool.academicCalendar.totalSchoolDaysGoal || 200,
+        pdfUrl: currentSchool.academicCalendar.pdfUrl,
+        pdfFileName: currentSchool.academicCalendar.pdfFileName,
+        pdfFileSize: currentSchool.academicCalendar.pdfFileSize,
+        pdfUploadedAt: currentSchool.academicCalendar.pdfUploadedAt,
+      };
+      updateAcademicCalendar(updatedConfig, currentSchool.id);
+    }
+  }, [currentSchool?.academicCalendar?.year, currentSchool?.id]);
 
   const updateAcademicCalendar = (newCalendar: AcademicCalendarConfig, schoolId?: string) => {
     const targetId = schoolId || currentSchoolId;
@@ -1595,6 +1641,54 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       return updated;
     });
+  };
+
+  const updateCalendarYear = (
+    newYear: number,
+    applyOfficialTemplate: boolean = true,
+    schoolId?: string
+  ) => {
+    const targetSchool = schoolId ? schools.find((s) => s.id === schoolId) : currentSchool;
+    const currentCal = targetSchool?.academicCalendar || academicCalendar;
+
+    if (applyOfficialTemplate) {
+      const template = createDefaultAcademicCalendar(newYear, currentCal.periodType || 'TRIMESTRE');
+      const updated: AcademicCalendarConfig = {
+        ...template,
+        warnOnHolidayBooking: currentCal.warnOnHolidayBooking ?? true,
+        blockBookingOnHolidays: currentCal.blockBookingOnHolidays ?? false,
+        totalSchoolDaysGoal: currentCal.totalSchoolDaysGoal || 200,
+        pdfUrl: currentCal.pdfUrl,
+        pdfFileName: currentCal.pdfFileName,
+        pdfFileSize: currentCal.pdfFileSize,
+        pdfUploadedAt: currentCal.pdfUploadedAt,
+      };
+      updateAcademicCalendar(updated, schoolId);
+    } else {
+      const oldYearStr = String(currentCal.year || 2026);
+      const newYearStr = String(newYear);
+      const updated: AcademicCalendarConfig = {
+        ...currentCal,
+        year: newYear,
+        schoolYearStart: currentCal.schoolYearStart.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        schoolYearEnd: currentCal.schoolYearEnd.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        terms: currentCal.terms.map((t) => ({
+          ...t,
+          startDate: t.startDate.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          endDate: t.endDate.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          classCouncilStart: t.classCouncilStart?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          classCouncilEnd: t.classCouncilEnd?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          parentMeetingStart: t.parentMeetingStart?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          parentMeetingEnd: t.parentMeetingEnd?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        })),
+        specialDays: currentCal.specialDays.map((d) => ({
+          ...d,
+          date: d.date.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+          endDate: d.endDate?.replace(new RegExp(`^${oldYearStr}`), newYearStr),
+        })),
+      };
+      updateAcademicCalendar(updated, schoolId);
+    }
   };
 
   const resetAcademicCalendarToDefault = (
@@ -1674,6 +1768,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         settings,
         academicCalendar,
         updateAcademicCalendar,
+        updateCalendarYear,
         resetAcademicCalendarToDefault,
         getCalendarDayInfo,
         selectedRoomId,

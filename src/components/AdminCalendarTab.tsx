@@ -29,6 +29,7 @@ import {
   FileCheck,
   HardDrive,
   CalendarClock,
+  Maximize2,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import {
@@ -224,7 +225,7 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
       }
     } else {
       // Renomeia apenas o ano mantendo eventos
-      const oldYearStr = String(calendarDraft.year || 2025);
+      const oldYearStr = String(calendarDraft.year || 2026);
       const newYearStr = String(newYear);
       const updated: AcademicCalendarConfig = {
         ...calendarDraft,
@@ -421,9 +422,41 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Calendário Letivo & Planejamento Escolar
               </h3>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-300 dark:border-emerald-800">
-                Ano {calendarDraft.year}
-              </span>
+              <div className="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-800/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
+                <CalendarClock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Ano:</span>
+                <select
+                  value={calendarDraft.year}
+                  onChange={(e) => {
+                    const chosenYear = parseInt(e.target.value, 10);
+                    if (chosenYear !== calendarDraft.year) {
+                      setYearInputVal(chosenYear);
+                      setIsYearModalOpen(true);
+                    }
+                  }}
+                  className="bg-transparent text-xs font-black text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+                  title="Alterar ano letivo"
+                >
+                  <option value={2024} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2024</option>
+                  <option value={2025} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2025</option>
+                  <option value={2026} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2026 (Atual)</option>
+                  <option value={2027} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2027</option>
+                  <option value={2028} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2028</option>
+                  <option value={2029} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2029</option>
+                  <option value={2030} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">2030</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYearInputVal(calendarDraft.year);
+                    setIsYearModalOpen(true);
+                  }}
+                  title="Definir outro ano letivo"
+                  className="p-0.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer"
+                >
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              </div>
               <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-wider border border-blue-300 dark:border-blue-800">
                 {calendarDraft.periodType === 'TRIMESTRE' ? 'Organização Trimestral (SEE-MG)' : calendarDraft.periodType === 'BIMESTRE' ? 'Organização Bimestral' : 'Organização Semestral'}
               </span>
@@ -435,6 +468,43 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
         </div>
 
         <div className="flex items-center flex-wrap gap-2 self-start md:self-auto">
+          {/* PDF Action in Header */}
+          {calendarDraft.pdfFileName ? (
+            <button
+              type="button"
+              onClick={() => setIsPdfViewerOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer hover:bg-rose-100 shadow-2xs"
+              title={`Visualizar documento PDF oficial (${calendarDraft.pdfFileName})`}
+            >
+              <FileText className="w-3.5 h-3.5 text-rose-600" />
+              <span>Ver PDF ({formatPdfFileSize(calendarDraft.pdfFileSize)})</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={isUploadingPdf}
+              className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer"
+              title="Anexar arquivo PDF do Calendário Letivo Oficial"
+            >
+              <Upload className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>{isUploadingPdf ? 'Enviando...' : 'Upload PDF'}</span>
+            </button>
+          )}
+
+          {/* Hidden File Input */}
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handlePdfUpload(file);
+              e.target.value = '';
+            }}
+            className="hidden"
+          />
+
           {calendarDraft.periodType !== 'TRIMESTRE' && (
             <button
               type="button"
@@ -480,6 +550,31 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
           </button>
         </div>
       </div>
+
+      {/* Alert banner if year is 2025 */}
+      {calendarDraft.year === 2025 && (
+        <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-900 dark:text-amber-200">
+                Atenção: O sistema está exibindo o Ano Letivo 2025 e nós já estamos em 2026!
+              </p>
+              <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                Deseja migrar imediatamente para o <strong>Ano Letivo 2026</strong> com a matriz oficial de 3 Trimestres (SEE-MG) e cumprimento de 200 dias letivos?
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleYearChange(2026, true)}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shrink-0 self-start sm:self-auto cursor-pointer shadow-xs transition-colors flex items-center space-x-1.5"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Atualizar para 2026 Agora</span>
+          </button>
+        </div>
+      )}
 
       {/* Alert banner if currently bimestral or not trimestral */}
       {calendarDraft.periodType !== 'TRIMESTRE' && (
@@ -643,13 +738,142 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
           }`}
         >
           <Sliders className="w-3.5 h-3.5" />
-          <span>Regras de Reserva & Parâmetros</span>
+          <span>Regras & Definição do Ano</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('PDF')}
+          className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'PDF'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Documento PDF Oficial</span>
+          {calendarDraft.pdfFileName && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 ml-1"></span>
+          )}
         </button>
       </div>
 
       {/* SUBTAB 1: MONTHLY INTERACTIVE CALENDAR */}
       {activeSubTab === 'OVERVIEW' && (
         <div className="space-y-4">
+          {/* Quick PDF Notice / Card */}
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            {calendarDraft.pdfFileName ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">
+                        {calendarDraft.pdfFileName}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                        PDF Oficial Anual ({calendarDraft.year})
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Tamanho: {formatPdfFileSize(calendarDraft.pdfFileSize)} • Enviado em: {calendarDraft.pdfUploadedAt ? formatDateBR(calendarDraft.pdfUploadedAt.slice(0, 10)) : 'Recentemente'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsPdfViewerOpen(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Visualizar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => downloadCalendarPdf(storedPdfUrl, calendarDraft.pdfFileName)}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Baixar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openCalendarPdfInNewTab(storedPdfUrl)}
+                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs cursor-pointer transition-colors"
+                    title="Abrir em Nova Aba"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs cursor-pointer transition-colors"
+                    title="Substituir Arquivo PDF"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRemovePdf}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl text-xs cursor-pointer transition-colors"
+                    title="Excluir PDF"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingPdf(true);
+                }}
+                onDragLeave={() => setIsDraggingPdf(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingPdf(false);
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) handlePdfUpload(file);
+                }}
+                onClick={() => pdfInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all ${
+                  isDraggingPdf
+                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-950/30'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <Upload className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-slate-900 dark:text-white">
+                      Anexar Calendário Escolar Oficial em Arquivo PDF ({calendarDraft.year})
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Arraste e solte o arquivo PDF aqui ou clique para selecionar (documentos oficiais da SEE-MG / SRE).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shrink-0 transition-colors shadow-xs">
+                    {isUploadingPdf ? 'Processando...' : 'Fazer Upload do PDF'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Month Switcher Bar */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -1217,7 +1441,298 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
                 </span>
               </div>
             </div>
+
+            {/* SEÇÃO: DEFINIÇÃO DO ANO LETIVO */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <div>
+                <h5 className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <CalendarClock className="w-4 h-4 text-blue-600" />
+                  <span>Definição do Ano Letivo Escolar (Vigência)</span>
+                </h5>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Configure o ano de vigência do calendário letivo para {currentSchool?.name || 'sua escola'}. O sistema está ajustado para o ano vigente de <strong>2026</strong>.
+                </p>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Ano Configurado:</span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-black">
+                      {calendarDraft.year}
+                    </span>
+                    {calendarDraft.year === 2026 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                        Ano Atual Vigente
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Período: {formatDateBR(calendarDraft.schoolYearStart)} até {formatDateBR(calendarDraft.schoolYearEnd)}
+                  </p>
+                </div>
+
+                <div className="flex items-center flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setYearInputVal(calendarDraft.year);
+                      setIsYearModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    <span>Definir / Trocar Ano Letivo</span>
+                  </button>
+
+                  {calendarDraft.year !== 2026 && (
+                    <button
+                      type="button"
+                      onClick={() => handleYearChange(2026, true)}
+                      className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Atualizar para 2026</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO: DOCUMENTO OFICIAL DO CALENDÁRIO EM PDF */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+              <div>
+                <h5 className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-rose-600" />
+                  <span>Documento Oficial do Calendário em Arquivo PDF</span>
+                </h5>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Anexe a resolução ou calendário oficial em PDF expedido pela Secretaria de Estado de Educação (SEE-MG) ou Superintendência Regional.
+                </p>
+              </div>
+
+              {calendarDraft.pdfFileName ? (
+                <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl border border-rose-200 dark:border-rose-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white text-xs">
+                        {calendarDraft.pdfFileName}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Tamanho: {formatPdfFileSize(calendarDraft.pdfFileSize)} • Enviado em: {calendarDraft.pdfUploadedAt ? formatDateBR(calendarDraft.pdfUploadedAt.slice(0, 10)) : 'Recentemente'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPdfViewerOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Visualizar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => downloadCalendarPdf(storedPdfUrl, calendarDraft.pdfFileName)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Baixar</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => pdfInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Substituir</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRemovePdf}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 text-xs cursor-pointer"
+                      title="Excluir PDF"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="p-5 border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer transition-all bg-slate-50/50 dark:bg-slate-900/40"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <Upload className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-white text-xs">
+                        Nenhum PDF do calendário anual anexado no momento
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Clique aqui para selecionar o arquivo PDF do Calendário Letivo {calendarDraft.year}.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shrink-0 shadow-xs">
+                    {isUploadingPdf ? 'Enviando...' : 'Fazer Upload do PDF'}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* SUBTAB 6: DEDICATED PDF VIEWER TAB */}
+      {activeSubTab === 'PDF' && (
+        <div className="space-y-4">
+          {/* Top PDF Controls Header */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <FileText className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 flex-wrap">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {calendarDraft.pdfFileName || `Calendário Letivo Anual ${calendarDraft.year}`}
+                  </h4>
+                  {calendarDraft.pdfFileName && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
+                      PDF Oficial Carregado
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {calendarDraft.pdfFileName
+                    ? `Arquivo: ${formatPdfFileSize(calendarDraft.pdfFileSize)} • Vigência Ano ${calendarDraft.year} • Escola: ${currentSchool?.name}`
+                    : `Faça upload do arquivo PDF oficial do calendário escolar do ano ${calendarDraft.year} para consulta rápida.`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center flex-wrap gap-2">
+              {calendarDraft.pdfFileName ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsPdfViewerOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Tela Cheia</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => downloadCalendarPdf(storedPdfUrl, calendarDraft.pdfFileName)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Baixar PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openCalendarPdfInNewTab(storedPdfUrl)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Abrir em Nova Aba</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Substituir PDF</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRemovePdf}
+                    className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 text-xs cursor-pointer"
+                    title="Excluir PDF"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => pdfInputRef.current?.click()}
+                  disabled={isUploadingPdf}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>{isUploadingPdf ? 'Processando...' : 'Fazer Upload do Arquivo PDF'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Embedded Viewer or Empty State */}
+          {calendarDraft.pdfFileName && storedPdfUrl ? (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-2 shadow-xs">
+              <iframe
+                src={storedPdfUrl}
+                title={calendarDraft.pdfFileName}
+                className="w-full h-[750px] rounded-2xl border-0 bg-slate-100 dark:bg-slate-950"
+              />
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingPdf(true);
+              }}
+              onDragLeave={() => setIsDraggingPdf(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDraggingPdf(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) handlePdfUpload(file);
+              }}
+              onClick={() => pdfInputRef.current?.click()}
+              className={`bg-white dark:bg-slate-900 rounded-3xl border-2 border-dashed p-12 text-center flex flex-col items-center justify-center space-y-4 cursor-pointer transition-all ${
+                isDraggingPdf
+                  ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
+                  : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="w-16 h-16 rounded-3xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 flex items-center justify-center shadow-xs">
+                <FileText className="w-8 h-8" />
+              </div>
+
+              <div className="max-w-md space-y-1">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                  Nenhum Arquivo PDF do Calendário Letivo Anexado
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Arraste e solte o documento oficial do Calendário Escolar (SEE-MG / SRE) em formato PDF aqui ou clique para selecionar do seu dispositivo.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <span className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition-colors">
+                  {isUploadingPdf ? 'Processando envio...' : 'Selecionar Documento PDF do Computador'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1544,6 +2059,118 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
               <button
                 type="button"
                 onClick={() => setIsResetConfirmOpen(false)}
+                className="w-full py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-medium cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF VIEWER MODAL */}
+      <CalendarPdfViewerModal
+        isOpen={isPdfViewerOpen}
+        onClose={() => setIsPdfViewerOpen(false)}
+        pdfUrl={storedPdfUrl}
+        fileName={calendarDraft.pdfFileName}
+        fileSize={calendarDraft.pdfFileSize}
+        uploadedAt={calendarDraft.pdfUploadedAt}
+        onReplace={() => pdfInputRef.current?.click()}
+        onRemove={handleRemovePdf}
+      />
+
+      {/* MODAL: DEFINIR / MUDAR ANO LETIVO */}
+      {isYearModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center mx-auto">
+              <CalendarClock className="w-6 h-6" />
+            </div>
+
+            <div className="text-center">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                Definir Ano Letivo do Calendário
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Configure a vigência do calendário letivo para <strong>{currentSchool?.name || 'sua escola'}</strong>.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Selecione o Ano Desejado:
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[2024, 2025, 2026, 2027].map((yr) => (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() => setYearInputVal(yr)}
+                      className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
+                        yearInputVal === yr
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {yr}
+                      {yr === 2026 && <span className="block text-[9px] font-normal opacity-90">Atual</span>}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Outro ano:</span>
+                  <input
+                    type="number"
+                    min={2020}
+                    max={2040}
+                    value={yearInputVal}
+                    onChange={(e) => setYearInputVal(parseInt(e.target.value, 10) || 2026)}
+                    className="w-28 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-bold text-center"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-2xl border border-blue-200 dark:border-blue-900 text-[11px] text-blue-800 dark:text-blue-300 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  Atualização para {yearInputVal}:
+                </p>
+                <p className="opacity-90 leading-relaxed">
+                  Ao escolher <strong>Aplicar Padrão Oficial</strong>, o sistema calcula os 200 dias da LDB, 3 trimestres oficiais (SEE-MG) e feriados exatos deste ano.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleYearChange(yearInputVal, true);
+                  setIsYearModalOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Aplicar Padrão Oficial {yearInputVal} (200 Dias - Recomendado)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleYearChange(yearInputVal, false);
+                  setIsYearModalOpen(false);
+                }}
+                className="w-full py-2 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Apenas Atualizar Ano (Manter Eventos Existentes)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsYearModalOpen(false)}
                 className="w-full py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-medium cursor-pointer"
               >
                 Cancelar
