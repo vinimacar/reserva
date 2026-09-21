@@ -163,6 +163,26 @@ export interface Announcement {
   targetRoomId?: string;
 }
 
+export type NotificationType = 'RESERVATION_APPROVED' | 'RESERVATION_CANCELLED' | 'RESERVATION_REJECTED' | 'INFO';
+
+export interface UserNotification {
+  id: string;
+  userId: string;
+  userEmail: string;
+  schoolId?: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  reservationId?: string;
+  roomName: string;
+  date: string;
+  periodLabels?: string;
+  adminName?: string;
+  adminNote?: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface SchoolSettings {
   schoolName: string;
   shortName?: string;

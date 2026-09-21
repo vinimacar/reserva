@@ -14,6 +14,7 @@ import {
   ClientOnboardingResult,
   AcademicCalendarConfig,
   AcademicPeriodType,
+  UserNotification,
 } from '../types';
 import {
   createDefaultAcademicCalendar,
@@ -48,6 +49,9 @@ import {
   deleteReservationFromCloud,
   saveAnnouncementToCloud,
   deleteAnnouncementFromCloud,
+  subscribeToNotifications,
+  saveNotificationToCloud,
+  deleteNotificationFromCloud,
   clearCloudDatabase,
 } from '../services/firestoreSync';
 
@@ -80,6 +84,9 @@ interface ReservationContextType {
   periods: TimePeriod[];
   announcements: Announcement[];
   allAnnouncements: Announcement[];
+  notifications: UserNotification[];
+  allNotifications: UserNotification[];
+  unreadNotificationsCount: number;
   settings: SchoolSettings;
 
   // Selected filters & UI state
@@ -122,6 +129,18 @@ interface ReservationContextType {
   addAnnouncement: (data: Omit<Announcement, 'id' | 'date'>) => void;
   deleteAnnouncement: (id: string) => void;
   clearAllAnnouncements: () => void;
+
+  // Teacher Alerts & In-App Notifications
+  sendTeacherReservationAlert: (
+    reservation: Reservation,
+    action: 'APPROVED' | 'CANCELLED' | 'REJECTED',
+    note?: string,
+    adminName?: string
+  ) => Promise<UserNotification>;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  deleteNotification: (id: string) => void;
+  clearAllNotifications: () => void;
 
   // Settings Actions
   updateSettings: (newSettings: Partial<SchoolSettings>) => void;
@@ -175,6 +194,7 @@ const STORAGE_KEY_ACTIVE_SCHOOL = 'reserve_school_active_id';
 const STORAGE_KEY_RES = 'reserve_school_reservations';
 const STORAGE_KEY_ROOMS = 'reserve_school_rooms';
 const STORAGE_KEY_ANN = 'reserve_school_announcements';
+const STORAGE_KEY_NOTIFS = 'reserve_user_notifications';
 const STORAGE_KEY_PERIODS = 'reserve_time_periods_v2';
 const STORAGE_KEY_CLASSES = 'reserve_school_classes_v2';
 
@@ -301,6 +321,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // ignore
     }
     return DEFAULT_ANNOUNCEMENTS;
+  });
+
+  const [allNotifications, setAllNotifications] = useState<UserNotification[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_NOTIFS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {
+      // ignore
+    }
+    return [];
   });
 
   // Periods (Horários) State - initialized with TIME_PERIODS and merged with saved custom periods

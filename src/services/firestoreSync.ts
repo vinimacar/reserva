@@ -11,7 +11,7 @@ import {
   OperationType,
   handleFirestoreError,
 } from './firebase';
-import { School, Room, Reservation, Announcement, User } from '../types';
+import { School, Room, Reservation, Announcement, User, UserNotification } from '../types';
 
 export const COLLECTIONS = {
   ESCOLAS: 'escolas',
@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   ANNOUNCEMENTS: 'announcements',
   USERS: 'users',
   SLOT_LOCKS: 'slot_locks',
+  NOTIFICATIONS: 'notifications',
 };
 
 export interface SlotLockData {
@@ -57,6 +58,7 @@ export async function clearCloudDatabase(): Promise<void> {
     COLLECTIONS.ANNOUNCEMENTS,
     COLLECTIONS.USERS,
     COLLECTIONS.SLOT_LOCKS,
+    COLLECTIONS.NOTIFICATIONS,
   ];
 
   for (const colName of collectionNames) {
@@ -156,6 +158,24 @@ export function subscribeToAnnouncements(callback: (announcements: Announcement[
         handleFirestoreError(err, OperationType.GET, COLLECTIONS.ANNOUNCEMENTS);
       } else {
         console.warn('Firestore announcements listener notice:', err);
+      }
+    }
+  );
+}
+
+export function subscribeToNotifications(callback: (notifications: UserNotification[]) => void) {
+  return onSnapshot(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    (snapshot) => {
+      const list: UserNotification[] = [];
+      snapshot.forEach((d) => list.push(d.data() as UserNotification));
+      callback(list);
+    },
+    (err) => {
+      if (err?.message?.includes('insufficient permissions') || err?.code === 'permission-denied') {
+        handleFirestoreError(err, OperationType.GET, COLLECTIONS.NOTIFICATIONS);
+      } else {
+        console.warn('Firestore notifications listener notice:', err);
       }
     }
   );
@@ -322,6 +342,27 @@ export async function saveUserToCloud(user: User): Promise<void> {
     }
     console.error('Error in saveUserToCloud:', err);
     throw err;
+  }
+}
+
+export async function saveNotificationToCloud(notification: UserNotification): Promise<void> {
+  const cleanNotif = sanitizeForFirestore(notification);
+  try {
+    await setDoc(doc(db, COLLECTIONS.NOTIFICATIONS, cleanNotif.id), cleanNotif, { merge: true });
+  } catch (err) {
+    if (err instanceof Error && (err.message.includes('permission') || (err as any).code === 'permission-denied')) {
+      handleFirestoreError(err, OperationType.WRITE, `${COLLECTIONS.NOTIFICATIONS}/${cleanNotif.id}`);
+    }
+    console.error('Error in saveNotificationToCloud:', err);
+    throw err;
+  }
+}
+
+export async function deleteNotificationFromCloud(notificationId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId));
+  } catch (err) {
+    console.warn('Error deleting notification from cloud:', err);
   }
 }
 

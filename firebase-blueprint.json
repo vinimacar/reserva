@@ -189,6 +189,29 @@
         "schoolId": { "type": "string", "description": "School ID context" }
       },
       "required": ["id", "message", "category", "severity", "url", "timestamp"]
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Alertas e notificações para professores sobre reservas aprovadas ou canceladas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique notification ID" },
+        "userId": { "type": "string", "description": "Target teacher user ID" },
+        "userEmail": { "type": "string", "description": "Target teacher user email" },
+        "schoolId": { "type": "string", "description": "School ID context" },
+        "type": { "type": "string", "description": "Notification type (RESERVATION_APPROVED, RESERVATION_CANCELLED, RESERVATION_REJECTED, INFO)" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Notification description text" },
+        "reservationId": { "type": "string", "description": "Associated reservation ID" },
+        "roomName": { "type": "string", "description": "Name of the room" },
+        "date": { "type": "string", "description": "Date of reservation ISO" },
+        "periodLabels": { "type": "string", "description": "Period labels" },
+        "adminName": { "type": "string", "description": "Name of administrator who approved or cancelled" },
+        "adminNote": { "type": "string", "description": "Administrator note or cancellation reason" },
+        "read": { "type": "boolean", "description": "Read status flag" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "userId", "userEmail", "type", "title", "message", "roomName", "date", "read", "createdAt"]
     }
   },
   "enums": {
@@ -253,6 +276,10 @@
     "/error_logs/{logId}": {
       "schema": "error_logs",
       "description": "Logs de erros críticos capturados no frontend para depuração remota"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "Alertas e notificações para professores sobre reservas aprovadas ou canceladas"
     }
   }
 }
