@@ -1001,16 +1001,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
     }
 
-    // Strict Academic Calendar Check: Block bookings on holidays and recesses for teachers
+    // Strict Academic Calendar Check: Block bookings on holidays and recesses
     const cal = targetSchool?.academicCalendar || academicCalendar;
-    if (cal?.blockBookingOnHolidays && !isAdmin) {
+    if (cal?.blockBookingOnHolidays) {
       const dateInfo = analyzeDateWithCalendar(data.date, cal);
       if (dateInfo.isHoliday || dateInfo.isRecess || !dateInfo.canBook) {
-        const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
-        return {
-          success: false,
-          error: `Agendamento Bloqueado: A escola "${targetSchool.name}" não permite que professores agendem em feriados ou recessos escolares (${holidayTitle} - ${formatDateBR(data.date)}). Apenas coordenadores ou gestores escolares podem autorizar reservas nestas datas.`,
-        };
+        const isAuthorizedOverride = isAdmin && data.allowHolidayOverride === true;
+        if (!isAuthorizedOverride) {
+          const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
+          return {
+            success: false,
+            error: `Agendamento Bloqueado: A escola "${targetSchool.name}" não permite agendamentos em feriados ou recessos escolares (${holidayTitle} - ${formatDateBR(data.date)}).`,
+          };
+        }
       }
     }
 
@@ -1124,17 +1127,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         continue;
       }
 
-      // Academic Calendar Holiday & Recess Policy Check for teachers
+      // Academic Calendar Holiday & Recess Policy Check
       const batchCal = currentSchool?.academicCalendar || academicCalendar;
-      if (batchCal?.blockBookingOnHolidays && !isAdmin) {
+      if (batchCal?.blockBookingOnHolidays) {
         const dateInfo = analyzeDateWithCalendar(data.date, batchCal);
         if (dateInfo.isHoliday || dateInfo.isRecess || !dateInfo.canBook) {
-          const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
-          conflicts.push({
-            date: data.date,
-            message: `Agendamento Bloqueado: ${holidayTitle} (${formatDateBR(data.date)}). Não é permitido agendar em feriados ou recessos escolares.`,
-          });
-          continue;
+          const isAuthorizedOverride = isAdmin && data.allowHolidayOverride === true;
+          if (!isAuthorizedOverride) {
+            const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
+            conflicts.push({
+              date: data.date,
+              message: `Agendamento Bloqueado: ${holidayTitle} (${formatDateBR(data.date)}). A escola não permite agendamentos em feriados ou recessos escolares.`,
+            });
+            continue;
+          }
         }
       }
 

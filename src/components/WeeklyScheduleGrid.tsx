@@ -28,6 +28,7 @@ import {
   Smartphone,
   Layers,
   Printer,
+  Lock,
 } from 'lucide-react';
 import { Room, TimePeriod, Reservation, ShiftType } from '../types';
 import { useReservations } from '../context/ReservationContext';
@@ -821,26 +822,50 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                                     </div>
                                   )}
                                 </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSlotClick(selectedRoomId, curDay.date, period)}
-                                  className="w-full text-left p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all cursor-pointer min-h-[50px] flex items-center justify-between"
-                                >
-                                  <div>
-                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mr-2">
-                                      {period.name}
-                                    </span>
-                                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                                      {period.startTime} - {period.endTime}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                    <Plus className="w-4 h-4" />
-                                    <span>Disponível</span>
-                                  </div>
-                                </button>
-                              )}
+                              ) : (() => {
+                                const isCurDayHolidayOrRecess = curDay.calendarInfo?.isHoliday || curDay.calendarInfo?.isRecess || !curDay.calendarInfo?.canBook;
+                                const isCurDayBlockedByCalendar = (academicCalendar?.blockBookingOnHolidays ?? false) && isCurDayHolidayOrRecess;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSlotClick(selectedRoomId, curDay.date, period)}
+                                    className={`w-full text-left p-3 rounded-xl border border-dashed transition-all cursor-pointer min-h-[50px] flex items-center justify-between ${
+                                      isCurDayBlockedByCalendar
+                                        ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-100/50'
+                                        : 'border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/30'
+                                    }`}
+                                  >
+                                    <div>
+                                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 mr-2">
+                                        {period.name}
+                                      </span>
+                                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                                        {period.startTime} - {period.endTime}
+                                      </span>
+                                    </div>
+                                    <div
+                                      className={`flex items-center space-x-1 text-xs font-bold ${
+                                        isCurDayBlockedByCalendar
+                                          ? 'text-rose-600 dark:text-rose-400'
+                                          : 'text-emerald-600 dark:text-emerald-400'
+                                      }`}
+                                    >
+                                      {isCurDayBlockedByCalendar ? (
+                                        <>
+                                          <Lock className="w-3.5 h-3.5" />
+                                          <span>Bloqueado ({curDay.calendarInfo?.badgeLabel || 'Feriado/Recesso'})</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Plus className="w-4 h-4" />
+                                          <span>Disponível</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })()}
 
                               {showInterval && (
                                 <div className="py-2 px-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-center text-xs text-amber-900 dark:text-amber-300 font-medium flex items-center justify-center space-x-1.5">
@@ -1026,21 +1051,50 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
                                       </div>
                                     )}
                                   </button>
-                                ) : (
-                                  /* Empty Slot -> Quick Book */
-                                  <button
-                                    onClick={() => handleSlotClick(selectedRoomId, day.date, period)}
-                                    className="w-full h-full min-h-[70px] rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all group cursor-pointer p-1"
-                                    title={`Reservar ${period.name} na ${day.dayName}`}
-                                  >
-                                    <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 flex items-center justify-center transition-colors">
-                                      <Plus className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                                    </div>
-                                    <span className="text-[10px] font-semibold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      Reservar
-                                    </span>
-                                  </button>
-                                )}
+                                ) : (() => {
+                                  const isDayHolidayOrRecess = day.calendarInfo?.isHoliday || day.calendarInfo?.isRecess || !day.calendarInfo?.canBook;
+                                  const isDayBlockedByCalendar = (academicCalendar?.blockBookingOnHolidays ?? false) && isDayHolidayOrRecess;
+
+                                  return (
+                                    /* Empty Slot -> Quick Book or Blocked Indicator */
+                                    <button
+                                      onClick={() => handleSlotClick(selectedRoomId, day.date, period)}
+                                      className={`w-full h-full min-h-[70px] rounded-xl border border-dashed transition-all group cursor-pointer p-1 flex flex-col items-center justify-center ${
+                                        isDayBlockedByCalendar
+                                          ? 'border-rose-200/80 dark:border-rose-900/40 bg-rose-50/30 dark:bg-rose-950/15 hover:bg-rose-100/40 text-rose-500 dark:text-rose-400'
+                                          : 'border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400'
+                                      }`}
+                                      title={
+                                        isDayBlockedByCalendar
+                                          ? `Data com bloqueio escolar ativo: ${day.calendarInfo?.badgeLabel || 'Feriado/Recesso'}`
+                                          : `Reservar ${period.name} na ${day.dayName}`
+                                      }
+                                    >
+                                      <div
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                                          isDayBlockedByCalendar
+                                            ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400'
+                                            : 'bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 text-slate-400 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400'
+                                        }`}
+                                      >
+                                        {isDayBlockedByCalendar ? (
+                                          <Lock className="w-3.5 h-3.5" />
+                                        ) : (
+                                          <Plus className="w-3.5 h-3.5" />
+                                        )}
+                                      </div>
+                                      <span
+                                        className={`text-[10px] font-semibold mt-1 transition-opacity ${
+                                          isDayBlockedByCalendar
+                                            ? 'text-rose-600 dark:text-rose-400'
+                                            : 'opacity-0 group-hover:opacity-100'
+                                        }`}
+                                      >
+                                        {isDayBlockedByCalendar ? 'Bloqueado' : 'Reservar'}
+                                      </span>
+                                    </button>
+                                  );
+                                })()}
                               </div>
                             );
                           })}

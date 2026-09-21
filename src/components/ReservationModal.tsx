@@ -131,6 +131,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const [skipConflictDates, setSkipConflictDates] = useState<boolean>(true);
   const [createdBatchReservations, setCreatedBatchReservations] = useState<Reservation[]>([]);
   const [batchSkippedConflicts, setBatchSkippedConflicts] = useState<Array<{ date: string; message: string }>>([]);
+  const [allowAdminHolidayOverride, setAllowAdminHolidayOverride] = useState<boolean>(false);
 
   // Target school for the selected room and reservation
   const currentRoom = useMemo(() => rooms.find((r) => r.id === roomId) || rooms[0], [rooms, roomId]);
@@ -166,6 +167,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   // Sync initial props when opened
   useEffect(() => {
     if (isOpen) {
+      setAllowAdminHolidayOverride(false);
       if (initialRoomId) setRoomId(initialRoomId);
       if (initialDate) setDate(initialDate);
       
@@ -256,7 +258,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       };
     }
 
-    const shouldBlockHolidays = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false);
+    const isHolidayBlockActive = academicCalendar?.blockBookingOnHolidays ?? false;
+    const shouldBlockHolidays = isHolidayBlockActive && !(isAdmin && allowAdminHolidayOverride);
 
     if (bookingType === 'SINGLE') {
       const c = checkConflict(roomId, date, selectedPeriodIds);
@@ -268,7 +271,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       if (isBlocked) {
         conflictingDates.push({
           date,
-          message: `Bloqueio Escolar: ${dayInfo.specialDay?.title || dayInfo.badgeLabel || 'Feriado / Recesso'} (reservas de professores bloqueadas nesta data)`,
+          message: `Data Bloqueada pelo Calendário: ${dayInfo.specialDay?.title || dayInfo.badgeLabel || 'Feriado / Recesso'} (agendamentos em datas não letivas estão bloqueados na escola)`,
         });
       }
       if (c.hasConflict) {
@@ -322,6 +325,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     selectedPeriodIds,
     checkConflict,
     isAdmin,
+    allowAdminHolidayOverride,
     academicCalendar?.blockBookingOnHolidays,
     getCalendarDayInfo,
   ]);
@@ -387,16 +391,17 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
   const conflict = checkConflict(roomId, date, selectedPeriodIds);
   const singleDateInfo = getCalendarDayInfo(date);
   const isSingleHolidayOrRecess = singleDateInfo.isHoliday || singleDateInfo.isRecess || !singleDateInfo.canBook;
-  const isSingleBlockedForTeacher = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false) && isSingleHolidayOrRecess;
+  const isHolidayBlockActive = academicCalendar?.blockBookingOnHolidays ?? false;
+  const isSingleBlocked = isHolidayBlockActive && isSingleHolidayOrRecess && !(isAdmin && allowAdminHolidayOverride);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Enforce holiday and recess booking block for teachers
-    if (bookingType === 'SINGLE' && isSingleBlockedForTeacher) {
+    // Enforce holiday and recess booking block
+    if (bookingType === 'SINGLE' && isSingleBlocked) {
       setErrorMessage(
-        `Agendamento Bloqueado: A escola não permite que professores agendem em feriados ou recessos escolares (${singleDateInfo.specialDay?.title || singleDateInfo.badgeLabel || 'Data não letiva'}). Por favor, escolha um dia letivo ou entre em contato com a equipe gestora.`
+        `Agendamento Bloqueado: A escola não permite agendamentos em feriados ou recessos escolares (${singleDateInfo.specialDay?.title || singleDateInfo.badgeLabel || 'Data não letiva'}). Por favor, escolha um dia letivo ou entre em contato com a coordenação pedagógica.`
       );
       return;
     }
@@ -461,6 +466,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
           requestedEquipment,
           observations,
           userId: reservingUser.id,
+          allowHolidayOverride: isAdmin && allowAdminHolidayOverride,
         });
 
         if (!result.success) {
@@ -496,6 +502,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
           requestedEquipment,
           observations,
           userId: reservingUser.id,
+          allowHolidayOverride: isAdmin && allowAdminHolidayOverride,
         }));
 
         const batchResult = await addBatchReservations(reservationsPayload);
@@ -888,32 +895,63 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             )}
           </div>
 
-          {/* Holiday / Recess Blocker Alert Banner for Teachers */}
-          {bookingType === 'SINGLE' && isSingleBlockedForTeacher && (
-            <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 rounded-2xl p-3.5 flex items-start space-x-3 text-rose-900 dark:text-rose-200 animate-in fade-in duration-150">
-              <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold text-xs">Data Bloqueada pelo Calendário Escolar</p>
-                <p className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5">
-                  A data selecionada ({formatDateBR(date)}) é classificada como <strong>{singleDateInfo.badgeLabel || (singleDateInfo.isHoliday ? 'Feriado' : 'Recesso')}</strong>.
-                  A política da escola bloqueia reservas de professores em feriados e recessos.
-                </p>
-                <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
-                  💡 Por favor, escolha um dia letivo ou entre em contato com a coordenação pedagógica.
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Holiday / Recess Blocker Alert Banner */}
+          {bookingType === 'SINGLE' && isHolidayBlockActive && isSingleHolidayOrRecess && (
+            <div
+              className={`border rounded-2xl p-4 transition-all animate-in fade-in duration-150 ${
+                allowAdminHolidayOverride
+                  ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+                  : 'bg-rose-50 dark:bg-rose-950/50 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+              }`}
+            >
+              <div className="flex items-start space-x-3">
+                <AlertTriangle
+                  className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    allowAdminHolidayOverride
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-rose-600 dark:text-rose-400'
+                  }`}
+                />
+                <div className="flex-1">
+                  <p className="font-bold text-xs">
+                    {allowAdminHolidayOverride
+                      ? 'Autorização Excepcional de Gestão Ativada'
+                      : 'Data Bloqueada pelo Calendário Escolar'}
+                  </p>
+                  <p className="text-[11px] mt-0.5 opacity-90 leading-relaxed">
+                    A data selecionada ({formatDateBR(date)}) é classificada como{' '}
+                    <strong>
+                      {singleDateInfo.badgeLabel ||
+                        (singleDateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar')}
+                    </strong>
+                    {singleDateInfo.specialDay?.title
+                      ? ` (${singleDateInfo.specialDay.title})`
+                      : ''}
+                    . O bloqueio de reservas em feriados e recessos está ativado na escola.
+                  </p>
 
-          {/* Special Admin Notice when booking on Holiday/Recess */}
-          {bookingType === 'SINGLE' && isAdmin && isSingleHolidayOrRecess && (
-            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-3 flex items-start space-x-2.5 text-amber-900 dark:text-amber-200 animate-in fade-in duration-150 text-xs">
-              <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">Autorização Especial de Gestão:</span>
-                <span className="ml-1 text-[11px] text-amber-700 dark:text-amber-300">
-                  Esta data é classificada como <strong>{singleDateInfo.badgeLabel || 'Feriado/Recesso'}</strong>. Como coordenador/administrador, você tem permissão para autorizar reservas extraordinárias.
-                </span>
+                  {isAdmin ? (
+                    <div className="mt-3 pt-2.5 border-t border-rose-200/70 dark:border-rose-800/70 flex items-center space-x-2.5">
+                      <input
+                        type="checkbox"
+                        id="adminHolidayOverrideCheckbox"
+                        checked={allowAdminHolidayOverride}
+                        onChange={(e) => setAllowAdminHolidayOverride(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer h-4 w-4"
+                      />
+                      <label
+                        htmlFor="adminHolidayOverrideCheckbox"
+                        className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 cursor-pointer select-none"
+                      >
+                        Autorizar agendamento extraordinário nesta data não letiva (Exceção de Gestão)
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
+                      💡 Por favor, escolha um dia letivo ou entre em contato com a coordenação pedagógica.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1017,6 +1055,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             conflictingDates={batchConflictAnalysis.conflictingDates}
             skipConflictDates={skipConflictDates}
             setSkipConflictDates={setSkipConflictDates}
+            allowAdminHolidayOverride={allowAdminHolidayOverride}
           />
 
           {/* 3. Turno de Funcionamento - Restrito rigorosamente aos turnos cadastrados da escola */}
@@ -1390,7 +1429,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               disabled={
                 isSubmitting ||
                 (bookingType === 'SINGLE'
-                  ? (conflict.hasConflict || isSingleBlockedForTeacher)
+                  ? (conflict.hasConflict || isSingleBlocked)
                   : skipConflictDates
                   ? batchConflictAnalysis.availableDates.length === 0
                   : batchConflictAnalysis.hasConflict)
@@ -1398,7 +1437,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-lg transition-all flex items-center space-x-2 cursor-pointer ${
                 isSubmitting ||
                 (bookingType === 'SINGLE'
-                  ? (conflict.hasConflict || isSingleBlockedForTeacher)
+                  ? (conflict.hasConflict || isSingleBlocked)
                   : skipConflictDates
                   ? batchConflictAnalysis.availableDates.length === 0
                   : batchConflictAnalysis.hasConflict)
@@ -1415,7 +1454,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                       : 'Salvando com Trava no Banco...'}
                   </span>
                 </>
-              ) : isSingleBlockedForTeacher ? (
+              ) : isSingleBlocked ? (
                 <>
                   <AlertTriangle className="w-4 h-4 text-rose-200" />
                   <span>Data Bloqueada (Feriado/Recesso)</span>

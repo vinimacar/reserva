@@ -41,6 +41,7 @@ interface PeriodBookingSelectorProps {
   conflictingDates: Array<{ date: string; message: string }>;
   skipConflictDates: boolean;
   setSkipConflictDates: (val: boolean) => void;
+  allowAdminHolidayOverride?: boolean;
 }
 
 const WEEKDAYS = [
@@ -75,6 +76,7 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
   conflictingDates,
   skipConflictDates,
   setSkipConflictDates,
+  allowAdminHolidayOverride = false,
 }) => {
   const { getCalendarDayInfo, academicCalendar } = useReservations();
   const { isAdmin } = useAuth();
@@ -83,7 +85,8 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
 
   const singleDayInfo = getCalendarDayInfo(singleDate);
   const isSingleHolidayOrRecess = singleDayInfo.isHoliday || singleDayInfo.isRecess || !singleDayInfo.canBook;
-  const isSingleBlockedForTeacher = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false) && isSingleHolidayOrRecess;
+  const isHolidayBlockActive = academicCalendar?.blockBookingOnHolidays ?? false;
+  const isSingleBlocked = isHolidayBlockActive && isSingleHolidayOrRecess && !(isAdmin && allowAdminHolidayOverride);
 
   const toggleDayOfWeek = (day: number) => {
     setRecurringDaysOfWeek(
@@ -222,14 +225,14 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
             )}
           </div>
 
-          {/* Blocked Date Alert for Teachers */}
-          {isSingleBlockedForTeacher && (
+          {/* Blocked Date Alert */}
+          {isSingleBlocked && (
             <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-start space-x-2 text-xs text-rose-800 dark:text-rose-200">
               <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold text-[11px] block">Agendamento Bloqueado nesta Data</span>
                 <span className="text-[11px] text-rose-700 dark:text-rose-300">
-                  A escola não permite reservas de professores em feriados e recessos ({singleDayInfo.badgeLabel || 'Data não letiva'}). Selecione uma data letiva para agendar.
+                  O bloqueio de reservas em feriados e recessos escolares está ativado na escola ({singleDayInfo.badgeLabel || 'Data não letiva'}). Selecione uma data letiva para agendar.
                 </span>
               </div>
             </div>

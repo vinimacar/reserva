@@ -149,6 +149,7 @@ export interface Reservation {
   status: ReservationStatus;
   createdAt: string;
   adminNote?: string;
+  allowHolidayOverride?: boolean;
 }
 
 export interface Announcement {
