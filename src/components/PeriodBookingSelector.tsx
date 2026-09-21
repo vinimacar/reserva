@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatDateBR, formatLocalDateToISO, getRelativeDays, addDaysToISO } from '../lib/dateUtils';
 import { useReservations } from '../context/ReservationContext';
+import { useAuth } from '../context/AuthContext';
 
 export type BookingType = 'SINGLE' | 'DATE_RANGE' | 'RECURRING';
 
@@ -75,11 +76,14 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
   skipConflictDates,
   setSkipConflictDates,
 }) => {
-  const { getCalendarDayInfo } = useReservations();
+  const { getCalendarDayInfo, academicCalendar } = useReservations();
+  const { isAdmin } = useAuth();
   const [showConflictsDetail, setShowConflictsDetail] = useState(false);
   const [showDatesList, setShowDatesList] = useState(false);
 
   const singleDayInfo = getCalendarDayInfo(singleDate);
+  const isSingleHolidayOrRecess = singleDayInfo.isHoliday || singleDayInfo.isRecess || !singleDayInfo.canBook;
+  const isSingleBlockedForTeacher = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false) && isSingleHolidayOrRecess;
 
   const toggleDayOfWeek = (day: number) => {
     setRecurringDaysOfWeek(
@@ -217,6 +221,19 @@ export const PeriodBookingSelector: React.FC<PeriodBookingSelectorProps> = ({
               </span>
             )}
           </div>
+
+          {/* Blocked Date Alert for Teachers */}
+          {isSingleBlockedForTeacher && (
+            <div className="p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-start space-x-2 text-xs text-rose-800 dark:text-rose-200">
+              <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-[11px] block">Agendamento Bloqueado nesta Data</span>
+                <span className="text-[11px] text-rose-700 dark:text-rose-300">
+                  A escola não permite reservas de professores em feriados e recessos ({singleDayInfo.badgeLabel || 'Data não letiva'}). Selecione uma data letiva para agendar.
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

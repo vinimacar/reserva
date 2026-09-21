@@ -1380,12 +1380,21 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
               <input
                 type="checkbox"
                 checked={calendarDraft.warnOnHolidayBooking ?? true}
-                onChange={(e) =>
-                  setCalendarDraft({
+                onChange={(e) => {
+                  const updated = {
                     ...calendarDraft,
                     warnOnHolidayBooking: e.target.checked,
-                  })
-                }
+                  };
+                  setCalendarDraft(updated);
+                  updateAcademicCalendar(updated, currentSchoolId);
+                  if (onShowToast) {
+                    onShowToast(
+                      e.target.checked
+                        ? 'Avisos em feriados e recessos ativados!'
+                        : 'Avisos em feriados e recessos desativados.'
+                    );
+                  }
+                }}
                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5"
               />
               <div>
@@ -1402,12 +1411,21 @@ export const AdminCalendarTab: React.FC<AdminCalendarTabProps> = ({ onShowToast 
               <input
                 type="checkbox"
                 checked={calendarDraft.blockBookingOnHolidays ?? false}
-                onChange={(e) =>
-                  setCalendarDraft({
+                onChange={(e) => {
+                  const updated = {
                     ...calendarDraft,
                     blockBookingOnHolidays: e.target.checked,
-                  })
-                }
+                  };
+                  setCalendarDraft(updated);
+                  updateAcademicCalendar(updated, currentSchoolId);
+                  if (onShowToast) {
+                    onShowToast(
+                      e.target.checked
+                        ? 'Bloqueio de reservas em feriados e recessos ATIVADO!'
+                        : 'Bloqueio de reservas em feriados e recessos DESATIVADO.'
+                    );
+                  }
+                }}
                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5"
               />
               <div>

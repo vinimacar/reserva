@@ -72,6 +72,8 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     schools,
     currentSchoolId,
     currentSchool,
+    academicCalendar,
+    getCalendarDayInfo,
   } = useReservations();
   const { currentUser, users, addUser, switchUser, isAdmin } = useAuth();
 
@@ -253,12 +255,32 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
         totalDates: 0,
       };
     }
+
+    const shouldBlockHolidays = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false);
+
     if (bookingType === 'SINGLE') {
       const c = checkConflict(roomId, date, selectedPeriodIds);
+      const dayInfo = getCalendarDayInfo(date);
+      const isHolidayOrRecess = dayInfo.isHoliday || dayInfo.isRecess || !dayInfo.canBook;
+      const isBlocked = shouldBlockHolidays && isHolidayOrRecess;
+      const conflictingDates: Array<{ date: string; message: string }> = [];
+
+      if (isBlocked) {
+        conflictingDates.push({
+          date,
+          message: `Bloqueio Escolar: ${dayInfo.specialDay?.title || dayInfo.badgeLabel || 'Feriado / Recesso'} (reservas de professores bloqueadas nesta data)`,
+        });
+      }
+      if (c.hasConflict) {
+        conflictingDates.push({ date, message: c.message || 'Horário ocupado por outra aula' });
+      }
+
+      const hasConflict = isBlocked || c.hasConflict;
+
       return {
-        hasConflict: c.hasConflict,
-        availableDates: c.hasConflict ? [] : [date],
-        conflictingDates: c.hasConflict ? [{ date, message: c.message || 'Horário ocupado' }] : [],
+        hasConflict,
+        availableDates: hasConflict ? [] : [date],
+        conflictingDates,
         totalDates: 1,
       };
     }
@@ -267,6 +289,16 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     const conflictingDates: Array<{ date: string; message: string }> = [];
 
     targetDates.forEach((d) => {
+      const dayInfo = getCalendarDayInfo(d);
+      const isHolidayOrRecess = dayInfo.isHoliday || dayInfo.isRecess || !dayInfo.canBook;
+      if (shouldBlockHolidays && isHolidayOrRecess) {
+        conflictingDates.push({
+          date: d,
+          message: `Data bloqueada pelo calendário escolar: ${dayInfo.specialDay?.title || dayInfo.badgeLabel || 'Feriado / Recesso'}`,
+        });
+        return;
+      }
+
       const c = checkConflict(roomId, d, selectedPeriodIds);
       if (c.hasConflict) {
         conflictingDates.push({ date: d, message: c.message || 'Horário ocupado por outra aula' });
@@ -281,7 +313,18 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
       conflictingDates,
       totalDates: targetDates.length,
     };
-  }, [isOpen, bookingType, date, targetDates, roomId, selectedPeriodIds, checkConflict]);
+  }, [
+    isOpen,
+    bookingType,
+    date,
+    targetDates,
+    roomId,
+    selectedPeriodIds,
+    checkConflict,
+    isAdmin,
+    academicCalendar?.blockBookingOnHolidays,
+    getCalendarDayInfo,
+  ]);
 
   if (!isOpen) return null;
 
@@ -340,12 +383,23 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
     );
   };
 
-  // Live Conflict Check for single mode
+  // Live Conflict & Holiday Check for single mode
   const conflict = checkConflict(roomId, date, selectedPeriodIds);
+  const singleDateInfo = getCalendarDayInfo(date);
+  const isSingleHolidayOrRecess = singleDateInfo.isHoliday || singleDateInfo.isRecess || !singleDateInfo.canBook;
+  const isSingleBlockedForTeacher = !isAdmin && (academicCalendar?.blockBookingOnHolidays ?? false) && isSingleHolidayOrRecess;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    // Enforce holiday and recess booking block for teachers
+    if (bookingType === 'SINGLE' && isSingleBlockedForTeacher) {
+      setErrorMessage(
+        `Agendamento Bloqueado: A escola não permite que professores agendem em feriados ou recessos escolares (${singleDateInfo.specialDay?.title || singleDateInfo.badgeLabel || 'Data não letiva'}). Por favor, escolha um dia letivo ou entre em contato com a equipe gestora.`
+      );
+      return;
+    }
 
     const reservingUser = users.find((u) => u.id === selectedTeacherId) || currentUser;
 
@@ -834,6 +888,36 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
             )}
           </div>
 
+          {/* Holiday / Recess Blocker Alert Banner for Teachers */}
+          {bookingType === 'SINGLE' && isSingleBlockedForTeacher && (
+            <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 rounded-2xl p-3.5 flex items-start space-x-3 text-rose-900 dark:text-rose-200 animate-in fade-in duration-150">
+              <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-xs">Data Bloqueada pelo Calendário Escolar</p>
+                <p className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5">
+                  A data selecionada ({formatDateBR(date)}) é classificada como <strong>{singleDateInfo.badgeLabel || (singleDateInfo.isHoliday ? 'Feriado' : 'Recesso')}</strong>.
+                  A política da escola bloqueia reservas de professores em feriados e recessos.
+                </p>
+                <p className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold mt-1">
+                  💡 Por favor, escolha um dia letivo ou entre em contato com a coordenação pedagógica.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Special Admin Notice when booking on Holiday/Recess */}
+          {bookingType === 'SINGLE' && isAdmin && isSingleHolidayOrRecess && (
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-3 flex items-start space-x-2.5 text-amber-900 dark:text-amber-200 animate-in fade-in duration-150 text-xs">
+              <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Autorização Especial de Gestão:</span>
+                <span className="ml-1 text-[11px] text-amber-700 dark:text-amber-300">
+                  Esta data é classificada como <strong>{singleDateInfo.badgeLabel || 'Feriado/Recesso'}</strong>. Como coordenador/administrador, você tem permissão para autorizar reservas extraordinárias.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Conflict Alert Banner */}
           {conflict.hasConflict && (
             <div className="bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 rounded-2xl p-3.5 flex items-start space-x-3 text-red-900 dark:text-red-200 animate-in fade-in duration-150">
@@ -1306,7 +1390,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               disabled={
                 isSubmitting ||
                 (bookingType === 'SINGLE'
-                  ? conflict.hasConflict
+                  ? (conflict.hasConflict || isSingleBlockedForTeacher)
                   : skipConflictDates
                   ? batchConflictAnalysis.availableDates.length === 0
                   : batchConflictAnalysis.hasConflict)
@@ -1314,7 +1398,7 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
               className={`px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-lg transition-all flex items-center space-x-2 cursor-pointer ${
                 isSubmitting ||
                 (bookingType === 'SINGLE'
-                  ? conflict.hasConflict
+                  ? (conflict.hasConflict || isSingleBlockedForTeacher)
                   : skipConflictDates
                   ? batchConflictAnalysis.availableDates.length === 0
                   : batchConflictAnalysis.hasConflict)
@@ -1330,6 +1414,11 @@ export const ReservationModal: React.FC<ReservationModalProps> = ({
                       ? `Salvando ${skipConflictDates ? batchConflictAnalysis.availableDates.length : targetDates.length} Reservas no Banco...`
                       : 'Salvando com Trava no Banco...'}
                   </span>
+                </>
+              ) : isSingleBlockedForTeacher ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-rose-200" />
+                  <span>Data Bloqueada (Feriado/Recesso)</span>
                 </>
               ) : (
                 <>

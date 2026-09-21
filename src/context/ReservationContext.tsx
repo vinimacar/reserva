@@ -32,7 +32,7 @@ import {
   SCHOOL_CLASSES,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
-import { formatLocalDateToISO } from '../lib/dateUtils';
+import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 import {
   subscribeToSchools,
   subscribeToRooms,
@@ -147,6 +147,7 @@ interface ReservationContextType {
   updateCalendarYear: (year: number, applyOfficialTemplate?: boolean, schoolId?: string) => void;
   resetAcademicCalendarToDefault: (schoolId?: string, year?: number, periodType?: AcademicPeriodType) => void;
   getCalendarDayInfo: (dateISO: string, schoolId?: string) => CalendarDayAnalysis;
+  isDateBlockedByCalendar: (dateISO: string, schoolId?: string) => { isBlocked: boolean; reason?: string; badgeLabel?: string };
 
   // Turmas & Horários Management (Mantendo os existentes e específicos por escola)
   classes: string[];
@@ -1000,6 +1001,19 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       };
     }
 
+    // Strict Academic Calendar Check: Block bookings on holidays and recesses for teachers
+    const cal = targetSchool?.academicCalendar || academicCalendar;
+    if (cal?.blockBookingOnHolidays && !isAdmin) {
+      const dateInfo = analyzeDateWithCalendar(data.date, cal);
+      if (dateInfo.isHoliday || dateInfo.isRecess || !dateInfo.canBook) {
+        const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
+        return {
+          success: false,
+          error: `Agendamento Bloqueado: A escola "${targetSchool.name}" não permite que professores agendem em feriados ou recessos escolares (${holidayTitle} - ${formatDateBR(data.date)}). Apenas coordenadores ou gestores escolares podem autorizar reservas nestas datas.`,
+        };
+      }
+    }
+
     // 1. Memory check
     const conflict = checkConflict(data.roomId, data.date, data.periodIds);
     if (conflict.hasConflict) {
@@ -1108,6 +1122,20 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
           message: `O turno ${shiftName} não é ofertado pela escola ${currentSchool.name}. Agendamento bloqueado.`,
         });
         continue;
+      }
+
+      // Academic Calendar Holiday & Recess Policy Check for teachers
+      const batchCal = currentSchool?.academicCalendar || academicCalendar;
+      if (batchCal?.blockBookingOnHolidays && !isAdmin) {
+        const dateInfo = analyzeDateWithCalendar(data.date, batchCal);
+        if (dateInfo.isHoliday || dateInfo.isRecess || !dateInfo.canBook) {
+          const holidayTitle = dateInfo.specialDay?.title || (dateInfo.isHoliday ? 'Feriado' : 'Recesso Escolar');
+          conflicts.push({
+            date: data.date,
+            message: `Agendamento Bloqueado: ${holidayTitle} (${formatDateBR(data.date)}). Não é permitido agendar em feriados ou recessos escolares.`,
+          });
+          continue;
+        }
       }
 
       // Check conflict including already created in this batch
@@ -1706,6 +1734,26 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return analyzeDateWithCalendar(dateISO, cal);
   };
 
+  const isDateBlockedByCalendar = (
+    dateISO: string,
+    schoolId?: string
+  ): { isBlocked: boolean; reason?: string; badgeLabel?: string } => {
+    const targetSchool = schoolId ? schools.find((s) => s.id === schoolId) : currentSchool;
+    const cal = targetSchool?.academicCalendar || academicCalendar;
+    if (!cal?.blockBookingOnHolidays) {
+      return { isBlocked: false };
+    }
+    const analysis = analyzeDateWithCalendar(dateISO, cal);
+    if (analysis.isHoliday || analysis.isRecess || !analysis.canBook) {
+      return {
+        isBlocked: true,
+        reason: analysis.specialDay?.title || (analysis.isHoliday ? 'Feriado' : 'Recesso Escolar'),
+        badgeLabel: analysis.badgeLabel,
+      };
+    }
+    return { isBlocked: false };
+  };
+
   // Horários (Periods) Actions
   const addPeriod = (periodData: Omit<TimePeriod, 'id'>): TimePeriod => {
     const newPeriod: TimePeriod = {
@@ -1771,6 +1819,7 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         updateCalendarYear,
         resetAcademicCalendarToDefault,
         getCalendarDayInfo,
+        isDateBlockedByCalendar,
         selectedRoomId,
         selectedDate,
         selectedShift,

@@ -61,6 +61,7 @@ export const WeeklyScheduleGrid: React.FC<WeeklyScheduleGridProps> = ({
     currentSchool,
     settings,
     getCalendarDayInfo,
+    academicCalendar,
   } = useReservations();
   const { currentUser, isAdmin } = useAuth();
 
