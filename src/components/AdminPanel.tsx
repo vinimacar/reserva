@@ -37,6 +37,7 @@ import {
   Bug,
   Terminal,
   Share2,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -49,6 +50,7 @@ import { AdminCalendarTab } from './AdminCalendarTab';
 import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
 import { ShareReservationModal } from './ShareReservationModal';
+import { AdminDashboard } from './AdminDashboard';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 import { isOwnerEmail } from '../services/totp';
 
@@ -100,8 +102,8 @@ export const AdminPanel: React.FC<{
   const { theme, setTheme, isDark } = useTheme();
 
   const [activeTab, setActiveTab] = useState<
-    'BOOKINGS' | 'CLASSES_SCHEDULES' | 'CALENDAR' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
-  >('BOOKINGS');
+    'DASHBOARD' | 'BOOKINGS' | 'CLASSES_SCHEDULES' | 'CALENDAR' | 'ROOMS' | 'REPORTS' | 'USERS' | 'ANNOUNCEMENTS' | 'SETTINGS' | 'ERROR_LOGS'
+  >('DASHBOARD');
 
   // Print modal state
   const [isWeeklyPrintModalOpen, setIsWeeklyPrintModalOpen] = useState<boolean>(false);
@@ -596,6 +598,19 @@ export const AdminPanel: React.FC<{
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs gap-1 text-xs font-bold transition-colors">
         <button
+          id="admin-tab-dashboard-btn"
+          onClick={() => setActiveTab('DASHBOARD')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'DASHBOARD'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <LayoutDashboard className="w-4 h-4 text-cyan-400" />
+          <span>Dashboard Analytics</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('BOOKINGS')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'BOOKINGS'
@@ -714,6 +729,16 @@ export const AdminPanel: React.FC<{
           <span>Logs de Erros (Depuração)</span>
         </button>
       </div>
+
+      {/* TAB 0: DASHBOARD & RECHARTS ANALYTICS */}
+      {activeTab === 'DASHBOARD' && (
+        <AdminDashboard
+          onNavigateToBookings={(status) => {
+            setActiveTab('BOOKINGS');
+            if (status) setFilterStatus(status);
+          }}
+        />
+      )}
 
       {/* TAB 1: RESERVATIONS MANAGEMENT */}
       {activeTab === 'BOOKINGS' && (
@@ -1265,6 +1290,13 @@ export const AdminPanel: React.FC<{
               <p className="text-xs text-slate-500 dark:text-slate-400">Métricas pedagógicas e taxa de ocupação para gestão escolar.</p>
             </div>
             <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setActiveTab('DASHBOARD')}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-xs hover:from-blue-500 hover:to-indigo-500 shadow cursor-pointer"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Gráficos Dinâmicos (Recharts)</span>
+              </button>
               <button
                 onClick={handleExportCSV}
                 className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-800 dark:bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 cursor-pointer"
