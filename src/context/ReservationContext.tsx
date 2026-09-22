@@ -415,6 +415,10 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.setItem(STORAGE_KEY_ANN, JSON.stringify(allAnnouncements));
   }, [allAnnouncements]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(allNotifications));
+  }, [allNotifications]);
+
   // Real-time Cloud Firestore Listeners
   useEffect(() => {
     const unsubSchools = subscribeToSchools((cloudSchools) => {
@@ -443,11 +447,18 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     });
 
+    const unsubNotifications = subscribeToNotifications((cloudNotifications) => {
+      if (cloudNotifications) {
+        setAllNotifications(cloudNotifications);
+      }
+    });
+
     return () => {
       unsubSchools();
       unsubRooms();
       unsubReservations();
       unsubAnnouncements();
+      unsubNotifications();
     };
   }, []);
 
@@ -463,6 +474,23 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const announcements: Announcement[] = (allAnnouncements || []).filter(
     (a) => a && (a.schoolId === currentSchoolId || (!a.schoolId && currentSchoolId === defaultSchoolId))
   );
+
+  // Derived teacher notifications for current logged in user
+  const notifications: UserNotification[] = useMemo(() => {
+    if (!currentUser) return [];
+    return (allNotifications || [])
+      .filter(
+        (n) =>
+          n &&
+          (n.userId === currentUser.id ||
+            (n.userEmail && currentUser.email && n.userEmail.toLowerCase() === currentUser.email.toLowerCase()))
+      )
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [allNotifications, currentUser]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    return notifications.filter((n) => !n.read).length;
+  }, [notifications]);
 
   // Derived School Settings dynamically generated from the active School tenant
   const settings: SchoolSettings = {
@@ -1276,10 +1304,113 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return true;
   };
 
+  const sendTeacherReservationAlert = async (
+    reservation: Reservation,
+    action: 'APPROVED' | 'CANCELLED' | 'REJECTED',
+    note?: string,
+    adminName?: string
+  ): Promise<UserNotification> => {
+    const isApproval = action === 'APPROVED';
+    const isRejection = action === 'REJECTED';
+
+    const title = isApproval
+      ? 'Reserva Aprovada!'
+      : isRejection
+      ? 'Reserva Não Aprovada'
+      : 'Reserva Cancelada';
+
+    let message = '';
+    if (isApproval) {
+      message = `Sua reserva para o espaço "${reservation.roomName}" em ${formatDateBR(reservation.date)} (${reservation.periodLabels || 'horário agendado'}) foi aprovada com sucesso.`;
+      if (note && note !== 'Aprovado pela Coordenação') {
+        message += ` Mensagem da coordenação: "${note}"`;
+      }
+    } else if (isRejection) {
+      message = `Sua solicitação para o espaço "${reservation.roomName}" em ${formatDateBR(reservation.date)} não pôde ser aprovada.`;
+      if (note) {
+        message += ` Motivo: "${note}"`;
+      }
+    } else {
+      message = `Sua reserva para o espaço "${reservation.roomName}" em ${formatDateBR(reservation.date)} foi cancelada pela administração.`;
+      if (note) {
+        message += ` Motivo informado: "${note}"`;
+      }
+    }
+
+    const newNotification: UserNotification = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      userId: reservation.userId,
+      userEmail: reservation.userEmail || '',
+      schoolId: reservation.schoolId || currentSchoolId,
+      type: isApproval ? 'RESERVATION_APPROVED' : isRejection ? 'RESERVATION_REJECTED' : 'RESERVATION_CANCELLED',
+      title,
+      message,
+      reservationId: reservation.id,
+      roomName: reservation.roomName,
+      date: reservation.date,
+      periodLabels: reservation.periodLabels,
+      adminName: adminName || currentUser?.name || 'Coordenação Pedagógica',
+      adminNote: note,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    setAllNotifications((prev) => [newNotification, ...(prev || [])]);
+    saveNotificationToCloud(newNotification).catch((e) => console.warn('Cloud save notification notice:', e));
+    return newNotification;
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setAllNotifications((prev) =>
+      prev.map((n) => {
+        if (n.id === id) {
+          const updated = { ...n, read: true };
+          saveNotificationToCloud(updated).catch(() => {});
+          return updated;
+        }
+        return n;
+      })
+    );
+  };
+
+  const markAllNotificationsAsRead = () => {
+    if (!currentUser) return;
+    setAllNotifications((prev) =>
+      prev.map((n) => {
+        if (n.userId === currentUser.id || n.userEmail?.toLowerCase() === currentUser.email?.toLowerCase()) {
+          const updated = { ...n, read: true };
+          saveNotificationToCloud(updated).catch(() => {});
+          return updated;
+        }
+        return n;
+      })
+    );
+  };
+
+  const deleteNotification = (id: string) => {
+    setAllNotifications((prev) => prev.filter((n) => n.id !== id));
+    deleteNotificationFromCloud(id).catch(() => {});
+  };
+
+  const clearAllNotifications = () => {
+    if (!currentUser) return;
+    const userNotifs = allNotifications.filter(
+      (n) => n.userId === currentUser.id || n.userEmail?.toLowerCase() === currentUser.email?.toLowerCase()
+    );
+    userNotifs.forEach((n) => deleteNotificationFromCloud(n.id).catch(() => {}));
+    setAllNotifications((prev) =>
+      prev.filter((n) => n.userId !== currentUser.id && n.userEmail?.toLowerCase() !== currentUser.email?.toLowerCase())
+    );
+  };
+
   const cancelReservation = (id: string, reason?: string) => {
     const existing = allReservations.find((r) => r.id === id);
     if (existing) {
       releaseReservationLocksFromCloud(existing).catch(() => {});
+      // In-app alert to the teacher
+      if (existing.userId) {
+        sendTeacherReservationAlert(existing, 'CANCELLED', reason, currentUser?.name);
+      }
     }
     setAllReservations((prev) =>
       prev.map((r) => {
@@ -1307,6 +1438,10 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const approveReservation = (id: string, note?: string) => {
+    const existing = allReservations.find((r) => r.id === id);
+    if (existing && existing.userId) {
+      sendTeacherReservationAlert(existing, 'APPROVED', note, currentUser?.name);
+    }
     setAllReservations((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -1324,6 +1459,10 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const rejectReservation = (id: string, note?: string) => {
+    const existing = allReservations.find((r) => r.id === id);
+    if (existing && existing.userId) {
+      sendTeacherReservationAlert(existing, 'REJECTED', note, currentUser?.name);
+    }
     setAllReservations((prev) =>
       prev.map((r) => {
         if (r.id === id) {
@@ -1852,6 +1991,14 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         resetPeriods,
         announcements,
         allAnnouncements: announcements,
+        notifications,
+        allNotifications,
+        unreadNotificationsCount,
+        sendTeacherReservationAlert,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        deleteNotification,
+        clearAllNotifications,
         settings,
         academicCalendar,
         updateAcademicCalendar,

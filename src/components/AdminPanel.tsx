@@ -36,6 +36,7 @@ import {
   GraduationCap,
   Bug,
   Terminal,
+  Share2,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +48,7 @@ import { AdminClassesAndSchedulesTab } from './AdminClassesAndSchedulesTab';
 import { AdminCalendarTab } from './AdminCalendarTab';
 import { AdminErrorLogsTab } from './AdminErrorLogsTab';
 import { WeeklySchedulePrintModal } from './WeeklySchedulePrintModal';
+import { ShareReservationModal } from './ShareReservationModal';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 import { isOwnerEmail } from '../services/totp';
 
@@ -129,6 +131,7 @@ export const AdminPanel: React.FC<{
     onConfirm: () => void;
   } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [shareReservation, setShareReservation] = useState<Reservation | null>(null);
 
   // Firebase Auth sync state
   const [isSyncingAuth, setIsSyncingAuth] = useState(false);
@@ -880,6 +883,13 @@ export const AdminPanel: React.FC<{
                             title="Comprovante"
                           >
                             <Printer className="w-3 h-3 inline" />
+                          </button>
+                          <button
+                            onClick={() => setShareReservation(res)}
+                            className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-lg font-bold text-[11px] cursor-pointer"
+                            title="Compartilhar via WhatsApp ou E-mail Institucional"
+                          >
+                            <Share2 className="w-3 h-3 inline" />
                           </button>
                         </td>
                       </tr>
@@ -2425,6 +2435,15 @@ export const AdminPanel: React.FC<{
         isOpen={isWeeklyPrintModalOpen}
         onClose={() => setIsWeeklyPrintModalOpen(false)}
       />
+
+      {/* Share Reservation Modal */}
+      {shareReservation && (
+        <ShareReservationModal
+          isOpen={!!shareReservation}
+          reservation={shareReservation}
+          onClose={() => setShareReservation(null)}
+        />
+      )}
     </div>
   );
 };

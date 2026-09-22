@@ -18,6 +18,7 @@ import {
   Tag,
   CalendarPlus,
   Download,
+  Share2,
 } from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
@@ -25,6 +26,7 @@ import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { formatDateBR } from '../lib/dateUtils';
 import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
+import { ShareReservationModal } from './ShareReservationModal';
 
 interface ReservationDetailsModalProps {
   reservation: Reservation | null;
@@ -54,6 +56,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
   const [showDeletePrompt, setShowDeletePrompt] = useState<boolean>(false);
   const [showRejectPrompt, setShowRejectPrompt] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('Horário indisponível');
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
 
   if (!isOpen || !reservation) return null;
 
@@ -397,7 +400,7 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
 
         {/* Footer Actions */}
         <div className="bg-slate-50 dark:bg-slate-850 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 shrink-0 transition-colors">
-          <div className="flex items-center justify-between sm:justify-start space-x-2">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2">
             <button
               onClick={() => {
                 onOpenReceipt(reservation);
@@ -406,7 +409,17 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
               className="flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs shadow-xs transition-colors cursor-pointer"
             >
               <Printer className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span>Imprimir Comprovante</span>
+              <span>Imprimir Ficha</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsShareModalOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/80 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold text-xs shadow-xs transition-colors cursor-pointer"
+              title="Compartilhar via WhatsApp ou E-mail Institucional"
+            >
+              <Share2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Compartilhar</span>
             </button>
 
             {isAdmin && (
@@ -456,6 +469,15 @@ export const ReservationDetailsModal: React.FC<ReservationDetailsModalProps> = (
           </div>
         </div>
       </div>
+
+      {/* Share Reservation Modal */}
+      {isShareModalOpen && (
+        <ShareReservationModal
+          isOpen={isShareModalOpen}
+          reservation={reservation}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

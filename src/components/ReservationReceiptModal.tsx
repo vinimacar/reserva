@@ -1,26 +1,53 @@
-import React from 'react';
-import { X, Printer, School, CheckCircle, Calendar, Clock, MapPin, User, Users, BookOpen, Shield, CalendarPlus, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  X,
+  Printer,
+  School,
+  CheckCircle,
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  Users,
+  BookOpen,
+  Shield,
+  CalendarPlus,
+  Download,
+  Share2,
+} from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
 import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
+import { ShareReservationModal } from './ShareReservationModal';
 
 interface ReservationReceiptModalProps {
   reservation: Reservation | null;
   isOpen: boolean;
   onClose: () => void;
+  onOpenShare?: (reservation: Reservation) => void;
 }
 
 export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = ({
   reservation,
   isOpen,
   onClose,
+  onOpenShare,
 }) => {
   const { settings, rooms, currentSchool } = useReservations();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   if (!isOpen || !reservation) return null;
 
   const schoolName = currentSchool?.name || settings?.schoolName || 'Escola da Rede';
   const room = rooms.find((r) => r.id === reservation.roomId);
+
+  const handleOpenShareModal = () => {
+    if (onOpenShare) {
+      onOpenShare(reservation);
+    } else {
+      setIsShareModalOpen(true);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -60,6 +87,16 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
             <h3 className="text-xs sm:text-sm font-bold text-white truncate">Comprovante de Agendamento</h3>
           </div>
           <div className="flex items-center space-x-2">
+            <button
+              id="receipt-share-header-btn"
+              type="button"
+              onClick={handleOpenShareModal}
+              className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              title="Compartilhar via WhatsApp ou E-mail Institucional"
+            >
+              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Compartilhar</span>
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors cursor-pointer"
@@ -241,7 +278,16 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
             </button>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleOpenShareModal}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 text-xs font-bold transition-colors cursor-pointer"
+              title="Compartilhar via WhatsApp ou E-mail Institucional"
+            >
+              <Share2 className="w-4 h-4 text-emerald-600" />
+              <span>Compartilhar</span>
+            </button>
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold cursor-pointer"
@@ -258,6 +304,15 @@ export const ReservationReceiptModal: React.FC<ReservationReceiptModalProps> = (
           </div>
         </div>
       </div>
+
+      {/* Quick Share Modal */}
+      {isShareModalOpen && (
+        <ShareReservationModal
+          reservation={reservation}
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

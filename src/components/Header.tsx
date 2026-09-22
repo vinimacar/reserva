@@ -25,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { isOwnerEmail } from '../services/totp';
 import { ReserveLabsLogo } from './ReserveLabsLogo';
+import { TeacherNotificationCenter } from './TeacherNotificationCenter';
 
 interface HeaderProps {
   currentView: 'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS';
@@ -275,6 +276,13 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Action & User Profile */}
           <div className="flex items-center space-x-2.5">
+            {/* Teacher Notifications Bell / Dropdown */}
+            {currentUser && (
+              <TeacherNotificationCenter
+                onNavigateToMyReservations={() => onViewChange('MY_RESERVATIONS')}
+              />
+            )}
+
             {/* Dark/Light Mode Toggle Button */}
             <button
               id="theme-toggle-btn"

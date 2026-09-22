@@ -16,6 +16,11 @@ import {
   AlertCircle,
   CalendarPlus,
   Download,
+  Bell,
+  CheckCircle2,
+  XCircle,
+  Check,
+  Share2,
 } from 'lucide-react';
 import { Reservation } from '../types';
 import { useReservations } from '../context/ReservationContext';
@@ -23,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { TeacherAvatar } from './TeacherAvatar';
 import { formatLocalDateToISO, formatDateBR } from '../lib/dateUtils';
 import { getGoogleCalendarUrl, downloadIcsFile } from '../lib/calendarExport';
+import { ShareReservationModal } from './ShareReservationModal';
 
 interface MyReservationsViewProps {
   onOpenNewReservation: () => void;
@@ -35,10 +41,19 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
   onSelectReservation,
   onOpenReceipt,
 }) => {
-  const { reservations, rooms, currentSchool, settings } = useReservations();
+  const {
+    reservations,
+    rooms,
+    currentSchool,
+    settings,
+    notifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+  } = useReservations();
   const { currentUser } = useAuth();
   const [filterTab, setFilterTab] = useState<'UPCOMING' | 'PAST' | 'ALL' | 'CANCELLED'>('UPCOMING');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [shareReservation, setShareReservation] = useState<Reservation | null>(null);
 
   if (!currentUser) {
     return (
@@ -150,6 +165,75 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Unread Alerts from Administration */}
+      {notifications && notifications.some((n) => !n.read) && (
+        <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/30 rounded-2xl p-4 shadow-sm backdrop-blur-xs">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                <Bell className="w-4 h-4" />
+              </span>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider">
+                Novos Alertas da Coordenação
+              </h4>
+            </div>
+            <button
+              type="button"
+              onClick={markAllNotificationsAsRead}
+              className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Check className="w-3 h-3" />
+              Dispensar todos
+            </button>
+          </div>
+          <div className="space-y-2">
+            {notifications
+              .filter((n) => !n.read)
+              .map((notif) => {
+                const isApproved = notif.type === 'RESERVATION_APPROVED';
+                return (
+                  <div
+                    key={notif.id}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-2xs gap-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`p-1 rounded-lg shrink-0 ${
+                          isApproved
+                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {isApproved ? (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          {notif.title}:{' '}
+                        </span>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {notif.roomName} em {formatDateBR(notif.date)}
+                          {notif.adminNote ? ` • ${notif.adminNote}` : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => markNotificationAsRead(notif.id)}
+                      className="shrink-0 text-[11px] font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      Lido
+                    </button>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs & Search */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 sm:p-4 shadow-xs border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-colors">
@@ -316,6 +400,16 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
                       <span>Ficha</span>
                     </button>
 
+                    <button
+                      type="button"
+                      onClick={() => setShareReservation(res)}
+                      className="flex items-center space-x-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 cursor-pointer"
+                      title="Compartilhar via WhatsApp ou E-mail Institucional"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>Compartilhar</span>
+                    </button>
+
                     {!isCancelled && (
                       <>
                         <button
@@ -368,6 +462,15 @@ export const MyReservationsView: React.FC<MyReservationsViewProps> = ({
             );
           })}
         </div>
+      )}
+
+      {/* Share Reservation Modal */}
+      {shareReservation && (
+        <ShareReservationModal
+          isOpen={!!shareReservation}
+          reservation={shareReservation}
+          onClose={() => setShareReservation(null)}
+        />
       )}
     </div>
   );
