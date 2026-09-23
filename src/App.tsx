@@ -24,6 +24,7 @@ import { DeveloperPortal } from './components/DeveloperPortal';
 import { LoginScreen } from './components/LoginScreen';
 import { PendingApprovalScreen } from './components/PendingApprovalScreen';
 import { TutorialModal } from './components/TutorialModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { Reservation } from './types';
 import { School, Terminal } from 'lucide-react';
 import { isOwnerEmail, isSession2FAVerified } from './services/totp';
@@ -324,6 +325,9 @@ function ReserveAppContent() {
           onClose={() => setIsTutorialModalOpen(false)}
         />
       )}
+
+      {/* Global Offline Mode Status Banner */}
+      <OfflineIndicator />
     </div>
   );
 }

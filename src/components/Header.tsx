@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Terminal,
   FileText,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReservations } from '../context/ReservationContext';
@@ -26,6 +27,8 @@ import { TeacherAvatar } from './TeacherAvatar';
 import { isOwnerEmail } from '../services/totp';
 import { ReserveLabsLogo } from './ReserveLabsLogo';
 import { TeacherNotificationCenter } from './TeacherNotificationCenter';
+import { PWAInstallButton } from './PWAInstallButton';
+import { InstallAppModal } from './InstallAppModal';
 
 interface HeaderProps {
   currentView: 'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS';
@@ -58,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
   const { theme, isDark, toggleTheme, setTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   const importantAnnouncementsCount = (announcements || []).filter((a) => a && a.important).length;
   const activeSchoolLogo = currentSchool?.logoUrl || settings?.logoUrl;
@@ -330,6 +334,9 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            {/* PWA Download / Install Button */}
+            <PWAInstallButton variant="header" />
+
             {/* Quick New Reservation Button */}
             <button
               id="header-new-reservation-btn"
@@ -550,6 +557,19 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
 
+                      {/* Download / Install App option in Profile */}
+                      <button
+                        id="profile-install-app-btn"
+                        onClick={() => {
+                          setIsInstallModalOpen(true);
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-950/40 text-left transition-colors cursor-pointer"
+                      >
+                        <Download className="w-4 h-4 text-emerald-400" />
+                        <span>Baixar / Instalar Aplicativo (PWA)</span>
+                      </button>
+
                       {isOwner && onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
@@ -706,6 +726,12 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </nav>
+
+      {/* PWA Download / Install App Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </header>
   );
 };

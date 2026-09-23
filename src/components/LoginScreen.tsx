@@ -23,6 +23,7 @@ import {
   Info,
   CalendarDays,
   Sparkles,
+  Smartphone,
   Layers,
   CheckCircle2,
   UserCheck,
@@ -34,6 +35,7 @@ import { DeveloperAuthModal } from './DeveloperAuthModal';
 import { User, School } from '../types';
 import { ReserveLabsLogo } from './ReserveLabsLogo';
 import { signInWithGooglePopup } from '../services/firebaseAuthService';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface LoginScreenProps {
   onOpenDeveloperPortal?: () => void;
@@ -70,38 +72,62 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     return schools.find((s) => s.id === selectedSchoolId) || schools[0];
   }, [schools, selectedSchoolId]);
 
-  // Filtered schools for search
+  // Filtered schools for search with deduplication
   const filteredSchools = useMemo(() => {
     const q = schoolSearchQuery.toLowerCase().trim();
-    if (!q) return schools;
-    return schools.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.shortName.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q) ||
-        (s.code && s.code.toLowerCase().includes(q)) ||
-        (s.inepCode && s.inepCode.toLowerCase().includes(q))
-    );
+    const list = !q
+      ? schools
+      : schools.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.shortName.toLowerCase().includes(q) ||
+            s.city.toLowerCase().includes(q) ||
+            (s.code && s.code.toLowerCase().includes(q)) ||
+            (s.inepCode && s.inepCode.toLowerCase().includes(q))
+        );
+
+    // Strictly deduplicate schools by ID/code to ensure unique rendering
+    const seen = new Set<string>();
+    return list.filter((s, idx) => {
+      const uniqueId = s.id || s.inepCode || s.code || `school-${idx}`;
+      if (seen.has(uniqueId)) return false;
+      seen.add(uniqueId);
+      return true;
+    });
   }, [schools, schoolSearchQuery]);
 
-  // Teachers filtered by selected school and search
+  // Teachers filtered by selected school and search with deduplication
   const teachersForSelectedSchool = useMemo(() => {
-    const list = users.filter(
+    const list = (users || []).filter(
       (u) =>
         u.schoolId === selectedSchoolId ||
         (!u.schoolId && selectedSchoolId === schools[0]?.id)
     );
-    const baseList = list.length > 0 ? list : users.slice(0, 8);
+    const baseList = list.length > 0 ? list : (users || []).slice(0, 8);
 
     const tq = teacherSearchQuery.toLowerCase().trim();
-    if (!tq) return baseList;
+    const filtered = !tq
+      ? baseList
+      : baseList.filter(
+          (u) =>
+            (u.name && u.name.toLowerCase().includes(tq)) ||
+            (u.email && u.email.toLowerCase().includes(tq)) ||
+            (u.subject && u.subject.toLowerCase().includes(tq))
+        );
 
-    return baseList.filter(
-      (u) =>
-        (u.name && u.name.toLowerCase().includes(tq)) ||
-        (u.email && u.email.toLowerCase().includes(tq)) ||
-        (u.subject && u.subject.toLowerCase().includes(tq))
-    );
+    // Strictly deduplicate teachers by ID and Email to ensure no duplicate keys
+    const seen = new Set<string>();
+    return filtered.filter((u, idx) => {
+      const emailKey = (u.email || '').toLowerCase().trim();
+      const idKey = u.id ? `id:${u.id}` : '';
+      const dedupeKey = idKey || (emailKey ? `email:${emailKey}` : `idx:${idx}`);
+      if (seen.has(dedupeKey) || (emailKey && seen.has(`email:${emailKey}`))) {
+        return false;
+      }
+      seen.add(dedupeKey);
+      if (emailKey) seen.add(`email:${emailKey}`);
+      return true;
+    });
   }, [users, selectedSchoolId, schools, teacherSearchQuery]);
 
   // Count active rooms in selected school
@@ -255,6 +281,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         </div>
 
         <div className="flex items-center space-x-2.5">
+          <PWAInstallButton variant="login" />
+
           <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-400 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-700/50">
             <Building2 className="w-3.5 h-3.5 text-blue-400" />
             <span className="font-semibold">{schools.length} Escolas Conectadas</span>
@@ -380,6 +408,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     <span>Dados protegidos por escola com autenticação institucional.</span>
                   </div>
                 </div>
+
+                <div className="flex items-start space-x-2.5">
+                  <div className="w-5 h-5 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center shrink-0 mt-0.5">
+                    <Smartphone className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <strong className="text-slate-200 font-semibold">Baixe como Aplicativo:</strong>{' '}
+                    <span>Instale no celular ou PC com abertura direta sem navegador.</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -494,11 +532,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       </div>
 
                       <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
-                        {filteredSchools.map((s) => {
+                        {filteredSchools.map((s, idx) => {
                           const isCur = s.id === selectedSchoolId;
+                          const schoolKey = s.id ? `school-${s.id}` : `school-idx-${idx}-${s.name || 'item'}`;
                           return (
                             <button
-                              key={s.id}
+                              key={schoolKey}
                               type="button"
                               onClick={() => handleSelectSchool(s)}
                               className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between transition-colors cursor-pointer ${
@@ -686,13 +725,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                   {/* Staff List */}
                   <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                    {teachersForSelectedSchool.map((user) => {
+                    {teachersForSelectedSchool.map((user, idx) => {
                       const isSelected = email.toLowerCase() === user.email.toLowerCase();
                       const isAdmin = user.role === 'ADMIN';
+                      const userKey = user.id
+                        ? `teacher-${user.id}`
+                        : `teacher-${user.email || idx}`;
 
                       return (
                         <button
-                          key={user.id}
+                          key={userKey}
                           type="button"
                           onClick={() => handleSelectQuickUser(user)}
                           className={`w-full flex items-center space-x-2.5 p-2 rounded-2xl border text-left transition-all cursor-pointer ${

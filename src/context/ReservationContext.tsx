@@ -423,7 +423,14 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   useEffect(() => {
     const unsubSchools = subscribeToSchools((cloudSchools) => {
       if (cloudSchools && cloudSchools.length > 0) {
-        setSchools(cloudSchools);
+        const seen = new Set<string>();
+        const deduped = cloudSchools.filter((s) => {
+          const key = s.id ? s.id.trim() : (s.code || s.inepCode || s.name || '').trim();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        setSchools(deduped);
       }
     });
 

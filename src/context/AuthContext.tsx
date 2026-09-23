@@ -105,6 +105,27 @@ function normalizeUser(u: User): User {
   };
 }
 
+// Helper to strictly deduplicate users by ID and email
+function deduplicateUsers(userList: User[]): User[] {
+  const seenIds = new Set<string>();
+  const seenEmails = new Set<string>();
+  const result: User[] = [];
+
+  for (const u of userList) {
+    const id = u.id ? String(u.id).trim() : '';
+    const email = u.email ? u.email.trim().toLowerCase() : '';
+
+    if (id && seenIds.has(id)) continue;
+    if (email && seenEmails.has(email)) continue;
+
+    if (id) seenIds.add(id);
+    if (email) seenEmails.add(email);
+    result.push(u);
+  }
+
+  return result;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
     try {
@@ -128,13 +149,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const ownerSeed = DEFAULT_USERS.find((u) => isOwnerEmail(u.email)) || DEFAULT_USERS[0];
             listWithNormalized.unshift(normalizeUser(ownerSeed));
           }
-          return listWithNormalized;
+          return deduplicateUsers(listWithNormalized);
         }
       }
     } catch {
       // ignore
     }
-    return DEFAULT_USERS.map(normalizeUser);
+    return deduplicateUsers(DEFAULT_USERS.map(normalizeUser));
   });
 
   const [isDeveloperMode, setIsDeveloperMode] = useState<boolean>(() => {
@@ -220,19 +241,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           normalizedList.unshift(normalizeUser(ownerSeed));
         }
 
-        setUsers(normalizedList);
+        const dedupedList = deduplicateUsers(normalizedList);
+        setUsers(dedupedList);
         // Ensure currentUser is kept in sync with the cloud state
         setCurrentUser((curr) => {
           if (!curr) return null;
           if (isOwnerEmail(curr.email)) {
-            const freshOwner = normalizedList.find((u) => isOwnerEmail(u.email));
+            const freshOwner = dedupedList.find((u) => isOwnerEmail(u.email));
             return freshOwner || {
               ...curr,
               role: 'ADMIN' as UserRole,
               approvalStatus: 'APPROVED' as UserApprovalStatus,
             };
           }
-          const fresh = normalizedList.find((u) => u.id === curr.id || u.email.toLowerCase() === curr.email.toLowerCase());
+          const fresh = dedupedList.find((u) => u.id === curr.id || u.email.toLowerCase() === curr.email.toLowerCase());
           return fresh || curr;
         });
       }
