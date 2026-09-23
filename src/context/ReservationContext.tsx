@@ -54,6 +54,13 @@ import {
   deleteNotificationFromCloud,
   clearCloudDatabase,
 } from '../services/firestoreSync';
+import {
+  sendReservationApprovalPush,
+  sendReservationRejectionPush,
+  sendCoordinationAnnouncementPush,
+  dispatchNativePushNotification,
+  setupForegroundFCMListener,
+} from '../services/fcmPushService';
 
 interface ConflictResult {
   hasConflict: boolean;
@@ -454,10 +461,59 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     });
 
+    // Cache known notifications to only alert for fresh arrivals in real-time
+    const knownNotificationIds = new Set<string>();
+    try {
+      const savedInitial = localStorage.getItem(STORAGE_KEY_NOTIFS);
+      if (savedInitial) {
+        const parsed: UserNotification[] = JSON.parse(savedInitial);
+        parsed.forEach((n) => knownNotificationIds.add(n.id));
+      }
+    } catch {
+      // ignore
+    }
+
     const unsubNotifications = subscribeToNotifications((cloudNotifications) => {
       if (cloudNotifications) {
         setAllNotifications(cloudNotifications);
+
+        // Check if any fresh notification arrived for current user
+        if (currentUser) {
+          const fresh = cloudNotifications.filter((n) => {
+            if (knownNotificationIds.has(n.id)) return false;
+            knownNotificationIds.add(n.id);
+            const isForUser =
+              n.userId === currentUser.id ||
+              n.userEmail?.toLowerCase() === currentUser.email?.toLowerCase();
+            return isForUser && !n.read;
+          });
+
+          fresh.forEach((notif) => {
+            dispatchNativePushNotification({
+              title: notif.title,
+              body: notif.message,
+              tag: notif.id,
+              data: { reservationId: notif.reservationId, type: notif.type },
+            }).catch(() => {});
+          });
+        } else {
+          cloudNotifications.forEach((n) => knownNotificationIds.add(n.id));
+        }
       }
+    });
+
+    // FCM Foreground Message Listener
+    let unsubFCM: (() => void) | null = null;
+    setupForegroundFCMListener((payload) => {
+      const title = payload?.notification?.title || payload?.data?.title || 'ReserveLabs Alerta';
+      const body = payload?.notification?.body || payload?.data?.message || 'Atualização na sua reserva.';
+      dispatchNativePushNotification({
+        title,
+        body,
+        data: payload?.data || {},
+      }).catch(() => {});
+    }).then((unsub) => {
+      unsubFCM = unsub;
     });
 
     return () => {
@@ -466,8 +522,9 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
       unsubReservations();
       unsubAnnouncements();
       unsubNotifications();
+      unsubFCM?.();
     };
-  }, []);
+  }, [currentUser]);
 
   // Derived tenant-scoped slices
   const rooms: Room[] = (allRooms || []).filter(
@@ -1364,6 +1421,27 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     setAllNotifications((prev) => [newNotification, ...(prev || [])]);
     saveNotificationToCloud(newNotification).catch((e) => console.warn('Cloud save notification notice:', e));
+
+    // Instant FCM / Native Web Push trigger
+    if (isApproval) {
+      sendReservationApprovalPush(
+        reservation.userEmail || '',
+        reservation.userName || 'Professor(a)',
+        reservation.roomName,
+        formatDateBR(reservation.date),
+        reservation.periodLabels || '',
+        adminName || currentUser?.name || 'Coordenação Pedagógica'
+      ).catch((e) => console.warn('Push approval notice:', e));
+    } else {
+      sendReservationRejectionPush(
+        reservation.userName || 'Professor(a)',
+        reservation.roomName,
+        formatDateBR(reservation.date),
+        note,
+        adminName || currentUser?.name || 'Coordenação Pedagógica'
+      ).catch((e) => console.warn('Push rejection notice:', e));
+    }
+
     return newNotification;
   };
 
@@ -1541,6 +1619,13 @@ export const ReservationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
     setAllAnnouncements((prev) => [newAnn, ...prev]);
     saveAnnouncementToCloud(newAnn).catch((e) => console.warn('Cloud save announcement error:', e));
+
+    // Instant Push Alert to Teachers for Coordination Announcements
+    sendCoordinationAnnouncementPush(
+      newAnn.title,
+      newAnn.author || currentUser?.name || 'Coordenação',
+      newAnn.content
+    ).catch((e) => console.warn('Push announcement notice:', e));
   };
 
   const deleteAnnouncement = (id: string) => {

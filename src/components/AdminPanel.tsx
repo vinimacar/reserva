@@ -881,16 +881,22 @@ export const AdminPanel: React.FC<{
                           {res.status === 'PENDING' && (
                             <>
                               <button
-                                onClick={() => approveReservation(res.id)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] shadow-xs cursor-pointer"
-                                title="Aprovar Reserva"
+                                onClick={() => {
+                                  approveReservation(res.id);
+                                  showToast('Reserva aprovada! Notificação Push enviada ao professor.');
+                                }}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-[11px] shadow-xs cursor-pointer inline-flex items-center gap-1"
+                                title="Aprovar Reserva e Notificar Professor via Push FCM"
                               >
                                 Aprovar
                               </button>
                               <button
-                                onClick={() => rejectReservation(res.id)}
-                                className="px-2.5 py-1 bg-red-100 dark:bg-red-950 hover:bg-red-200 dark:hover:bg-red-900 text-red-800 dark:text-red-200 rounded-lg font-bold text-[11px] cursor-pointer"
-                                title="Recusar Reserva"
+                                onClick={() => {
+                                  rejectReservation(res.id);
+                                  showToast('Reserva não aprovada. Alerta Push enviado ao professor.');
+                                }}
+                                className="px-2.5 py-1 bg-red-100 dark:bg-red-950 hover:bg-red-200 dark:hover:bg-red-900 text-red-800 dark:text-red-200 rounded-lg font-bold text-[11px] cursor-pointer inline-flex items-center gap-1"
+                                title="Recusar Reserva e Notificar Professor"
                               >
                                 Recusar
                               </button>
@@ -1915,6 +1921,13 @@ export const AdminPanel: React.FC<{
                 />
                 <span>Marcar como Importante (Destaque em Amarelo)</span>
               </label>
+
+              <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/40 text-[11px] text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                <span>
+                  <strong>Push Automático (FCM Gratuito):</strong> Ao publicar, os professores receberão um alerta pop-up sonoro instantâneo no celular e navegador.
+                </span>
+              </div>
 
               <button
                 type="submit"

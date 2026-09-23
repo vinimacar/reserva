@@ -93,6 +93,9 @@ export interface User {
   approvedBy?: string;
   firstLoginAt?: string;
   authProvider?: 'GOOGLE' | 'PASSWORD' | 'SYSTEM';
+  fcmToken?: string;
+  fcmTokens?: string[];
+  pushNotificationsEnabled?: boolean;
 }
 
 export type SpaceType = 'INFORMATICA' | 'CIENCIAS' | 'QUIMICA_FISICA' | 'MAKER' | 'MULTIMIDIA';

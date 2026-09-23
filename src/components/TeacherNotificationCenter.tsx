@@ -10,11 +10,15 @@ import {
   Trash2,
   X,
   Layers,
+  Smartphone,
+  Sparkles,
+  Settings2,
 } from 'lucide-react';
 import { useReservations } from '../context/ReservationContext';
 import { useAuth } from '../context/AuthContext';
 import { UserNotification } from '../types';
 import { formatDateBR } from '../lib/dateUtils';
+import { PushNotificationModal } from './PushNotificationModal';
 
 interface TeacherNotificationCenterProps {
   onNavigateToMyReservations?: () => void;
@@ -33,8 +37,14 @@ export const TeacherNotificationCenter: React.FC<TeacherNotificationCenterProps>
   } = useReservations();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [toastDismissedIds, setToastDismissedIds] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isPushGranted =
+    typeof window !== 'undefined' &&
+    'Notification' in window &&
+    Notification.permission === 'granted';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -186,16 +196,46 @@ export const TeacherNotificationCenter: React.FC<TeacherNotificationCenterProps>
                 </span>
               )}
             </div>
-            {notifications.length > 0 && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={markAllNotificationsAsRead}
-                className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 cursor-pointer"
+                onClick={() => setIsPushModalOpen(true)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Configurações de Notificações Push (FCM)"
               >
-                <Check className="w-3 h-3" />
-                Marcar todas
+                <Settings2 className="w-3.5 h-3.5" />
               </button>
-            )}
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllNotificationsAsRead}
+                  className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Check className="w-3 h-3" />
+                  Marcar todas
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* FCM Push Notification Quick Banner */}
+          <div className="px-3 py-2 bg-gradient-to-r from-blue-950/60 to-indigo-950/60 border-b border-slate-800/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <Smartphone className={`w-3.5 h-3.5 ${isPushGranted ? 'text-emerald-400' : 'text-blue-400'}`} />
+              <span className="text-[11px] text-slate-300">
+                {isPushGranted ? 'Push no Celular Ativo' : 'Alertas Push no Celular'}
+              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Grátis
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPushModalOpen(true)}
+              className="text-[11px] font-bold text-blue-400 hover:text-blue-300 hover:underline cursor-pointer"
+            >
+              {isPushGranted ? 'Gerenciar' : 'Ativar Agora'}
+            </button>
           </div>
 
           {/* List of Notifications */}
@@ -319,8 +359,8 @@ export const TeacherNotificationCenter: React.FC<TeacherNotificationCenterProps>
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && onNavigateToMyReservations && (
-            <div className="p-2.5 bg-slate-850 border-t border-slate-800 text-center">
+          <div className="p-2.5 bg-slate-850 border-t border-slate-800 space-y-1.5 text-center">
+            {notifications.length > 0 && onNavigateToMyReservations && (
               <button
                 type="button"
                 onClick={() => {
@@ -332,10 +372,28 @@ export const TeacherNotificationCenter: React.FC<TeacherNotificationCenterProps>
                 <Layers className="w-3.5 h-3.5 text-blue-400" />
                 Ver todas as Minhas Reservas
               </button>
-            </div>
-          )}
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setIsPushModalOpen(true);
+              }}
+              className="w-full py-1 px-3 rounded-xl hover:bg-slate-800/60 text-[11px] font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Smartphone className="w-3 h-3 text-indigo-400" />
+              <span>Configurar Notificações Push (FCM Gratuito)</span>
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Push Notification Modal */}
+      <PushNotificationModal
+        isOpen={isPushModalOpen}
+        onClose={() => setIsPushModalOpen(false)}
+      />
     </div>
   );
 };

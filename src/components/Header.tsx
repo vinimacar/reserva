@@ -29,6 +29,7 @@ import { ReserveLabsLogo } from './ReserveLabsLogo';
 import { TeacherNotificationCenter } from './TeacherNotificationCenter';
 import { PWAInstallButton } from './PWAInstallButton';
 import { InstallAppModal } from './InstallAppModal';
+import { PushNotificationModal } from './PushNotificationModal';
 
 interface HeaderProps {
   currentView: 'SCHEDULE' | 'MY_RESERVATIONS' | 'ADMIN' | 'ANNOUNCEMENTS';
@@ -62,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
 
   const importantAnnouncementsCount = (announcements || []).filter((a) => a && a.important).length;
   const activeSchoolLogo = currentSchool?.logoUrl || settings?.logoUrl;
@@ -570,6 +572,19 @@ export const Header: React.FC<HeaderProps> = ({
                         <span>Baixar / Instalar Aplicativo (PWA)</span>
                       </button>
 
+                      {/* Push Notifications (FCM) option in Profile */}
+                      <button
+                        id="profile-push-notifications-btn"
+                        onClick={() => {
+                          setIsPushModalOpen(true);
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-950/40 text-left transition-colors cursor-pointer"
+                      >
+                        <Bell className="w-4 h-4 text-blue-400" />
+                        <span>Notificações Push no Celular (FCM Gratuito)</span>
+                      </button>
+
                       {isOwner && onOpenDeveloperPortal && (
                         <button
                           id="profile-developer-portal-btn"
@@ -731,6 +746,12 @@ export const Header: React.FC<HeaderProps> = ({
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
+      />
+
+      {/* Push Notification (FCM) Settings Modal */}
+      <PushNotificationModal
+        isOpen={isPushModalOpen}
+        onClose={() => setIsPushModalOpen(false)}
       />
     </header>
   );
